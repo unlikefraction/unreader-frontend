@@ -687,7 +687,7 @@ class AudioSetup {
 }
 
 // Usage
-const audioSetup = new AudioSetup('./public/audio/suckAtReading.wav', './public/order/word_timings_ordered.json', './public/transcript/landing.html', -100);
+const audioSetup = new AudioSetup('/audio/suckAtReading.wav', '/order/word_timings_ordered.json', '/transcript/landing.html', -100);
 window.audioSetup = audioSetup;
 audioSetup.init();
 
