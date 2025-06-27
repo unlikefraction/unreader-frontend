@@ -1,96 +1,323 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
-body {
+*{
   margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+::-moz-selection {
+  color: rgb(255, 255, 255);
+  background: rgb(0, 0, 0);
+}
+
+::selection {
+  color: rgb(255, 255, 255);
+  background: rgb(0, 0, 0);
+}
+
+/* width */
+::-webkit-scrollbar {
+  width: 12px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #fff;
+  border: 1px solid #D2D2D2;
+  padding: 1px;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  background: #D2D2D2;
+  transition: 0.1s all;
+  background-clip: padding-box;
+  border-radius: 9999px;
+  border: 2px solid rgba(0, 0, 0, 0);
+}
+
+body{
+  background: #fff;
+  font-family: 'Apfel Grotezk', sans-serif;
+}
+
+nav{
+  position: fixed;
+  top: 0;
+  z-index: 1000;
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  background: #F8F8F8;
+  width: 100%;
+  justify-content: space-between;
+  padding: 1rem 2rem;
+  align-items: center;
+  font-size: 18px;
+  border-bottom: 1px solid rgba(131, 131, 131, 0.36);
+
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #f7df1eaa);
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+.logo{
+  font-weight: 400;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: 0.2s all;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+.logo:hover{
+  color: #979797;
+}
+
+.links{
+  display: flex;
+  gap: 1.5rem;
+}
+
+.links a{
+  text-decoration: none;
+  color: #000;
+  font-weight: 400;
+  font-size: 17px;
+}
+
+.mainContent{
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8rem;
+  margin-bottom: 30vh;
+  min-width: 650px;
+  width: 650px;
+  font-size: 32px;
+  font-weight: 500;
+  color: #ABABAB;
+}
+
+.mainContent .word{
+  transition: 0.2s all;
+}
+
+.mainContent .highlight{
+  color: #000;
+}
+
+.bottomControl{
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1rem;
+}
+
+.controls{
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
+  border-radius: 100px;
+  border: 1px solid rgba(54, 54, 54, 0.35);
+}
+
+.control{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  padding: 0.5rem;
+  border-radius: 50%;
+  color: #373737;
+  cursor: pointer;
+  transition: 0.4s all;
+}
+
+.control:hover{
+  background: #dddddd;
+}
+
+.control i{
+  font-size: 1.5rem;
+  font-weight: 500;
+}
+
+.control.active{
+  background: #373737;
+  color: #fff;
+}
+.control.active:hover{
+  background: #000000;
+}
+
+.hold-up{
+  width: 62px;
+  height: 62px;
+  display: flex;
+  overflow: hidden;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
+  cursor: pointer;
+  transition: 0.2s all;
+}
+
+.hold-up:hover{
+  transform: scale(1.1);
+}
+
+.hold-up svg{
+  transform: scale(2);
+  filter: blur(4px);
+}
+
+.hold-up .blue{
+  margin-top: 1.2rem;
+}
+
+.hold-up .lightYellow{
+  margin-top: 2.4rem;
+  margin-left: -1rem;
+}
+
+.hold-up .yellow{
+  margin-top: 1.1rem;
+}
+
+/* Add this keyframe animation */
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(2);
   }
-  a:hover {
-    color: #747bff;
+  50% {
+    transform: scale(6.4);
   }
-  button {
-    background-color: #f9f9f9;
-  }
+}
+
+/* Add animation to your existing SVG rules */
+.hold-up.loading svg{
+  transform: scale(2);
+  filter: blur(4px);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.hold-up.loading .blue{
+  margin-top: 1.2rem;
+  animation-delay: 0s;
+}
+
+.hold-up.loading .lightYellow{
+  margin-top: 2.4rem;
+  margin-left: -1rem;
+  animation-delay: 0.5s;
+}
+
+.hold-up.loading .yellow{
+  margin-top: 1.1rem;
+  animation-delay: 1s;
+}
+
+.heightSetter{
+  display: flex;
+  width: 40px;
+  height: 80px;
+  align-items: center;
+  justify-content: right;
+  position: fixed;
+  top: 10%;
+  right: 0;
+  opacity: 0.8;
+  transition: 0.2s opacity;
+  cursor: grab;
+}
+
+.heightSetter:hover{
+  opacity: 1;
+}
+
+.pageDetails{
+  position: fixed;
+  right: 1.5rem;
+  bottom: 1.5rem;
+  font-family: "Space Mono", monospace;
+  color: #BFBFBF;
+  font-size: 1rem;
+}
+
+.leftControls{
+  position: fixed;
+  justify-content: space-between;
+  height: 100%;
+  left: 0rem;
+  top: 0rem;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+}
+
+.leftControls i{
+  font-size: 1.5rem;
+}
+
+.whiteboardControls{
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 6px;
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  border-radius: 1000px;
+  background: #fff;
+}
+
+.whiteboardControls .w-control{
+  width: 45px;
+  height: 45px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+}
+
+.w-control:hover{
+  background: #dddddd;
+}
+
+.w-control.active{
+  background: #373737;
+  color: #fff;
+}
+
+.w-control.active:hover{
+  background: #000;
+}
+
+.bookDetails{
+  width: 55px;
+  height: 55px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  transition: 0.4s all;
+  background: #fff;
+}
+
+.bookDetails:hover{
+  background: #dddddd;
+}
+
+.bookDetails.active{
+  background: #373737;
+  color: #fff;
+}
+
+.bookDetails.active:hover{
+  background: #000;
+}
+
+.holdup{
+  background: rebeccapurple;
 }
