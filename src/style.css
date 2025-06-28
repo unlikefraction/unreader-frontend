@@ -321,3 +321,24 @@ nav{
 .holdup{
   background: rebeccapurple;
 }
+
+@font-face {
+  font-family: 'excalifont';
+  src: url('/assets/Excalifont-Regular.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.annotation-text-editor,
+.annotation-text-editor.completed {
+  font-family: 'excalifont', sans-serif !important;
+}
+
+.eraser-mouse{
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: black;
+  transform: translate(-50%,-50%);
+}
