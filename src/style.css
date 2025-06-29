@@ -92,11 +92,14 @@ nav{
 
 .mainContent .word{
   transition: 0.2s all;
+  cursor: text;
 }
 
 .mainContent .highlight{
   color: #000;
+  cursor: text;
 }
+
 
 .bottomControl{
   position: fixed;
@@ -277,6 +280,7 @@ nav{
   align-items: center;
   justify-content: center;
   color: #000;
+  cursor: default !important;
 }
 
 .w-control:hover{

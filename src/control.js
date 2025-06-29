@@ -145,9 +145,14 @@ class DrawingTools {
       tool.addEventListener('click', () => this.setActiveTool(tool))
     );
 
-    // Eraser events
+    // Also update the eraser events
     ['mousedown', 'mousemove', 'mouseup'].forEach(evt =>
-      document.addEventListener(evt, e => this.handleEraser(evt, e))
+      document.addEventListener(evt, e => {
+        // Skip erasing if clicking on tool buttons
+        if (evt === 'mousedown' && this._isClickOnTool(e)) return;
+        
+        this.handleEraser(evt, e);
+      })
     );
 
     // Move custom eraser cursor
@@ -161,9 +166,11 @@ class DrawingTools {
       }
     });
 
-    // Text-tool click (flagged second-click)
+    // Update text click handler
     document.addEventListener('click', e => {
       if (!this.activeTool?.classList.contains('text')) return;
+      if (this._isClickOnTool(e)) return; // Skip if clicking on tools
+      
       if (!this.textClickArmed) {
         this.textClickArmed = true;
         return;
@@ -174,6 +181,9 @@ class DrawingTools {
     // Shape drawing events
     ['mousedown', 'mousemove', 'mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
+        // Skip drawing if clicking on tool buttons
+        if (evt === 'mousedown' && this._isClickOnTool(e)) return;
+        
         this.handleRectangle(evt, e);
         this.handleEllipse(evt, e);
         this.handleLine(evt, e);
@@ -392,6 +402,11 @@ class DrawingTools {
 
     const drawTools = ['rectangle','circle','line','arrow','pencil','highlighter','text','eraser'];
     document.body.style.cursor = drawTools.some(c => tool.classList.contains(c)) ? 'crosshair' : 'default';
+  }
+
+  // Add this helper method to check if click is on a tool button
+  _isClickOnTool(e) {
+    return e.target.closest(this.selector) !== null;
   }
 
   /** Get proper bounding box for any shape */
@@ -705,7 +720,7 @@ class DrawingTools {
     );
   }
 
-  /** Generic freehand helper */
+  /** Generic freehand helper - Updated to not auto-switch tools */
   _handleFreehand(type, e, dataKey, options, color, opacity) {
     const { xRel, y } = this.computeCoords(e);
     const zeroX = this.getZeroXPoint();
@@ -741,8 +756,7 @@ class DrawingTools {
       this.drawCtx.fill();
 
       this.save();
-      const cursor = this.tools.find(t => t.classList.contains('cursor'));
-      if (cursor) this.setActiveTool(cursor);
+      // Removed the auto-switch to cursor tool - tools stay active for continuous drawing
     }
   }
 
@@ -869,5 +883,6 @@ class DrawingTools {
 // Instantiate with highlight and eraser support
 window.addEventListener('DOMContentLoaded', () => {
   const drawer = new DrawingTools({ selector: '.w-control', strokeWidth: 2, roughness: 2 });
+  window.drawer = drawer
   drawer.init();
 });
