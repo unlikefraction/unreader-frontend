@@ -16,9 +16,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js"></script>
-    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/rough.js/2.1.1/rough.js" integrity="sha512-sZtT5AmC0DFqxtF/WG8fUVvsum8ZkIoHa08hQO5css2CRXZrvMt9DwMZ4hFNQZiJtwZnmc413p/msPhYMyjlPA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> -->
-    <title>Vite App</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <title>Unreader</title>
   </head>
   <body>
     <div id="app">
@@ -62,6 +63,28 @@
           <svg class="yellow" width="29" height="31" viewBox="0 0 29 31" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M20.0148 5.1128C18.8318 17.0633 7.07198 20.8686 1.33998 21.2774C-3.13643 39.2701 15.462 28.5007 26.6234 16.0549C31.9666 10.0967 21.1979 -6.83769 20.0148 5.1128Z" fill="#FBCB04"/>
           </svg>                  
+        </div>
+      </div>
+
+      <div class="settingsDialog">
+        <div class="playBack settingsOption">
+          <div class="slider"></div>
+          <div class="thumb">
+            <i class="ph ph-speedometer iconSettings speedIcon"></i>
+            <div class="value">1.0</div>
+          </div>
+        </div>
+        <!-- Add these inside your settingsOption divs -->
+        <div class="output settingsOption" id="output-device">
+          <i class="ph ph-speaker-high iconSettings"></i>
+          <select class="device-select"></select>
+          <i class="ph ph-caret-down iconSettings"></i>
+        </div>
+
+        <div class="input settingsOption" id="input-device">
+          <i class="ph ph-microphone iconSettings"></i>
+          <select class="device-select"></select>
+          <i class="ph ph-caret-down iconSettings"></i>
         </div>
       </div>
 
@@ -111,8 +134,9 @@
       </div>
     </div>
     <br><br><br>
-    <script type="module" src="/src/main.js"></script>
-    <script type="module" src="/src/control.js"></script>
+    <script type="module" src="/src/audio.js"></script>
+    <script type="module" src="/src/whiteboard/main-drawing-tools.js"></script>
     <script type="module" src="/src/keyboard.js"></script>
+    <script type="module" src="/src/settings.js"></script>
   </body>
 </html>

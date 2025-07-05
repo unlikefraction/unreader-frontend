@@ -346,3 +346,148 @@ nav{
   background: black;
   transform: translate(-50%,-50%);
 }
+
+.settingsDialog{
+  position: fixed;
+  left: 41%;
+  bottom: 95px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column-reverse;
+  width: 280px;
+  gap: 10px;
+}
+
+.settingsDialog {
+  display: none;      /* hidden by default */
+  /* your other styles… */
+}
+
+.settingsDialog.active {
+  display: flex;      /* or block/grid—whatever layout you need */
+}
+
+
+.settingsOption {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 60px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
+  border-radius: 100px;
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  padding: 0 12px;
+  box-sizing: border-box;
+}
+
+.device-select {
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  color: #373737;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding: 0 8px;
+}
+
+/* ensure the native arrow is gone so our caret icon shows */
+.device-select::-ms-expand {
+  display: none;
+}
+
+.iconSettings {
+  font-size: 24px;
+  color: #373737;
+}
+
+/* optional: increase hit area for the caret icon */
+.settingsOption .ph-caret-down {
+  pointer-events: none;
+}
+
+.playBack{
+  padding: 6px;
+  display: none; /* uncomment when needed */
+}
+
+.slider {
+  position: absolute;
+  top: 50%;
+  width: 90%;
+  height: 40px;
+  border-radius: 10px;
+  z-index: -1;
+  transform: translateY(-50%);
+}
+
+.slider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: #000;
+  border-radius: 100px;
+  transform: translateY(-50%);
+}
+
+.thumb{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 60%;
+  height: 100%;
+  border-radius: 30px;
+  background: #373737;
+  z-index: 20;
+  padding: 6px;
+}
+
+.iconSettings{
+  font-size: 24px;
+  margin-left: 3px;
+}
+
+.speedIcon{
+  color: #fff;
+}
+
+.playBack .thumb .value{
+  display: flex;
+  padding: 4px 12px;
+  background: #fff;
+  border-radius: 100px;
+  align-items: center;
+  justify-content: center;
+  font-family: "Space Mono", monospace;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.output, .input{
+  padding: 12px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.output{
+  display: none;
+}
+
+.textSettings{
+  color: #373737;
+  white-space: nowrap;
+  width: 100%;
+  overflow: none;
+  text-overflow: ellipsis;
+}
