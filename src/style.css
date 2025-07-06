@@ -491,3 +491,30 @@ nav{
   overflow: none;
   text-overflow: ellipsis;
 }
+
+.paragraph-hover-nav {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #fff;
+  margin-left: -2.5rem;
+  text-align: center;
+}
+
+.paragraph-hover-nav i{
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  top: 50%;
+  left: 50%;
+  background: #fff;
+  width: 30px;
+  height: 30px;
+  text-align: center;
+  border-radius: 50%;
+  border: 2px solid #000;
+  font-weight: 600;
+}
