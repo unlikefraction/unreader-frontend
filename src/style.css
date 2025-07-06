@@ -500,6 +500,7 @@ nav{
   background: #fff;
   margin-left: -2.5rem;
   text-align: center;
+  cursor: pointer;
 }
 
 .paragraph-hover-nav i{

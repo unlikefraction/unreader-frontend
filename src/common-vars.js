@@ -1,1 +1,4 @@
-export let toolActive = false;
+// common-vars.js
+export const commonVars = {
+    toolActive: false
+};

@@ -1,4 +1,8 @@
+import { commonVars } from '../common-vars.js';
+
 export class ParagraphSeeker {
+  static _mouseListenersAdded = false;
+
   constructor(textProcessor, audioCore, {
     minProbabilityThreshold = 0.4,
     contextWindow = 15,
@@ -9,6 +13,28 @@ export class ParagraphSeeker {
     this.minProbabilityThreshold = minProbabilityThreshold;
     this.contextWindow = contextWindow;
     this.cleanPattern = cleanPattern;
+
+    // Track last known toolActive state
+    this._lastToolActive = commonVars.toolActive;
+
+    // Poll for toolActive changes every second
+    this._stateInterval = setInterval(() => {
+      const current = commonVars.toolActive;
+      if (current !== this._lastToolActive) {
+        this._lastToolActive = current;
+        this.refreshParagraphNavigation();
+      }
+    }, 1000);
+
+    // Restore overlays on mouseup
+    if (!ParagraphSeeker._mouseListenersAdded) {
+      document.addEventListener('mouseup', () => {
+        document
+          .querySelectorAll('.paragraph-hover-area')
+          .forEach(area => area.style.pointerEvents = 'auto');
+      });
+      ParagraphSeeker._mouseListenersAdded = true;
+    }
   }
 
   preprocessText(inputText) {
@@ -34,7 +60,7 @@ export class ParagraphSeeker {
     }
 
     const directScore = directMatches / maxLen;
-    const seqScore = minLen ? sequentialMatches / minLen : 0;
+    const seqScore = minLen ? (sequentialMatches / minLen) : 0;
     return directScore * 0.6 + seqScore * 0.4;
   }
 
@@ -61,7 +87,6 @@ export class ParagraphSeeker {
       const windowWords = slice
         .map(s => s.dataset.originalWord?.toLowerCase())
         .filter(Boolean);
-      // Skip windows with too few words
       if (windowWords.length < winSize * 0.5) continue;
 
       const direct = this.calculateSimilarity(inputWords, windowWords);
@@ -81,7 +106,7 @@ export class ParagraphSeeker {
     const to = Math.min(timings.length, idx + this.contextWindow);
     const ctx = [];
     for (let i = from; i < to; i++) {
-      const w = timings[i]?.word
+      const w = timings[i].word
         .toLowerCase()
         .replace(this.cleanPattern, '');
       if (w) ctx.push(w);
@@ -126,18 +151,22 @@ export class ParagraphSeeker {
     }
 
     const timing = this.findAudioTimestamp(match.start);
-    if (!timing) return { success: false, error: 'No audio timing', match };
+    if (!timing) {
+      return { success: false, error: 'No audio timing', match };
+    }
 
     this.audioCore.sound?.seek(timing.time_start);
     if (log) console.log(`Seeked to ${timing.time_start}s`);
-
     return { success: true, timestamp: timing.time_start, match, timing };
   }
 
   async seekToParagraphs(paragraphTexts, options = {}) {
     const results = [];
     for (let i = 0; i < paragraphTexts.length; i++) {
-      const result = await this.seekToParagraph(paragraphTexts[i], { ...options, log: false });
+      const result = await this.seekToParagraph(
+        paragraphTexts[i],
+        { ...options, log: false }
+      );
       results.push({ index: i, text: paragraphTexts[i], result });
       if (result.success) break;
     }
@@ -155,10 +184,7 @@ export class ParagraphSeeker {
         curr += node.textContent;
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         if (node.tagName === 'BR') {
-          if (curr.trim()) {
-            paras.push(curr.trim());
-            curr = '';
-          }
+          if (curr.trim()) { paras.push(curr.trim()); curr = ''; }
         } else if (node.classList.contains('word')) {
           curr += node.textContent;
         }
@@ -171,9 +197,12 @@ export class ParagraphSeeker {
   setupParagraphHoverNavigation() {
     const main = document.querySelector('.mainContent');
     if (!main) return;
-    document.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
-
-    this.findParagraphBoundaries().forEach((p, i) => this.setupParagraphHover(p, i));
+    document
+      .querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area')
+      .forEach(el => el.remove());
+    this.findParagraphBoundaries().forEach((p, i) =>
+      this.setupParagraphHover(p, i)
+    );
     this.setupDynamicUpdates();
   }
 
@@ -185,7 +214,10 @@ export class ParagraphSeeker {
     let idx = 0;
 
     main.childNodes.forEach(node => {
-      if (node.nodeType === Node.ELEMENT_NODE && node.classList.contains('word')) {
+      if (
+        node.nodeType === Node.ELEMENT_NODE &&
+        node.classList.contains('word')
+      ) {
         para.text += node.textContent + ' ';
         para.elements.push(node);
         idx++;
@@ -197,7 +229,10 @@ export class ParagraphSeeker {
         para = { start: idx, end: idx, text: '', elements: [] };
       }
     });
-    if (para.text.trim()) para.end = idx - 1, paras.push(para);
+    if (para.text.trim()) {
+      para.end = idx - 1;
+      paras.push(para);
+    }
     return paras;
   }
 
@@ -207,24 +242,38 @@ export class ParagraphSeeker {
     const last = paragraph.elements[paragraph.elements.length - 1];
 
     const hoverArea = document.createElement('div');
-    Object.assign(hoverArea.style, { position: 'absolute', zIndex: 999, pointerEvents: 'auto', background: 'transparent' });
+    Object.assign(hoverArea.style, {
+      position: 'absolute',
+      zIndex: 999,
+      background: 'transparent',
+      pointerEvents: commonVars.toolActive ? 'auto' : 'auto',
+      cursor: commonVars.toolActive ? 'default' : 'text'
+    });
     hoverArea.className = 'paragraph-hover-area';
+
+    // If toolActive is true, just block selection and bail
+    if (commonVars.toolActive) {
+      document.body.appendChild(hoverArea);
+      this.updateHoverAreaPosition(hoverArea, paragraph);
+      return;
+    }
+
+    // When inactive: allow mousedown to pass through for text selection
+    hoverArea.addEventListener('mousedown', () => {
+      hoverArea.style.pointerEvents = 'none';
+    });
 
     const hoverDiv = document.createElement('div');
     hoverDiv.className = 'paragraph-hover-nav';
-    Object.assign(hoverDiv.style, { display: 'none', position: 'absolute', zIndex: 1000, cursor: 'pointer' });
+    Object.assign(hoverDiv.style, {
+      display: 'none',
+      position: 'absolute',
+      zIndex: 1000,
+      cursor: 'pointer',
+      pointerEvents: 'auto'
+    });
     hoverDiv.innerHTML = '<i class="ph ph-play"></i>';
     hoverDiv.dataset.paragraphIndex = index;
-
-    hoverDiv.addEventListener('click', async e => {
-      e.preventDefault();
-      const result = await this.seekToParagraph(paragraph.text);
-      if (result.success && this.audioCore && !this.audioCore.isPlaying) await this.audioCore.playAudio();
-    });
-
-    hoverArea._linkedHoverDiv = hoverDiv;
-    hoverDiv._linkedHoverArea = hoverArea;
-    hoverArea.dataset.paragraphIndex = index;
 
     hoverArea.addEventListener('mouseenter', () => this.showHoverDiv(hoverDiv, first, paragraph));
     hoverArea.addEventListener('mouseleave', e => {
@@ -233,6 +282,14 @@ export class ParagraphSeeker {
     hoverDiv.addEventListener('mouseenter', () => this.showHoverDiv(hoverDiv, first, paragraph));
     hoverDiv.addEventListener('mouseleave', e => {
       if (!hoverArea.contains(e.relatedTarget)) this.hideHoverDiv(hoverDiv);
+    });
+
+    hoverDiv.addEventListener('click', async e => {
+      e.preventDefault();
+      const result = await this.seekToParagraph(paragraph.text);
+      if (result.success && this.audioCore && !this.audioCore.isPlaying) {
+        await this.audioCore.playAudio();
+      }
     });
 
     document.body.appendChild(hoverArea);
@@ -245,7 +302,8 @@ export class ParagraphSeeker {
     const lastRect = paragraph.elements[paragraph.elements.length - 1].getBoundingClientRect();
     const left = Math.min(firstRect.left, lastRect.left) - 25;
     const top = Math.min(firstRect.top, lastRect.top) + window.scrollY;
-    const height = Math.max(firstRect.bottom, lastRect.bottom) - Math.min(firstRect.top, lastRect.top);
+    const height = Math.max(firstRect.bottom, lastRect.bottom) - Math.min(firstRect.top, firstRect.top);
+
     hoverArea.style.left = `${left}px`;
     hoverArea.style.top = `${top}px`;
     hoverArea.style.width = `700px`;
@@ -263,7 +321,7 @@ export class ParagraphSeeker {
 
   hideHoverDiv(hoverDiv) {
     setTimeout(() => {
-      if (!hoverDiv.matches(':hover') && !hoverDiv._linkedHoverArea.matches(':hover')) {
+      if (!hoverDiv.matches(':hover') && !document.querySelector(`.paragraph-hover-area[data-index="${hoverDiv.dataset.paragraphIndex}"]`)?.matches(':hover')) {
         hoverDiv.style.display = 'none';
       }
     }, 50);
@@ -275,12 +333,13 @@ export class ParagraphSeeker {
   }
 
   disableParagraphNavigation() {
-    document.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
+    document.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area')
+      .forEach(el => el.remove());
     if (this.scrollListener) window.removeEventListener('scroll', this.scrollListener);
     if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
     console.log('❌ Paragraph hover navigation disabled');
   }
-
+  
   setupDynamicUpdates() {
     this.scrollListener = () => this.updateAllHoverAreas();
     this.resizeListener = () => this.updateAllHoverAreas();

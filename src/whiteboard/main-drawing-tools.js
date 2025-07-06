@@ -1,3 +1,4 @@
+import { commonVars } from '../common-vars.js';
 import { CanvasManager } from './canvas-manager.js';
 import { saveShapesData, loadShapesData, clearAllShapesData } from './storage.js';
 import { redrawAll } from './renderer.js';
@@ -15,6 +16,8 @@ import { isClickOnTool, hexToRgba } from './utils.js';
  * Class to manage drawing annotations on the document
  */
 export class DrawingTools {
+  static _mouseListenersAdded = false;
+
   /**
    * @param {object} options
    * @param {string} options.selector - CSS selector for tool buttons
@@ -29,7 +32,7 @@ export class DrawingTools {
     roughness = 3,
     pencilOptions = {},
     highlightOptions = {}
-  }) {
+  } = {}) {
     this.selector = selector;
     this.strokeWidth = strokeWidth;
     this.roughness = roughness;
@@ -90,6 +93,16 @@ export class DrawingTools {
       display: 'none'
     });
     document.body.appendChild(this.eraserCursor);
+
+    // Global mouseup listener for selection pass-through (if paragraph nav present)
+    if (!DrawingTools._mouseListenersAdded) {
+      document.addEventListener('mouseup', () => {
+        document.querySelectorAll('.paragraph-hover-area').forEach(area => {
+          area.style.pointerEvents = 'auto';
+        });
+      });
+      DrawingTools._mouseListenersAdded = true;
+    }
   }
 
   /** Initialize event listeners and sizing */
@@ -98,15 +111,13 @@ export class DrawingTools {
       this.canvasManager.sizeCanvases();
       this.redrawAll();
     });
-    
+
     window.addEventListener('load', () => {
       this.canvasManager.sizeCanvases();
-      this.redrawAll(); // Redraw after window loads to ensure proper sizing
+      this.redrawAll();
     });
-    
+
     this.canvasManager.sizeCanvases();
-    
-    // Initial draw of loaded shapes - delay slightly to ensure DOM is ready
     setTimeout(() => this.redrawAll(), 10);
 
     // Tool button clicks
@@ -114,27 +125,22 @@ export class DrawingTools {
       tool.addEventListener('click', () => this.setActiveTool(tool))
     );
 
-    // Add clear all functionality (optional)
-    window.addEventListener('keydown', (e) => {
-      // Ctrl/Cmd + Shift + C to clear all annotations
+    // Clear all on Ctrl/Cmd+Shift+C
+    window.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
-        if (confirm('Clear all annotations?')) {
-          this.clearAll();
-        }
+        if (confirm('Clear all annotations?')) this.clearAll();
       }
     });
 
-    // Also update the eraser events
-    ['mousedown', 'mousemove', 'mouseup'].forEach(evt =>
+    // Eraser events
+    ['mousedown','mousemove','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
-        // Skip erasing if clicking on tool buttons
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
-        
         handleEraser(this, evt, e);
       })
     );
 
-    // Move custom eraser cursor
+    // Eraser cursor follow
     document.addEventListener('mousemove', e => {
       if (this.activeTool?.classList.contains('eraser')) {
         this.eraserCursor.style.display = 'block';
@@ -145,17 +151,13 @@ export class DrawingTools {
       }
     });
 
-    // Update text click handler
-    document.addEventListener('click', e => {
-      handleText(this, e);
-    });
+    // Text tool click
+    document.addEventListener('click', e => handleText(this, e));
 
     // Shape drawing events
-    ['mousedown', 'mousemove', 'mouseup'].forEach(evt =>
+    ['mousedown','mousemove','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
-        // Skip drawing if clicking on tool buttons
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
-        
         handleRectangle(this, evt, e);
         handleEllipse(this, evt, e);
         handleLine(this, evt, e);
@@ -176,21 +178,28 @@ export class DrawingTools {
     saveShapesData(this.shapesData);
   }
 
-  /** Tool switch & reset flags */
+  /** Tool switch & update global flag */
   setActiveTool(tool) {
     if (tool === this.activeTool) return;
     this.tools.forEach(t => t.classList.remove('active'));
     tool.classList.add('active');
     this.activeTool = tool;
 
+    // Flip global toolActive flag by mutating exported object
+    commonVars.toolActive = !tool.classList.contains('cursor');
+
+    // Reset state
     this.textClickArmed = false;
     this.erasedShapeIds.clear();
 
+    // Update cursor style
     const drawTools = ['rectangle','circle','line','arrow','pencil','highlighter','text','eraser'];
-    document.body.style.cursor = drawTools.some(c => tool.classList.contains(c)) ? 'crosshair' : 'default';
+    document.body.style.cursor = drawTools.some(c => tool.classList.contains(c))
+      ? 'crosshair'
+      : 'default';
   }
 
-  /** Add this helper method to check if click is on a tool button */
+  /** Add helper to detect clicks on UI */
   _isClickOnTool(e) {
     return isClickOnTool(e, this.selector);
   }
@@ -199,8 +208,7 @@ export class DrawingTools {
   _genericDraw(type, xRel, y, previewFn, finalizeFn) {
     if (type === 'mousedown') {
       this.isDrawing = true;
-      this.startXRel = xRel;
-      this.startY = y;
+      this.startXRel = xRel; this.startY = y;
       this.currentSeed = Math.floor(Math.random()*10000)+1;
       document.body.style.userSelect = 'none';
     } else if (type === 'mousemove' && this.isDrawing) {
@@ -227,7 +235,7 @@ export class DrawingTools {
     previewArrowHead(this, x1, y1, x2, y2, seed);
   }
 
-  /** Hex to RGBA */
+  /** Convert hex to RGBA */
   _hexToRgba(hex, alpha) {
     return hexToRgba(hex, alpha);
   }
@@ -244,15 +252,15 @@ export class DrawingTools {
     this.redrawAll();
   }
 
-  /** Generic freehand helper - Updated to not auto-switch tools */
-  _handleFreehand(type, e, dataKey, options, color, opacity) {
-    handleFreehand(this, type, e, dataKey, options, color, opacity);
+  /** Generic freehand helper */
+  _handleFreehand(type, e, dataKey, options, color,opacity) {
+    handleFreehand(this, type, e, dataKey, options, color,opacity);
   }
 }
 
-// Instantiate with highlight and eraser support
+// Instantiate on DOM ready
 window.addEventListener('DOMContentLoaded', () => {
-  const drawer = new DrawingTools({ selector: '.w-control', strokeWidth: 2, roughness: 2 });
+  const drawer = new DrawingTools({ selector: '.w-control', strokeWidth:2, roughness:2 });
   window.drawer = drawer;
   drawer.init();
 });
