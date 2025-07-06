@@ -244,10 +244,10 @@ export class ParagraphSeeker {
     const hoverArea = document.createElement('div');
     Object.assign(hoverArea.style, {
       position: 'absolute',
-      zIndex: 999,
+      zIndex: 1,
       background: 'transparent',
       pointerEvents: commonVars.toolActive ? 'auto' : 'auto',
-      cursor: commonVars.toolActive ? 'default' : 'text'
+      cursor: commonVars.toolActive ? 'crossbow' : 'text'
     });
     hoverArea.className = 'paragraph-hover-area';
 
@@ -268,7 +268,7 @@ export class ParagraphSeeker {
     Object.assign(hoverDiv.style, {
       display: 'none',
       position: 'absolute',
-      zIndex: 1000,
+      zIndex: 2,
       cursor: 'pointer',
       pointerEvents: 'auto'
     });
@@ -339,7 +339,7 @@ export class ParagraphSeeker {
     if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
     console.log('❌ Paragraph hover navigation disabled');
   }
-  
+
   setupDynamicUpdates() {
     this.scrollListener = () => this.updateAllHoverAreas();
     this.resizeListener = () => this.updateAllHoverAreas();

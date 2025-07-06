@@ -6,11 +6,7 @@ import { getZeroXPoint } from '../utils.js';
 export function handleText(drawingTools, e) {
   if (!drawingTools.activeTool?.classList.contains('text')) return;
   if (drawingTools._isClickOnTool(e)) return; // Skip if clicking on tools
-  
-  if (!drawingTools.textClickArmed) {
-    drawingTools.textClickArmed = true;
-    return;
-  }
+
   drawingTools._createTextEditor(e);
 }
 

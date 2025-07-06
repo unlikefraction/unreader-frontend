@@ -108,6 +108,7 @@ nav{
   transform: translateX(-50%);
   display: flex;
   gap: 1rem;
+  z-index: 1000;
 }
 
 .controls{
@@ -356,6 +357,7 @@ nav{
   flex-direction: column-reverse;
   width: 280px;
   gap: 10px;
+  z-index: 1000;
 }
 
 .settingsDialog {

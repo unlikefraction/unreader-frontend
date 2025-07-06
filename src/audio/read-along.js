@@ -3,177 +3,195 @@
  */
 export class ReadAlong {
     constructor(highlighter) {
-      this.highlighter = highlighter;
-      this.isActive = true;
-      this.heightSetter = null;
-      this.isDragging = false;
-      this.startY = 0;
-      this.startTop = 0;
-      
+      this.highlighter      = highlighter;
+  
+      // read-along state
+      this.isActive         = true;
+      this.thresholdPx      = 200;    // ±200px = 400px total band
+      this.isUserScrolling  = false;
+      this.scrollTimeout    = null;
+  
+      // heightSetter (draggable line) state
+      this.heightSetter     = null;
+      this.isDragging       = false;
+      this.startY           = 0;
+      this.startTop         = 0;
+  
       this.setupHeightSetter();
       this.setupReadAlongControl();
+      this.setupScrollDetection();
     }
   
+    /** Listen for scroll and debounce end */
+    setupScrollDetection() {
+      window.addEventListener('scroll', this.onScroll.bind(this), { passive: true });
+    }
+  
+    onScroll() {
+      // mark that user is actively scrolling
+      if (!this.isUserScrolling) this.isUserScrolling = true;
+  
+      // immediate disable if highlighted word goes completely off-screen
+      const wordEl = this.highlighter.currentHighlightedWord;
+      if (this.isActive && wordEl) {
+        const rect = wordEl.getBoundingClientRect();
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+          this.setReadAlongActive(false);
+        }
+      }
+  
+      clearTimeout(this.scrollTimeout);
+      this.scrollTimeout = setTimeout(() => this.onScrollEnd(), 250);
+    }
+  
+    onScrollEnd() {
+      this.isUserScrolling = false;
+      this.evaluateReadAlongState();
+    }
+  
+    /** After scrolling stops, decide if we re-enable or disable */
+    evaluateReadAlongState() {
+      const wordEl = this.highlighter.currentHighlightedWord;
+      if (!this.heightSetter || !wordEl) return;
+  
+      const rect      = wordEl.getBoundingClientRect();
+      const vpHeight  = window.innerHeight;
+      const linePct   = this.getCurrentTopPercent();
+      const lineY     = (linePct / 100) * vpHeight;
+      const diff      = rect.top - lineY;
+  
+      if (Math.abs(diff) <= this.thresholdPx) {
+        this.setReadAlongActive(true);
+      } else {
+        this.setReadAlongActive(false);
+      }
+    }
+  
+    /**
+     * Toggle read-along on/off,
+     * update UI, and snap when enabling.
+     */
+    setReadAlongActive(active) {
+      if (this.isActive === active) return;
+      this.isActive = active;
+  
+      const ctrl = document.querySelector('.read-along.control');
+      if (ctrl) ctrl.classList.toggle('active', active);
+  
+      console.log(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
+  
+      // If enabling and we have a word, scroll to it
+      if (active && this.highlighter.currentHighlightedWord) {
+        this.updateTextPosition();
+      }
+    }
+  
+    /** Build & position the draggable heightSetter line */
     setupHeightSetter() {
       this.heightSetter = document.getElementById('heightSetter');
       if (!this.heightSetter) {
         console.warn('heightSetter element not found');
         return;
       }
-  
-      // Initialize heightSetter position if not set
       if (!this.heightSetter.style.top) {
         this.heightSetter.style.top = '50%';
       }
-  
       this.setupHeightSetterDragging();
     }
   
     setupHeightSetterDragging() {
       if (!this.heightSetter) return;
   
-      // Mouse events
-      this.heightSetter.addEventListener('mousedown', (e) => {
+      const startDrag = (clientY, e) => {
         this.isDragging = true;
-        this.startY = e.clientY;
-        this.startTop = this.getCurrentTopPercent();
-        
-        // Change cursor to grabbing
-        this.heightSetter.style.cursor = 'grabbing';
-        
-        // Prevent text selection and other default behaviors
-        e.preventDefault();
-      });
-  
-      document.addEventListener('mousemove', (e) => {
-        if (!this.isDragging) return;
-        
-        // Calculate the difference in Y position
-        const deltaY = e.clientY - this.startY;
-        const viewportHeight = window.innerHeight;
-        
-        // Convert pixel difference to percentage
-        const deltaPercent = (deltaY / viewportHeight) * 100;
-        
-        // Update position
-        const newTop = this.startTop + deltaPercent;
-        this.setTopPercent(newTop);
-      });
-  
-      document.addEventListener('mouseup', () => {
-        if (this.isDragging) {
-          this.isDragging = false;
-          this.heightSetter.style.cursor = 'grab';
+        this.startY     = clientY;
+        this.startTop   = this.getCurrentTopPercent();
+        if (e.type.startsWith('mouse')) {
+          this.heightSetter.style.cursor = 'grabbing';
+          e.preventDefault();
         }
-      });
-  
-      // Touch events for mobile support
-      this.heightSetter.addEventListener('touchstart', (e) => {
-        this.isDragging = true;
-        this.startY = e.touches[0].clientY;
-        this.startTop = this.getCurrentTopPercent();
-        
-        e.preventDefault();
-      });
-  
-      document.addEventListener('touchmove', (e) => {
+      };
+      const onDrag = (clientY, e) => {
         if (!this.isDragging) return;
-        
-        const deltaY = e.touches[0].clientY - this.startY;
-        const viewportHeight = window.innerHeight;
-        const deltaPercent = (deltaY / viewportHeight) * 100;
-        
-        const newTop = this.startTop + deltaPercent;
-        this.setTopPercent(newTop);
-        
-        e.preventDefault();
-      });
+        const deltaY       = clientY - this.startY;
+        const vpHeight     = window.innerHeight;
+        const deltaPercent = (deltaY / vpHeight) * 100;
+        this.setTopPercent(this.startTop + deltaPercent);
+        if (e.type.startsWith('touch')) e.preventDefault();
+      };
+      const endDrag = () => {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+        this.heightSetter.style.cursor = 'grab';
+      };
   
-      document.addEventListener('touchend', () => {
-        if (this.isDragging) {
-          this.isDragging = false;
-        }
-      });
+      this.heightSetter.addEventListener('mousedown', e => startDrag(e.clientY, e));
+      document.addEventListener('mousemove', e => onDrag(e.clientY, e));
+      document.addEventListener('mouseup',   endDrag);
+  
+      this.heightSetter.addEventListener('touchstart', e => startDrag(e.touches[0].clientY, e));
+      document.addEventListener('touchmove',  e => onDrag(e.touches[0].clientY, e), { passive: false });
+      document.addEventListener('touchend',   endDrag);
     }
   
-    // Get current top position as percentage
+    /** Read setter’s current top in % */
     getCurrentTopPercent() {
       if (!this.heightSetter) return 50;
-      const currentTop = this.heightSetter.style.top || '50%';
-      return parseFloat(currentTop.replace('%', ''));
+      return parseFloat((this.heightSetter.style.top || '50%').replace('%',''));
     }
   
-    // Set top position as percentage with 10% to 90% constraint
-    setTopPercent(percent) {
+    /** Move setter (clamped 10–90%) and, if active, reflow text */
+    setTopPercent(pct) {
       if (!this.heightSetter) return;
-      
-      // Clamp between 10% and 90% (not 0% to 100%)
-      const clampedPercent = Math.max(10, Math.min(90, percent));
-      this.heightSetter.style.top = `${clampedPercent}%`;
-      
-      // Update text position when heightSetter moves (only if read-along is active)
-      setTimeout(() => {
-        if (this.isActive && this.highlighter.currentHighlightedWord) {
-          this.updateTextPosition();
-        }
-      }, 0);
-    }
-  
-    setupReadAlongControl() {
-      const readAlongControl = document.querySelector('.read-along.control');
-      if (!readAlongControl) {
-        console.warn('Read-along control not found');
-        return;
-      }
-  
-      readAlongControl.addEventListener('click', () => {
-        this.toggle();
-      });
-    }
-  
-    toggle() {
-      this.isActive = !this.isActive;
-      
-      const readAlongControl = document.querySelector('.read-along.control');
-      if (readAlongControl) {
-        if (this.isActive) {
-          readAlongControl.classList.add('active');
-        } else {
-          readAlongControl.classList.remove('active');
-        }
-      }
-      
-      console.log(`📖 Read-along ${this.isActive ? 'enabled' : 'disabled'}`);
-      
-      // If just enabled and we have a current word, update position immediately
+      const clamped = Math.max(10, Math.min(90, pct));
+      this.heightSetter.style.top = `${clamped}%`;
       if (this.isActive && this.highlighter.currentHighlightedWord) {
         this.updateTextPosition();
       }
     }
   
-    updateTextPosition() {
-      if (!this.isActive || !this.highlighter.currentHighlightedWord || !this.heightSetter) {
+    /** Click UI to manually toggle read-along */
+    setupReadAlongControl() {
+      const ctrl = document.querySelector('.read-along.control');
+      if (!ctrl) {
+        console.warn('Read-along control not found');
         return;
       }
-      
-      const heightSetterTop = this.getCurrentTopPercent();
-      
-      const wordRect = this.highlighter.currentHighlightedWord.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const targetY = (heightSetterTop / 100) * viewportHeight;
-      
-      const currentWordY = wordRect.top + window.scrollY;
-      const desiredScrollY = currentWordY - targetY;
-      
+      ctrl.addEventListener('click', () => this.toggle());
+    }
+  
+    toggle() {
+      this.setReadAlongActive(!this.isActive);
+    }
+  
+    /**
+     * Scroll so that the highlighted word sits at the setter line.
+     */
+    updateTextPosition() {
+      if (!this.isActive ||
+          this.isUserScrolling ||
+          !this.highlighter.currentHighlightedWord ||
+          !this.heightSetter) {
+        return;
+      }
+      const rect     = this.highlighter.currentHighlightedWord.getBoundingClientRect();
+      const vpHeight = window.innerHeight;
+      const linePct  = this.getCurrentTopPercent();
+      const targetY  = (linePct / 100) * vpHeight;
+      const currentY = rect.top + window.scrollY;
+      const scrollTo = currentY - targetY;
+  
       window.scrollTo({
-        top: desiredScrollY,
+        top:      scrollTo,
         behavior: 'smooth'
       });
     }
   
-    // Method to be called when highlighting updates
+    /** Called whenever highlighting moves to a new word */
     onWordHighlighted() {
-      if (this.isActive) {
+      if (!this.isActive) {
+        this.evaluateReadAlongState();
+      } else {
         this.updateTextPosition();
       }
     }

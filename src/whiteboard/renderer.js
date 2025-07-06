@@ -75,13 +75,18 @@ export function redrawAll(drawingTools) {
 
   // pencil
   drawingTools.shapesData.pencil.forEach((p, i) => {
+    // Skip strokes without valid points
+    if (!Array.isArray(p.points) || p.points.length === 0) return;
     const id = `pencil-${i}`;
     runDraw(id, () => {
       const raw = p.points.map(pt => [pt.xRel, pt.y]);
       const stroke = getStroke(raw, p.options);
-      const poly = stroke.map(([x,y]) => [zeroX + x, y]);
+      const poly = stroke.map(([x, y]) => [zeroX + x, y]);
       drawingTools.canvasManager.drawCtx.beginPath();
-      poly.forEach(([px,py], j) => j ? drawingTools.canvasManager.drawCtx.lineTo(px,py) : drawingTools.canvasManager.drawCtx.moveTo(px,py));
+      poly.forEach(([px, py], j) => j
+        ? drawingTools.canvasManager.drawCtx.lineTo(px, py)
+        : drawingTools.canvasManager.drawCtx.moveTo(px, py)
+      );
       drawingTools.canvasManager.drawCtx.closePath();
       drawingTools.canvasManager.drawCtx.fillStyle = 'black';
       drawingTools.canvasManager.drawCtx.fill();
@@ -90,13 +95,18 @@ export function redrawAll(drawingTools) {
 
   // highlighter
   drawingTools.shapesData.highlighter.forEach((h, i) => {
+    // Skip highlights without valid points
+    if (!Array.isArray(h.points) || h.points.length === 0) return;
     const id = `highlighter-${i}`;
     runDraw(id, () => {
       const raw = h.points.map(pt => [pt.xRel, pt.y]);
       const stroke = getStroke(raw, h.options);
-      const poly = stroke.map(([x,y]) => [zeroX + x, y]);
+      const poly = stroke.map(([x, y]) => [zeroX + x, y]);
       drawingTools.canvasManager.drawCtx.beginPath();
-      poly.forEach(([px,py], j) => j ? drawingTools.canvasManager.drawCtx.lineTo(px,py) : drawingTools.canvasManager.drawCtx.moveTo(px,py));
+      poly.forEach(([px, py], j) => j
+        ? drawingTools.canvasManager.drawCtx.lineTo(px, py)
+        : drawingTools.canvasManager.drawCtx.moveTo(px, py)
+      );
       drawingTools.canvasManager.drawCtx.closePath();
       drawingTools.canvasManager.drawCtx.fillStyle = hexToRgba(h.options.color, h.options.opacity);
       drawingTools.canvasManager.drawCtx.fill();
@@ -109,17 +119,16 @@ export function redrawAll(drawingTools) {
     const div = document.createElement('div');
     div.innerText = t.text;
     div.classList.add('annotation-text-editor', 'completed');
-    div.setAttribute('data-text-id', id); // Add ID for eraser tracking
-    
+    div.setAttribute('data-text-id', id);
+
     // Calculate rotation based on horizontal position
     const centerX = window.innerWidth / 2;
     const textX = zeroX + t.xRel;
-    const maxDistance = window.innerWidth / 2; // Distance from center to edge
+    const maxDistance = window.innerWidth / 2;
     const distanceFromCenter = textX - centerX;
-    // Map distance to rotation: -30deg (left) to +30deg (right)
     const rotation = (distanceFromCenter / maxDistance) * 30;
     const clampedRotation = Math.max(-30, Math.min(30, rotation));
-    
+
     Object.assign(div.style, {
       position: 'absolute',
       left: `${textX}px`,
@@ -132,7 +141,6 @@ export function redrawAll(drawingTools) {
       fontSize: '24px',
       transform: `rotate(${clampedRotation}deg)`,
       transformOrigin: 'left center',
-      // Apply fading if this text is flagged for erasing
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
     });
     document.body.appendChild(div);
@@ -142,9 +150,11 @@ export function redrawAll(drawingTools) {
 /** Draw arrow head */
 export function drawArrowHead(drawingTools, x1, y1, x2, y2, seed) {
   const zeroX = getZeroXPoint();
-  const dx = x2 - x1; const dy = y2 - y1;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
   const angle = Math.atan2(dy, dx);
   const len = Math.hypot(dx, dy) * 0.2;
+
   [angle - Math.PI/6, angle + Math.PI/6].forEach(wing => {
     const x3 = zeroX + x2 - len * Math.cos(wing);
     const y3 = y2 - len * Math.sin(wing);
