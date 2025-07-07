@@ -75,7 +75,6 @@ export function redrawAll(drawingTools) {
 
   // pencil
   drawingTools.shapesData.pencil.forEach((p, i) => {
-    // Skip strokes without valid points
     if (!Array.isArray(p.points) || p.points.length === 0) return;
     const id = `pencil-${i}`;
     runDraw(id, () => {
@@ -95,7 +94,6 @@ export function redrawAll(drawingTools) {
 
   // highlighter
   drawingTools.shapesData.highlighter.forEach((h, i) => {
-    // Skip highlights without valid points
     if (!Array.isArray(h.points) || h.points.length === 0) return;
     const id = `highlighter-${i}`;
     runDraw(id, () => {
@@ -121,14 +119,7 @@ export function redrawAll(drawingTools) {
     div.classList.add('annotation-text-editor', 'completed');
     div.setAttribute('data-text-id', id);
 
-    // Calculate rotation based on horizontal position
-    const centerX = window.innerWidth / 2;
     const textX = zeroX + t.xRel;
-    const maxDistance = window.innerWidth / 2;
-    const distanceFromCenter = textX - centerX;
-    const rotation = (distanceFromCenter / maxDistance) * 30;
-    const clampedRotation = Math.max(-30, Math.min(30, rotation));
-
     Object.assign(div.style, {
       position: 'absolute',
       left: `${textX}px`,
@@ -139,8 +130,6 @@ export function redrawAll(drawingTools) {
       pointerEvents: 'none',
       zIndex: '-1000',
       fontSize: '24px',
-      transform: `rotate(${clampedRotation}deg)`,
-      transformOrigin: 'left center',
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
     });
     document.body.appendChild(div);

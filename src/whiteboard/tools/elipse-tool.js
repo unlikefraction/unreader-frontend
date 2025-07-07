@@ -1,29 +1,62 @@
 import { computeCoords, getZeroXPoint } from '../utils.js';
 
 /**
- * Ellipse drawing tool
+ * Ellipse drawing tool with Shift for perfect circles
  */
 export function handleEllipse(drawingTools, type, e) {
+  // Only run when circle tool is active
   if (!drawingTools.activeTool?.classList.contains('circle')) return;
-  const { xRel, y } = computeCoords(e, getZeroXPoint);
-  
+
+  // Starting coordinates
+  const { xRel: startX, y: startY } = computeCoords(e, getZeroXPoint);
+  // Check if Shift was held at the start
+  const isCircle = e.shiftKey;
+
   drawingTools._genericDraw(
-    type, xRel, y,
-    (x1,y1,x2,y2,seed) => {
-      const cx = getZeroXPoint()+x1+(x2-x1)/2;
-      const cy = y1+(y2-y1)/2;
+    type,
+    startX,
+    startY,
+    // Preview callback
+    (x1, y1, x2, y2, seed) => {
+      let width = x2 - x1;
+      let height = y2 - y1;
+      // Constrain to circle if Shift
+      if (isCircle) {
+        const size = Math.min(Math.abs(width), Math.abs(height));
+        width = Math.sign(width) * size;
+        height = Math.sign(height) * size;
+      }
+      const cx = getZeroXPoint() + x1 + width / 2;
+      const cy = y1 + height / 2;
       drawingTools.canvasManager.previewRough.ellipse(
-        cx, cy, Math.abs(x2-x1), Math.abs(y2-y1),
-        { stroke:'black', strokeWidth:drawingTools.strokeWidth, roughness:drawingTools.roughness, seed }
+        cx,
+        cy,
+        Math.abs(width),
+        Math.abs(height),
+        { stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed }
       );
     },
-    (x1,y1,x2,y2,seed) => {
-      drawingTools.shapesData.ellipse.push({ xRel:x1, y:y1, widthRel:x2-x1, height:y2-y1, seed });
-      const cx = getZeroXPoint()+x1+(x2-x1)/2;
-      const cy = y1+(y2-y1)/2;
+    // Commit callback
+    (x1, y1, x2, y2, seed) => {
+      let width = x2 - x1;
+      let height = y2 - y1;
+      // Constrain to circle if Shift
+      if (isCircle) {
+        const size = Math.min(Math.abs(width), Math.abs(height));
+        width = Math.sign(width) * size;
+        height = Math.sign(height) * size;
+      }
+      // Save shape data
+      drawingTools.shapesData.ellipse.push({ xRel: x1, y: y1, widthRel: width, height: height, seed });
+      // Draw final shape
+      const cx = getZeroXPoint() + x1 + width / 2;
+      const cy = y1 + height / 2;
       drawingTools.canvasManager.drawRough.ellipse(
-        cx, cy, Math.abs(x2-x1), Math.abs(y2-y1),
-        { stroke:'black', strokeWidth:drawingTools.strokeWidth, roughness:drawingTools.roughness, seed }
+        cx,
+        cy,
+        Math.abs(width),
+        Math.abs(height),
+        { stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed }
       );
     }
   );
