@@ -1,27 +1,34 @@
-import { getStroke } from 'perfect-freehand';
-import { getZeroXPoint, hexToRgba } from './utils.js';
-
 /**
- * Renderer for drawing all shapes
+ * Renderer for drawing all shapes and their bounding borders
  */
+import { getZeroXPoint, getShapeBounds } from './utils.js';
+import { drawArrowHead } from './tools/arrow-tool.js';
+import { getStroke } from 'perfect-freehand';
+
 export function redrawAll(drawingTools) {
+  // Remove completed text editors
   document.querySelectorAll('.annotation-text-editor.completed').forEach(el => el.remove());
+
+  // Resize & clear the draw canvas
   drawingTools.canvasManager.sizeCanvases();
-  drawingTools.canvasManager.clearDraw();
+  const drawCtx = drawingTools.canvasManager.drawCtx;
+  drawCtx.clearRect(0, 0, drawingTools.canvasManager.drawCanvas.width, drawingTools.canvasManager.drawCanvas.height);
+
   const zeroX = getZeroXPoint();
 
-  // helper to fade flagged shapes
+  // helper to fade flagged shapes (text is skipped)
   const runDraw = (id, drawFn) => {
     if (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) {
-      drawingTools.canvasManager.drawCtx.save();
-      drawingTools.canvasManager.drawCtx.globalAlpha = 0.2;
+      drawCtx.save();
+      drawCtx.globalAlpha = 0.2;
     }
     drawFn();
     if (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) {
-      drawingTools.canvasManager.drawCtx.restore();
+      drawCtx.restore();
     }
   };
 
+  // DRAW SHAPES
   // rectangles
   drawingTools.shapesData.rectangle.forEach((r, i) => {
     const id = `rectangle-${i}`;
@@ -39,8 +46,8 @@ export function redrawAll(drawingTools) {
     const id = `ellipse-${i}`;
     runDraw(id, () => {
       const w = Math.abs(e.widthRel), h = Math.abs(e.height);
-      const cx = zeroX + e.xRel + e.widthRel/2;
-      const cy = e.y + e.height/2;
+      const cx = zeroX + e.xRel + e.widthRel / 2;
+      const cy = e.y + e.height / 2;
       drawingTools.canvasManager.drawRough.ellipse(
         cx, cy, w, h,
         { stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: e.seed }
@@ -73,82 +80,54 @@ export function redrawAll(drawingTools) {
     });
   });
 
-  // pencil
+  // pencil stroke
   drawingTools.shapesData.pencil.forEach((p, i) => {
-    if (!Array.isArray(p.points) || p.points.length === 0) return;
+    if (!p.points || p.points.length === 0) return;
     const id = `pencil-${i}`;
     runDraw(id, () => {
       const raw = p.points.map(pt => [pt.xRel, pt.y]);
       const stroke = getStroke(raw, p.options);
-      const poly = stroke.map(([x, y]) => [zeroX + x, y]);
-      drawingTools.canvasManager.drawCtx.beginPath();
-      poly.forEach(([px, py], j) => j
-        ? drawingTools.canvasManager.drawCtx.lineTo(px, py)
-        : drawingTools.canvasManager.drawCtx.moveTo(px, py)
-      );
-      drawingTools.canvasManager.drawCtx.closePath();
-      drawingTools.canvasManager.drawCtx.fillStyle = 'black';
-      drawingTools.canvasManager.drawCtx.fill();
+      drawCtx.beginPath();
+      stroke.forEach(([x, y], j) => j ? drawCtx.lineTo(zeroX + x, y) : drawCtx.moveTo(zeroX + x, y));
+      drawCtx.closePath();
+      drawCtx.fillStyle = 'black';
+      drawCtx.fill();
     });
   });
 
   // highlighter
   drawingTools.shapesData.highlighter.forEach((h, i) => {
-    if (!Array.isArray(h.points) || h.points.length === 0) return;
+    if (!h.points || h.points.length === 0) return;
     const id = `highlighter-${i}`;
     runDraw(id, () => {
       const raw = h.points.map(pt => [pt.xRel, pt.y]);
       const stroke = getStroke(raw, h.options);
-      const poly = stroke.map(([x, y]) => [zeroX + x, y]);
-      drawingTools.canvasManager.drawCtx.beginPath();
-      poly.forEach(([px, py], j) => j
-        ? drawingTools.canvasManager.drawCtx.lineTo(px, py)
-        : drawingTools.canvasManager.drawCtx.moveTo(px, py)
-      );
-      drawingTools.canvasManager.drawCtx.closePath();
-      drawingTools.canvasManager.drawCtx.fillStyle = hexToRgba(h.options.color, h.options.opacity);
-      drawingTools.canvasManager.drawCtx.fill();
+      drawCtx.beginPath();
+      stroke.forEach(([x, y], j) => j ? drawCtx.lineTo(zeroX + x, y) : drawCtx.moveTo(zeroX + x, y));
+      drawCtx.closePath();
+      drawCtx.fillStyle = drawingTools._hexToRgba(h.options.color, h.options.opacity);
+      drawCtx.fill();
     });
   });
 
   // text
   drawingTools.shapesData.text.forEach((t, i) => {
     const id = `text-${i}`;
+    // Create text div and position it above canvas so eraser won't hide it
     const div = document.createElement('div');
     div.innerText = t.text;
     div.classList.add('annotation-text-editor', 'completed');
     div.setAttribute('data-text-id', id);
-
-    const textX = zeroX + t.xRel;
     Object.assign(div.style, {
       position: 'absolute',
-      left: `${textX}px`,
+      left: `${zeroX + t.xRel}px`,
       top: `${t.y}px`,
-      display: 'inline-block',
-      padding: '4px',
-      background: 'transparent',
       pointerEvents: 'none',
-      zIndex: '-1000',
       fontSize: '24px',
+      background: 'transparent',
+      zIndex: '-1',
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
     });
     document.body.appendChild(div);
-  });
-}
-
-/** Draw arrow head */
-export function drawArrowHead(drawingTools, x1, y1, x2, y2, seed) {
-  const zeroX = getZeroXPoint();
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const angle = Math.atan2(dy, dx);
-  const len = Math.hypot(dx, dy) * 0.2;
-
-  [angle - Math.PI/6, angle + Math.PI/6].forEach(wing => {
-    const x3 = zeroX + x2 - len * Math.cos(wing);
-    const y3 = y2 - len * Math.sin(wing);
-    drawingTools.canvasManager.drawRough.line(zeroX + x2, y2, x3, y3, {
-      stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed
-    });
   });
 }

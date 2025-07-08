@@ -11,6 +11,7 @@ import { handleHighlight } from './tools/highlighter-tool.js';
 import { handleText, createTextEditor } from './tools/text-tool.js';
 import { handleEraser } from './tools/eraser-tool.js';
 import { isClickOnTool, hexToRgba } from './utils.js';
+import { initSelectionHandler } from './selection.js';
 
 /**
  * Class to manage drawing annotations on the document
@@ -83,6 +84,9 @@ export class DrawingTools {
 
     // Create canvas manager
     this.canvasManager = new CanvasManager();
+
+    initSelectionHandler(this);
+
 
     // Custom eraser-following cursor
     this.eraserCursor = document.createElement('div');

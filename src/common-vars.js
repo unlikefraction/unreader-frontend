@@ -1,4 +1,5 @@
 // common-vars.js
 export const commonVars = {
-    toolActive: false
+    toolActive: false,
+    currentTool: 'cursor'
 };

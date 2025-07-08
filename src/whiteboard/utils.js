@@ -18,7 +18,7 @@ export function computeCoords(e, getZeroXPoint) {
 
 /** X-axis zero offset for centering */
 export function getZeroXPoint() {
-  return window.innerWidth/2 - 325;
+  return window.innerWidth / 2 - 325;
 }
 
 /** Check if click is on a tool button */
@@ -77,7 +77,6 @@ export function getShapeBounds(type, shape) {
   }
 
   if (type === 'pencil' || type === 'highlighter') {
-    // Guard against missing or empty points array
     const pts = Array.isArray(shape.points) ? shape.points : [];
     if (pts.length === 0) {
       return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
@@ -93,13 +92,24 @@ export function getShapeBounds(type, shape) {
   }
 
   if (type === 'text') {
-    const textWidth = shape.text.length * 12; // Approximate character width
-    const textHeight = 24; // Font size
+    // Measure actual rendered text dimensions for accurate bounds
+    const fontSize = shape.fontSize || 24;
+    const fontFamily = shape.fontFamily || 'sans-serif';
+    const yOffset = shape.yOffset || 22   ; // user-adjustable vertical offset
+
+    // Use an offscreen canvas for text measurement
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    const metrics = ctx.measureText(shape.text);
+    const textWidth = metrics.width;
+    const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
+    const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
+
     return {
       minX: shape.xRel - padding,
+      minY: shape.y - ascent + yOffset - padding,
       maxX: shape.xRel + textWidth + padding,
-      minY: shape.y - padding,
-      maxY: shape.y + textHeight + padding
+      maxY: shape.y + descent + yOffset + padding
     };
   }
 
