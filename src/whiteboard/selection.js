@@ -1,9 +1,3 @@
-/**
- * Sets up click-based single-shape selection, highlights with a 5px stroke,
- * adds a draggable red rotation-handle on top,
- * and supports moving or rotating any shape with correct hit-testing on rotated bounds.
- * Ensures commonVars.beingEdited toggles.
- */
 import { getZeroXPoint, getShapeBounds } from './utils.js';
 import { commonVars } from '../common-vars.js';
 
@@ -49,43 +43,65 @@ export function initSelectionHandler(drawingTools) {
     ctx.fillRect(localX, localY, size, size);
     ctx.restore();
 
-    // compute absolute handle position for hit-test
-    const cos = Math.cos(rot), sin = Math.sin(rot);
-    const hx = cx + localX * cos - localY * sin;
-    const hy = cy + localX * sin + localY * cos;
-    drawingTools.selectedShape.handle = { x: hx, y: hy, size };
+    // store handle info for hit test
+    drawingTools.selectedShape.handle = { cx, cy, localX, localY, size, rot };
+  }
+
+  function getLocalCoords(e) {
+    // use the preview canvas element's DOM node
+    const canvas = drawingTools.canvasManager.previewCtx.canvas;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
   }
 
   document.addEventListener('mousedown', e => {
     if (commonVars.toolActive !== false) return;
-    const x = e.clientX;
-    const y = e.pageY;
+    const { x, y } = getLocalCoords(e);
     let hit = null;
 
-    // rotate handle hit
-    if (drawingTools.selectedShape?.handle) {
-      const h = drawingTools.selectedShape.handle;
-      if (x >= h.x && x <= h.x + h.size && y >= h.y && y <= h.y + h.size) {
-        hit = { ...drawingTools.selectedShape };
-        const { minX, maxX, minY, maxY } = drawingTools.selectedShape.bounds;
+    // rotated handle hit-test via inverse rotation
+    const h = drawingTools.selectedShape?.handle;
+    if (h) {
+      const { cx, cy, localX, localY, size, rot } = h;
+      // translate into handle local coords
+      const dx = x - cx;
+      const dy = y - cy;
+      const invCos = Math.cos(-rot);
+      const invSin = Math.sin(-rot);
+      const hxLocal = dx * invCos - dy * invSin;
+      const hyLocal = dx * invSin + dy * invCos;
+      const half = size / 2;
+      const centerX = localX + half;
+      const centerY = localY + half;
+      if (
+        hxLocal >= centerX - half && hxLocal <= centerX + half &&
+        hyLocal >= centerY - half && hyLocal <= centerY + half
+      ) {
+        // start rotate
+        const sel = drawingTools.selectedShape;
+        const { minX, maxX, minY, maxY } = sel.bounds;
         const zeroX = getZeroXPoint();
-        const cx = zeroX + (minX + maxX) / 2;
-        const cy = (minY + maxY) / 2;
+        const cxShape = zeroX + (minX + maxX) / 2;
+        const cyShape = (minY + maxY) / 2;
         dragInfo = {
           mode: 'rotate',
-          type: hit.type,
-          index: hit.index,
-          cx,
-          cy,
-          startAng: Math.atan2(y - cy, x - cx),
-          origRot: drawingTools.shapesData[hit.type][hit.index].rotation || 0
+          type: sel.type,
+          index: sel.index,
+          cx: cxShape,
+          cy: cyShape,
+          startAng: Math.atan2(y - cyShape, x - cxShape),
+          origRot: drawingTools.shapesData[sel.type][sel.index].rotation || 0
         };
         commonVars.beingEdited = true;
         document.body.style.userSelect = 'none';
+        hit = sel;
       }
     }
 
-    // shape hit on rotated bounds
+    // shape hit-test (rotated bounds)
     if (!hit) {
       outer: for (const type of Object.keys(drawingTools.shapesData)) {
         const list = drawingTools.shapesData[type];
@@ -93,30 +109,28 @@ export function initSelectionHandler(drawingTools) {
           const shape = list[i];
           const bounds = getShapeBounds(type, shape);
           const zeroX = getZeroXPoint();
-          // center and rotation
-          const cx = zeroX + (bounds.minX + bounds.maxX) / 2;
-          const cy = (bounds.minY + bounds.maxY) / 2;
+          const cxShape = zeroX + (bounds.minX + bounds.maxX) / 2;
+          const cyShape = (bounds.minY + bounds.maxY) / 2;
           const rot = -((shape.rotation || 0) * Math.PI / 180);
-          // translate click into shape local coords
-          const dx = x - cx;
-          const dy = y - cy;
+          const dx = x - cxShape;
+          const dy = y - cyShape;
           const localX = dx * Math.cos(rot) - dy * Math.sin(rot);
           const localY = dx * Math.sin(rot) + dy * Math.cos(rot);
           const halfW = (bounds.maxX - bounds.minX) / 2;
           const halfH = (bounds.maxY - bounds.minY) / 2;
-          if (localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH) {
+          if (
+            localX >= -halfW && localX <= halfW &&
+            localY >= -halfH && localY <= halfH
+          ) {
             hit = { type, index: i };
-            // prepare move drag state
-            const base = drawingTools.shapesData[type][i];
-            const info = { mode: 'move', type, index: i };
-            if (type === 'rectangle' || type === 'ellipse' || type === 'text') {
-              info.startX = x; info.startY = y;
-              info.origX = base.xRel; info.origY = base.y;
-            } else if (type === 'line' || type === 'arrow') {
-              info.startX = x; info.startY = y;
+            const base = shape;
+            const info = { mode: 'move', type, index: i, startX: x, startY: y };
+            if (['rectangle','ellipse','text'].includes(type)) {
+              info.origX = base.xRel;
+              info.origY = base.y;
+            } else if (['line','arrow'].includes(type)) {
               info.orig = { x1: base.x1Rel, y1: base.y1, x2: base.x2Rel, y2: base.y2 };
-            } else if (type === 'pencil' || type === 'highlighter') {
-              info.startX = x; info.startY = y;
+            } else {
               info.origPts = base.points.map(pt => ({ x: pt.xRel, y: pt.y }));
             }
             dragInfo = info;
@@ -137,21 +151,22 @@ export function initSelectionHandler(drawingTools) {
   document.addEventListener('mousemove', e => {
     if (!dragInfo) return;
     commonVars.beingEdited = true;
-    const x = e.clientX; const y = e.pageY;
+    const { x, y } = getLocalCoords(e);
     const { mode, type, index } = dragInfo;
     const shape = drawingTools.shapesData[type][index];
+
     if (mode === 'move') {
       const dx = x - dragInfo.startX;
       const dy = y - dragInfo.startY;
-      if (type === 'rectangle' || type === 'ellipse' || type === 'text') {
+      if (['rectangle','ellipse','text'].includes(type)) {
         shape.xRel = dragInfo.origX + dx;
         shape.y    = dragInfo.origY + dy;
-      } else if (type === 'line' || type === 'arrow') {
+      } else if (['line','arrow'].includes(type)) {
         shape.x1Rel = dragInfo.orig.x1 + dx;
         shape.y1    = dragInfo.orig.y1 + dy;
         shape.x2Rel = dragInfo.orig.x2 + dx;
         shape.y2    = dragInfo.orig.y2 + dy;
-      } else if (type === 'pencil' || type === 'highlighter') {
+      } else {
         shape.points.forEach((pt, i) => {
           pt.xRel = dragInfo.origPts[i].x + dx;
           pt.y    = dragInfo.origPts[i].y + dy;
@@ -161,6 +176,7 @@ export function initSelectionHandler(drawingTools) {
       const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
       shape.rotation = dragInfo.origRot + (ang - dragInfo.startAng) * 180 / Math.PI;
     }
+
     drawingTools.canvasManager.clearPreview();
     drawingTools.redrawAll();
     drawPersistentHighlight();
