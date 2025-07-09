@@ -26,7 +26,10 @@ export function isClickOnTool(e, selector) {
   return e.target.closest(selector) !== null;
 }
 
-/** Get proper bounding box for any shape */
+/**
+ * Get proper bounding box for any shape, including padding,
+ * used for both hit-testing and rotation-aware erasing.
+ */
 export function getShapeBounds(type, shape) {
   const padding = 20; // Extra padding around shapes
 
@@ -47,24 +50,24 @@ export function getShapeBounds(type, shape) {
     return {
       minX: Math.min(shape.x1Rel, shape.x2Rel) - padding,
       maxX: Math.max(shape.x1Rel, shape.x2Rel) + padding,
-      minY: Math.min(shape.y1, shape.y2) - padding,
-      maxY: Math.max(shape.y1, shape.y2) + padding
+      minY: Math.min(shape.y1, shape.y2)   - padding,
+      maxY: Math.max(shape.y1, shape.y2)   + padding
     };
   }
 
   if (type === 'arrow') {
     const dx = shape.x2Rel - shape.x1Rel;
-    const dy = shape.y2 - shape.y1;
+    const dy = shape.y2    - shape.y1;
     const angle = Math.atan2(dy, dx);
-    const len = Math.hypot(dx, dy) * 0.2;
+    const len   = Math.hypot(dx, dy) * 0.2;
 
     const head1X = shape.x2Rel - len * Math.cos(angle - Math.PI/6);
-    const head1Y = shape.y2 - len * Math.sin(angle - Math.PI/6);
+    const head1Y = shape.y2    - len * Math.sin(angle - Math.PI/6);
     const head2X = shape.x2Rel - len * Math.cos(angle + Math.PI/6);
-    const head2Y = shape.y2 - len * Math.sin(angle + Math.PI/6);
+    const head2Y = shape.y2    - len * Math.sin(angle + Math.PI/6);
 
     const allX = [shape.x1Rel, shape.x2Rel, head1X, head2X];
-    const allY = [shape.y1, shape.y2, head1Y, head2Y];
+    const allY = [shape.y1,    shape.y2,    head1Y, head2Y];
 
     return {
       minX: Math.min(...allX) - padding,
@@ -76,9 +79,7 @@ export function getShapeBounds(type, shape) {
 
   if (type === 'pencil' || type === 'highlighter') {
     const pts = Array.isArray(shape.points) ? shape.points : [];
-    if (pts.length === 0) {
-      return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
-    }
+    if (!pts.length) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
     const allX = pts.map(p => p.xRel);
     const allY = pts.map(p => p.y);
     return {
@@ -91,29 +92,30 @@ export function getShapeBounds(type, shape) {
 
   if (type === 'text') {
     // Measure actual rendered text dimensions for accurate bounds
-    const fontSize = shape.fontSize || 24;
+    const fontSize   = shape.fontSize   || 24;
     const fontFamily = shape.fontFamily || 'sans-serif';
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.font = `${fontSize}px ${fontFamily}`;
-    const metrics = ctx.measureText(shape.text);
+    const metrics   = ctx.measureText(shape.text);
     const textWidth = metrics.width;
-    const ascent = metrics.actualBoundingBoxAscent != null ? metrics.actualBoundingBoxAscent : fontSize * 0.8;
-    const descent = metrics.actualBoundingBoxDescent != null ? metrics.actualBoundingBoxDescent : fontSize * 0.2;
+    const ascent    = metrics.actualBoundingBoxAscent  ?? fontSize * 0.8;
+    const descent   = metrics.actualBoundingBoxDescent ?? fontSize * 0.2;
     const x = shape.xRel;
     const y = shape.y;
     return {
       minX: x - padding,
       minY: y - ascent - padding,
       maxX: x + textWidth + padding,
-      maxY: y + descent + padding
+      maxY: y + descent   + padding
     };
   }
 
+  // Fallback
   return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
 }
 
-/** Hit-test using proper bounding boxes */
+/** Hit-test using the padded bounding box (no rotation) */
 export function pointInShapeBounds(type, shape, x, y) {
-  const bounds = getShapeBounds(type, shape);
-  return x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY;
+  const b = getShapeBounds(type, shape);
+  return x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY;
 }
