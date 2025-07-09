@@ -1,41 +1,40 @@
 import { commonVars } from '../common-vars.js';
 
 export class ParagraphSeeker {
-  static _mouseListenersAdded = false;
+    static _mouseListenersAdded = false;
 
-  constructor(textProcessor, audioCore, {
-    minProbabilityThreshold = 0.4,
-    contextWindow = 15,
-    cleanPattern = /[^\w\s]/g
-  } = {}) {
-    this.textProcessor = textProcessor;
-    this.audioCore = audioCore;
-    this.minProbabilityThreshold = minProbabilityThreshold;
-    this.contextWindow = contextWindow;
-    this.cleanPattern = cleanPattern;
+    constructor(textProcessor, audioCore, {
+        minProbabilityThreshold = 0.4,
+        contextWindow = 15,
+        cleanPattern = /[^\w\s]/g
+    } = {}) {
+        this.textProcessor = textProcessor;
+        this.audioCore = audioCore;
+        this.minProbabilityThreshold = minProbabilityThreshold;
+        this.contextWindow = contextWindow;
+        this.cleanPattern = cleanPattern;
 
-    // Track last known toolActive state
-    this._lastToolActive = commonVars.toolActive;
+        this._lastToolActive = commonVars.toolActive;
+        this._lastBeingEdited = commonVars.beingEdited;
 
-    // Poll for toolActive changes every second
-    this._stateInterval = setInterval(() => {
-      const current = commonVars.toolActive;
-      if (current !== this._lastToolActive) {
-        this._lastToolActive = current;
-        this.refreshParagraphNavigation();
-      }
-    }, 1000);
+        this._stateInterval = setInterval(() => {
+        const { toolActive, beingEdited } = commonVars;
+        if (toolActive !== this._lastToolActive || beingEdited !== this._lastBeingEdited) {
+            this._lastToolActive = toolActive;
+            this._lastBeingEdited = beingEdited;
+            this.refreshParagraphNavigation();
+        }
+        }, 1000);
 
-    // Restore overlays on mouseup
-    if (!ParagraphSeeker._mouseListenersAdded) {
-      document.addEventListener('mouseup', () => {
-        document
-          .querySelectorAll('.paragraph-hover-area')
-          .forEach(area => area.style.pointerEvents = 'auto');
-      });
-      ParagraphSeeker._mouseListenersAdded = true;
+        if (!ParagraphSeeker._mouseListenersAdded) {
+        document.addEventListener('mouseup', () => {
+            document
+            .querySelectorAll('.paragraph-hover-area')
+            .forEach(area => area.style.pointerEvents = 'auto');
+        });
+        ParagraphSeeker._mouseListenersAdded = true;
+        }
     }
-  }
 
   preprocessText(inputText) {
     return inputText
@@ -237,6 +236,7 @@ export class ParagraphSeeker {
   }
 
   setupParagraphHover(paragraph, index) {
+    // if (commonVars.beingEdited) return;  // disable if editing
     if (!paragraph.elements.length) return;
     const first = paragraph.elements[0];
     const last = paragraph.elements[paragraph.elements.length - 1];
@@ -246,21 +246,25 @@ export class ParagraphSeeker {
       position: 'absolute',
       zIndex: 1,
       background: 'transparent',
-      pointerEvents: commonVars.toolActive ? 'auto' : 'auto',
+      pointerEvents: commonVars.toolActive && !commonVars.beingEdited ? 'auto' : 'none',
       cursor: commonVars.toolActive ? 'crossbow' : 'text'
     });
     hoverArea.className = 'paragraph-hover-area';
 
-    // If toolActive is true, just block selection and bail
-    if (commonVars.toolActive) {
+    if (commonVars.toolActive && !commonVars.beingEdited) {
       document.body.appendChild(hoverArea);
       this.updateHoverAreaPosition(hoverArea, paragraph);
-      return;
+    } else {
+      // not active: append only to maintain layout but disable pointer events
+      document.body.appendChild(hoverArea);
+      this.updateHoverAreaPosition(hoverArea, paragraph);
     }
 
-    // When inactive: allow mousedown to pass through for text selection
+    // allow native text selection when not active
     hoverArea.addEventListener('mousedown', () => {
-      hoverArea.style.pointerEvents = 'none';
+      if (!commonVars.toolActive || commonVars.beingEdited) {
+        hoverArea.style.pointerEvents = 'none';
+      }
     });
 
     const hoverDiv = document.createElement('div');
@@ -270,7 +274,7 @@ export class ParagraphSeeker {
       position: 'absolute',
       zIndex: 2,
       cursor: 'pointer',
-      pointerEvents: 'auto'
+      pointerEvents: commonVars.beingEdited ? 'none' : 'auto'
     });
     hoverDiv.innerHTML = '<i class="ph ph-play"></i>';
     hoverDiv.dataset.paragraphIndex = index;
@@ -286,6 +290,7 @@ export class ParagraphSeeker {
 
     hoverDiv.addEventListener('click', async e => {
       e.preventDefault();
+      if (commonVars.beingEdited) return;
       const result = await this.seekToParagraph(paragraph.text);
       if (result.success && this.audioCore && !this.audioCore.isPlaying) {
         await this.audioCore.playAudio();
@@ -294,7 +299,6 @@ export class ParagraphSeeker {
 
     document.body.appendChild(hoverArea);
     document.body.appendChild(hoverDiv);
-    this.updateHoverAreaPosition(hoverArea, paragraph);
   }
 
   updateHoverAreaPosition(hoverArea, paragraph) {

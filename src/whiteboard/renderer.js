@@ -1,5 +1,5 @@
 /**
- * Renderer for drawing all shapes and their bounding borders
+ * Renderer for drawing all shapes and their bounding borders, now supporting per-shape rotation
  */
 import { getZeroXPoint, getShapeBounds } from './utils.js';
 import { drawArrowHead } from './tools/arrow-tool.js';
@@ -19,12 +19,9 @@ export function redrawAll(drawingTools) {
   // helper to fade flagged shapes (text is skipped)
   const runDraw = (id, drawFn) => {
     if (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) {
-      drawCtx.save();
-      drawCtx.globalAlpha = 0.2;
-    }
-    drawFn();
-    if (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) {
-      drawCtx.restore();
+      drawCtx.save(); drawCtx.globalAlpha = 0.2; drawFn(); drawCtx.restore();
+    } else {
+      drawFn();
     }
   };
 
@@ -33,11 +30,25 @@ export function redrawAll(drawingTools) {
   drawingTools.shapesData.rectangle.forEach((r, i) => {
     const id = `rectangle-${i}`;
     runDraw(id, () => {
+      const w = r.widthRel;
+      const h = r.height;
+      const cx = zeroX + r.xRel + w / 2;
+      const cy = r.y + h / 2;
+      const rotRad = ((r.rotation || 0) * Math.PI) / 180;
+      drawCtx.save();
+      drawCtx.translate(cx, cy);
+      drawCtx.rotate(rotRad);
       drawingTools.canvasManager.drawRough.rectangle(
-        zeroX + r.xRel, r.y,
-        r.widthRel, r.height,
-        { stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: r.seed }
+        -w / 2, -h / 2,
+        w, h,
+        {
+          stroke: 'black',
+          strokeWidth: drawingTools.strokeWidth,
+          roughness: drawingTools.roughness,
+          seed: r.seed
+        }
       );
+      drawCtx.restore();
     });
   });
 
@@ -45,13 +56,24 @@ export function redrawAll(drawingTools) {
   drawingTools.shapesData.ellipse.forEach((e, i) => {
     const id = `ellipse-${i}`;
     runDraw(id, () => {
-      const w = Math.abs(e.widthRel), h = Math.abs(e.height);
+      const w = Math.abs(e.widthRel);
+      const h = Math.abs(e.height);
       const cx = zeroX + e.xRel + e.widthRel / 2;
       const cy = e.y + e.height / 2;
+      const rotRad = ((e.rotation || 0) * Math.PI) / 180;
+      drawCtx.save();
+      drawCtx.translate(cx, cy);
+      drawCtx.rotate(rotRad);
       drawingTools.canvasManager.drawRough.ellipse(
-        cx, cy, w, h,
-        { stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: e.seed }
+        0, 0, w, h,
+        {
+          stroke: 'black',
+          strokeWidth: drawingTools.strokeWidth,
+          roughness: drawingTools.roughness,
+          seed: e.seed
+        }
       );
+      drawCtx.restore();
     });
   });
 
@@ -59,11 +81,27 @@ export function redrawAll(drawingTools) {
   drawingTools.shapesData.line.forEach((l, i) => {
     const id = `line-${i}`;
     runDraw(id, () => {
+      const x1 = zeroX + l.x1Rel;
+      const y1 = l.y1;
+      const x2 = zeroX + l.x2Rel;
+      const y2 = l.y2;
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      const rotRad = ((l.rotation || 0) * Math.PI) / 180;
+      drawCtx.save();
+      drawCtx.translate(cx, cy);
+      drawCtx.rotate(rotRad);
       drawingTools.canvasManager.drawRough.line(
-        zeroX + l.x1Rel, l.y1,
-        zeroX + l.x2Rel, l.y2,
-        { stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: l.seed }
+        x1 - cx, y1 - cy,
+        x2 - cx, y2 - cy,
+        {
+          stroke: 'black',
+          strokeWidth: drawingTools.strokeWidth,
+          roughness: drawingTools.roughness,
+          seed: l.seed
+        }
       );
+      drawCtx.restore();
     });
   });
 
@@ -71,12 +109,35 @@ export function redrawAll(drawingTools) {
   drawingTools.shapesData.arrow.forEach((a, i) => {
     const id = `arrow-${i}`;
     runDraw(id, () => {
+      const x1 = zeroX + a.x1Rel;
+      const y1 = a.y1;
+      const x2 = zeroX + a.x2Rel;
+      const y2 = a.y2;
+      const cx = (x1 + x2) / 2;
+      const cy = (y1 + y2) / 2;
+      const rotRad = ((a.rotation || 0) * Math.PI) / 180;
+      drawCtx.save();
+      drawCtx.translate(cx, cy);
+      drawCtx.rotate(rotRad);
       drawingTools.canvasManager.drawRough.line(
-        zeroX + a.x1Rel, a.y1,
-        zeroX + a.x2Rel, a.y2,
-        { stroke: 'black', strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: a.seed }
+        x1 - cx, y1 - cy,
+        x2 - cx, y2 - cy,
+        {
+          stroke: 'black',
+          strokeWidth: drawingTools.strokeWidth,
+          roughness: drawingTools.roughness,
+          seed: a.seed
+        }
       );
-      drawArrowHead(drawingTools, a.x1Rel, a.y1, a.x2Rel, a.y2, a.seed);
+      drawArrowHead(
+        drawingTools,
+        x1 - cx,
+        y1 - cy,
+        x2 - cx,
+        y2 - cy,
+        a.seed
+      );
+      drawCtx.restore();
     });
   });
 
@@ -86,12 +147,25 @@ export function redrawAll(drawingTools) {
     const id = `pencil-${i}`;
     runDraw(id, () => {
       const raw = p.points.map(pt => [pt.xRel, pt.y]);
+      const xs = raw.map(r => r[0]), ys = raw.map(r => r[1]);
+      const cxRel = xs.reduce((a,b)=>a+b)/xs.length;
+      const cy = ys.reduce((a,b)=>a+b)/ys.length;
+      const cx = zeroX + cxRel;
+      const rotRad = ((p.rotation || 0) * Math.PI) / 180;
       const stroke = getStroke(raw, p.options);
+      drawCtx.save();
+      drawCtx.translate(cx, cy);
+      drawCtx.rotate(rotRad);
       drawCtx.beginPath();
-      stroke.forEach(([x, y], j) => j ? drawCtx.lineTo(zeroX + x, y) : drawCtx.moveTo(zeroX + x, y));
+      stroke.forEach(([x, y], j) => {
+        const rx = x - cxRel;
+        const ry = y - cy;
+        j ? drawCtx.lineTo(rx, ry) : drawCtx.moveTo(rx, ry);
+      });
       drawCtx.closePath();
       drawCtx.fillStyle = 'black';
       drawCtx.fill();
+      drawCtx.restore();
     });
   });
 
@@ -101,29 +175,58 @@ export function redrawAll(drawingTools) {
     const id = `highlighter-${i}`;
     runDraw(id, () => {
       const raw = h.points.map(pt => [pt.xRel, pt.y]);
+      const xs = raw.map(r => r[0]), ys = raw.map(r => r[1]);
+      const cxRel = xs.reduce((a,b)=>a+b)/xs.length;
+      const cy = ys.reduce((a,b)=>a+b)/ys.length;
+      const cx = zeroX + cxRel;
+      const rotRad = ((h.rotation || 0) * Math.PI) / 180;
       const stroke = getStroke(raw, h.options);
+      drawCtx.save();
+      drawCtx.translate(cx, cy);
+      drawCtx.rotate(rotRad);
       drawCtx.beginPath();
-      stroke.forEach(([x, y], j) => j ? drawCtx.lineTo(zeroX + x, y) : drawCtx.moveTo(zeroX + x, y));
+      stroke.forEach(([x, y], j) => {
+        const rx = x - cxRel;
+        const ry = y - cy;
+        j ? drawCtx.lineTo(rx, ry) : drawCtx.moveTo(rx, ry);
+      });
       drawCtx.closePath();
       drawCtx.fillStyle = drawingTools._hexToRgba(h.options.color, h.options.opacity);
       drawCtx.fill();
+      drawCtx.restore();
     });
   });
 
-  // text
+  // TEXT: render and position using measured bounds for accurate highlighting
   drawingTools.shapesData.text.forEach((t, i) => {
     const id = `text-${i}`;
-    // Create text div and position it above canvas so eraser won't hide it
+    const bounds = getShapeBounds('text', t);
+    const rotDeg = t.rotation || 0;
+    const cx = zeroX + (bounds.minX + bounds.maxX) / 2;
+    const cy = (bounds.minY + bounds.maxY) / 2;
+    const width = bounds.maxX - bounds.minX;
+    const height = bounds.maxY - bounds.minY;
     const div = document.createElement('div');
     div.innerText = t.text;
     div.classList.add('annotation-text-editor', 'completed');
     div.setAttribute('data-text-id', id);
     Object.assign(div.style, {
       position: 'absolute',
-      left: `${zeroX + t.xRel}px`,
-      top: `${t.y}px`,
+      left: `${cx}px`,
+      top: `${cy}px`,
+      width: `${width}px`,
+      height: `${height}px`,
+      transform: `translate(-50%, -50%) rotate(${rotDeg}deg)`,
+      transformOrigin: 'center center',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      textAlign: 'center',
       pointerEvents: 'none',
-      fontSize: '24px',
+      fontSize: `${t.fontSize || 24}px`,
+      fontFamily: t.fontFamily || 'sans-serif',
+      lineHeight: 'normal',
+      whiteSpace: 'pre-wrap',
       background: 'transparent',
       zIndex: '-1',
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'

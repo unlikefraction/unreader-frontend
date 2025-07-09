@@ -28,7 +28,7 @@ export function isClickOnTool(e, selector) {
 
 /** Get proper bounding box for any shape */
 export function getShapeBounds(type, shape) {
-  const padding = 10; // Extra padding around shapes
+  const padding = 20; // Extra padding around shapes
 
   if (type === 'rectangle' || type === 'ellipse') {
     const x1 = shape.xRel;
@@ -53,13 +53,11 @@ export function getShapeBounds(type, shape) {
   }
 
   if (type === 'arrow') {
-    // Include arrow head in bounds calculation
     const dx = shape.x2Rel - shape.x1Rel;
     const dy = shape.y2 - shape.y1;
     const angle = Math.atan2(dy, dx);
     const len = Math.hypot(dx, dy) * 0.2;
 
-    // Calculate arrow head points
     const head1X = shape.x2Rel - len * Math.cos(angle - Math.PI/6);
     const head1Y = shape.y2 - len * Math.sin(angle - Math.PI/6);
     const head2X = shape.x2Rel - len * Math.cos(angle + Math.PI/6);
@@ -95,21 +93,19 @@ export function getShapeBounds(type, shape) {
     // Measure actual rendered text dimensions for accurate bounds
     const fontSize = shape.fontSize || 24;
     const fontFamily = shape.fontFamily || 'sans-serif';
-    const yOffset = shape.yOffset || 22   ; // user-adjustable vertical offset
-
-    // Use an offscreen canvas for text measurement
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.font = `${fontSize}px ${fontFamily}`;
     const metrics = ctx.measureText(shape.text);
     const textWidth = metrics.width;
-    const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
-    const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
-
+    const ascent = metrics.actualBoundingBoxAscent != null ? metrics.actualBoundingBoxAscent : fontSize * 0.8;
+    const descent = metrics.actualBoundingBoxDescent != null ? metrics.actualBoundingBoxDescent : fontSize * 0.2;
+    const x = shape.xRel;
+    const y = shape.y;
     return {
-      minX: shape.xRel - padding,
-      minY: shape.y - ascent + yOffset - padding,
-      maxX: shape.xRel + textWidth + padding,
-      maxY: shape.y + descent + yOffset + padding
+      minX: x - padding,
+      minY: y - ascent - padding,
+      maxX: x + textWidth + padding,
+      maxY: y + descent + padding
     };
   }
 
