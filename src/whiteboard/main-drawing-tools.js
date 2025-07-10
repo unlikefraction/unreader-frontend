@@ -33,7 +33,7 @@ export class DrawingTools {
     // Drawing palette
     this.colorOptions = ['#373737', '#9C0000', '#0099FF', '#045C32', '#FFAA00'];
     // Highlight palette
-    this.highlightColorOptions = ['#FFF176', '#AED581', '#81D4FA', '#FFAB91', '#E1BEE7'];
+    this.highlightColorOptions = ['#FFE500', '#F84F4F', '#2FCEF6', '#1FDC82', '#FC49FF'];
 
     // Default colors
     this.selectedColor = this.colorOptions[0];
