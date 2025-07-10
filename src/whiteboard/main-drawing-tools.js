@@ -19,14 +19,6 @@ import { initSelectionHandler } from './selection.js';
 export class DrawingTools {
   static _mouseListenersAdded = false;
 
-  /**
-   * @param {object} options
-   * @param {string} options.selector - CSS selector for tool buttons
-   * @param {number} options.strokeWidth - default stroke width for shapes
-   * @param {number} options.roughness - default roughness for shapes
-   * @param {object} options.pencilOptions - customization for pencil stroke
-   * @param {object} options.highlightOptions - customization for highlighter
-   */
   constructor({
     selector = '.w-control',
     strokeWidth = 2,
@@ -38,57 +30,60 @@ export class DrawingTools {
     this.strokeWidth = strokeWidth;
     this.roughness = roughness;
 
+    // Drawing palette
+    this.colorOptions = ['#373737', '#9C0000', '#0099FF', '#045C32', '#FFAA00'];
+    // Highlight palette
+    this.highlightColorOptions = ['#FFF176', '#AED581', '#81D4FA', '#FFAB91', '#E1BEE7'];
+
+    // Default colors
+    this.selectedColor = this.colorOptions[0];
+    this.highlightColor = this.highlightColorOptions[0];
+
     // Pencil settings
-    this.pencilOptions = Object.assign(
-      {
-        size: 8,
-        smoothing: 0.5,
-        thinning: 0.5,
-        streamline: 0.5,
-        easing: t => t,
-        start: { taper: 0, cap: true },
-        end: { taper: 0, cap: true }
-      },
-      pencilOptions
-    );
+    this.pencilOptions = Object.assign({
+      size: 8,
+      smoothing: 0.5,
+      thinning: 0.5,
+      streamline: 0.5,
+      easing: t => t,
+      start: { taper: 0, cap: true },
+      end: { taper: 0, cap: true }
+    }, pencilOptions);
 
     // Highlighter settings
-    this.highlightOptions = Object.assign(
-      {
-        size: 35,
-        smoothing: 0.5,
-        thinning: 0.1,
-        streamline: 0.5,
-        easing: t => t,
-        start: { taper: 0, cap: true },
-        end: { taper: 0, cap: true },
-        color: '#FFE500',
-        opacity: 0.5
-      },
-      highlightOptions
-    );
+    this.highlightOptions = Object.assign({
+      size: 35,
+      smoothing: 0.5,
+      thinning: 0.1,
+      streamline: 0.5,
+      easing: t => t,
+      start: { taper: 0, cap: true },
+      end: { taper: 0, cap: true },
+      color: this.highlightColor,
+      opacity: 0.5
+    }, highlightOptions);
 
     // Tool buttons
     this.tools = Array.from(document.querySelectorAll(this.selector));
     this.activeTool = this.tools.find(t => t.classList.contains('active')) || null;
 
-    // Flags and state
+    // Build the color picker UI container
+    this._createColorPicker();
+
+    // State flags
     this.isDrawing = false;
     this.isErasing = false;
     this.currentPoints = [];
     this.textClickArmed = false;
     this.erasedShapeIds = new Set();
 
-    // Shape storage
+    // Load shapes and canvas
     this.shapesData = loadShapesData();
-
-    // Create canvas manager
     this.canvasManager = new CanvasManager();
 
     initSelectionHandler(this);
 
-
-    // Custom eraser-following cursor
+    // Eraser-following cursor
     this.eraserCursor = document.createElement('div');
     this.eraserCursor.classList.add('eraser-mouse');
     Object.assign(this.eraserCursor.style, {
@@ -98,24 +93,20 @@ export class DrawingTools {
     });
     document.body.appendChild(this.eraserCursor);
 
-    // Global mouseup listener for selection pass-through (if paragraph nav present)
+    // Global mouseup to restore paragraph events
     if (!DrawingTools._mouseListenersAdded) {
-      document.addEventListener('mouseup', () => {
-        document.querySelectorAll('.paragraph-hover-area').forEach(area => {
-          area.style.pointerEvents = 'auto';
-        });
-      });
+      document.addEventListener('mouseup', () =>
+        document.querySelectorAll('.paragraph-hover-area').forEach(a => a.style.pointerEvents = 'auto')
+      );
       DrawingTools._mouseListenersAdded = true;
     }
   }
 
-  /** Initialize event listeners and sizing */
   init() {
     window.addEventListener('resize', () => {
       this.canvasManager.sizeCanvases();
       this.redrawAll();
     });
-
     window.addEventListener('load', () => {
       this.canvasManager.sizeCanvases();
       this.redrawAll();
@@ -124,19 +115,16 @@ export class DrawingTools {
     this.canvasManager.sizeCanvases();
     setTimeout(() => this.redrawAll(), 10);
 
-    // Tool button clicks
     this.tools.forEach(tool =>
       tool.addEventListener('click', () => this.setActiveTool(tool))
     );
 
-    // Clear all on Ctrl/Cmd+Shift+C
     window.addEventListener('keydown', e => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'c') {
         if (confirm('Clear all annotations?')) this.clearAll();
       }
     });
 
-    // Eraser events
     ['mousedown','mousemove','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
@@ -144,7 +132,6 @@ export class DrawingTools {
       })
     );
 
-    // Eraser cursor follow
     document.addEventListener('mousemove', e => {
       if (this.activeTool?.classList.contains('eraser')) {
         this.eraserCursor.style.display = 'block';
@@ -155,116 +142,195 @@ export class DrawingTools {
       }
     });
 
-    // Text tool click
-    document.addEventListener('click', e => handleText(this, e));
+    // Text tool (with color)
+    document.addEventListener('click', e =>
+      handleText(this, e, this.selectedColor)
+    );
 
-    // Shape drawing events
+    // Drawing shape events
     ['mousedown','mousemove','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
-        handleRectangle(this, evt, e);
-        handleEllipse(this, evt, e);
-        handleLine(this, evt, e);
-        handleArrow(this, evt, e);
-        handlePencil(this, evt, e);
-        handleHighlight(this, evt, e);
+        handleRectangle(this, evt, e, this.selectedColor);
+        handleEllipse(this, evt, e, this.selectedColor);
+        handleLine(this, evt, e, this.selectedColor);
+        handleArrow(this, evt, e, this.selectedColor);
+        handlePencil(this, evt, e, this.pencilOptions, this.selectedColor);
+        handleHighlight(
+          this,
+          evt,
+          e,
+          this.highlightOptions,
+          this.highlightColor,
+          this.highlightOptions.opacity
+        );
       })
     );
   }
 
-  /** Clear & redraw everything */
+  /** Build the floating color-picker container */
+  _createColorPicker() {
+    this.colorPicker = document.createElement('div');
+    Object.assign(this.colorPicker.style, {
+      display: 'none',
+      position: 'fixed',
+      flexDirection: 'column',
+      gap: '8px',
+      marginLeft: '8px',
+      borderRadius: '20px',
+      padding: '5px',
+      background: '#fff',
+      border: '1px solid #B7B7B7',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    });
+    ['mousedown','click'].forEach(evt =>
+      this.colorPicker.addEventListener(evt, e => e.stopPropagation())
+    );
+    document.body.appendChild(this.colorPicker);
+  }
+
+  /** Show and populate picker based on active tool */
+  _showColorPicker(tool) {
+    this.colorPicker.innerHTML = '';
+    const isHighlight = tool.classList.contains('highlighter');
+    const palette = isHighlight ? this.highlightColorOptions : this.colorOptions;
+    const current = isHighlight ? this.highlightColor : this.selectedColor;
+
+    palette.forEach(color => {
+      const dot = document.createElement('div');
+      const size = color === current ? '20px' : '13px';
+      Object.assign(dot.style, {
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: color,
+        cursor: 'pointer'
+      });
+      ['mousedown','click'].forEach(evt =>
+        dot.addEventListener(evt, e => {
+          e.stopPropagation();
+          if (evt === 'click') {
+            if (isHighlight) {
+              this.highlightColor = color;
+              this.highlightOptions.color = color;
+            } else {
+              this.selectedColor = color;
+            }
+            this._updatePickerDots(tool);
+          }
+        })
+      );
+      this.colorPicker.appendChild(dot);
+    });
+
+    const r = tool.getBoundingClientRect();
+    Object.assign(this.colorPicker.style, {
+      top: `${r.top}px`,
+      left: `${r.right + 8}px`,
+      display: 'flex'
+    });
+  }
+
+  /** Update dot sizes after selection */
+  _updatePickerDots(tool) {
+    const isHighlight = tool.classList.contains('highlighter');
+    const palette = isHighlight ? this.highlightColorOptions : this.colorOptions;
+    const current = isHighlight ? this.highlightColor : this.selectedColor;
+
+    Array.from(this.colorPicker.children).forEach((dot, idx) => {
+      const color = palette[idx];
+      const size = color === current ? '20px' : '11px';
+      dot.style.width = size;
+      dot.style.height = size;
+    });
+  }
+
+  _hideColorPicker() {
+    this.colorPicker.style.display = 'none';
+  }
+
   redrawAll() {
     redrawAll(this);
   }
 
-  /** Persist shapesData */
   save() {
     saveShapesData(this.shapesData);
   }
 
-  /** Tool switch & update global flag */
   setActiveTool(tool) {
     if (tool === this.activeTool) return;
     this.tools.forEach(t => t.classList.remove('active'));
     tool.classList.add('active');
     this.activeTool = tool;
 
-    // Flip global toolActive flag by mutating exported object
-    commonVars.toolActive = !tool.classList.contains('cursor');
+    const draw = ['rectangle','circle','line','arrow','pencil','highlighter','text'];
+    const isDraw = draw.some(c => tool.classList.contains(c));
+    if (isDraw) this._showColorPicker(tool);
+    else this._hideColorPicker();
 
-    // Reset state
+    commonVars.toolActive = !tool.classList.contains('cursor');
     this.textClickArmed = false;
     this.erasedShapeIds.clear();
-
-    // Update cursor style
-    const drawTools = ['rectangle','circle','line','arrow','pencil','highlighter','text','eraser'];
-    document.body.style.cursor = drawTools.some(c => tool.classList.contains(c))
-      ? 'crosshair'
-      : 'default';
+    document.body.style.cursor = isDraw ? 'crosshair' : 'default';
   }
 
-  /** Add helper to detect clicks on UI */
   _isClickOnTool(e) {
     return isClickOnTool(e, this.selector);
   }
 
-  /** Generic draw lifecycle helper */
-  _genericDraw(type, xRel, y, previewFn, finalizeFn) {
+  _genericDraw(type, x, y, pF, fF) {
     if (type === 'mousedown') {
       this.isDrawing = true;
-      this.startXRel = xRel; this.startY = y;
-      this.currentSeed = Math.floor(Math.random()*10000)+1;
+      this.startXRel = x;
+      this.startY = y;
+      this.currentSeed = Math.floor(Math.random() * 10000) + 1;
       document.body.style.userSelect = 'none';
     } else if (type === 'mousemove' && this.isDrawing) {
       this.canvasManager.clearPreview();
-      previewFn(this.startXRel, this.startY, xRel, y, this.currentSeed);
+      pF(this.startXRel, this.startY, x, y, this.currentSeed);
     } else if (type === 'mouseup' && this.isDrawing) {
       this.isDrawing = false;
       document.body.style.userSelect = 'auto';
       this.canvasManager.clearPreview();
-      finalizeFn(this.startXRel, this.startY, xRel, y, this.currentSeed);
+      fF(this.startXRel, this.startY, x, y, this.currentSeed);
       this.save();
-      const cursor = this.tools.find(t => t.classList.contains('cursor'));
-      if (cursor) this.setActiveTool(cursor);
+      const c = this.tools.find(t => t.classList.contains('cursor'));
+      if (c) this.setActiveTool(c);
     }
   }
 
-  /** Draw arrow head */
-  _drawArrowHead(x1, y1, x2, y2, seed) {
-    drawArrowHead(this, x1, y1, x2, y2, seed);
+  _drawArrowHead(x1, y1, x2, y2, s) {
+    drawArrowHead(this, x1, y1, x2, y2, s);
   }
 
-  /** Preview arrow head */
-  _previewArrowHead(x1, y1, x2, y2, seed) {
-    previewArrowHead(this, x1, y1, x2, y2, seed);
+  _previewArrowHead(x1, y1, x2, y2, s) {
+    previewArrowHead(this, x1, y1, x2, y2, s);
   }
 
-  /** Convert hex to RGBA */
-  _hexToRgba(hex, alpha) {
-    return hexToRgba(hex, alpha);
+  _hexToRgba(h, a) {
+    return hexToRgba(h, a);
   }
 
-  /** Create editable text box */
   _createTextEditor(e) {
     createTextEditor(this, e);
   }
 
-  /** Clear all annotations */
   clearAll() {
     this.shapesData = clearAllShapesData();
     this.save();
     this.redrawAll();
   }
 
-  /** Generic freehand helper */
-  _handleFreehand(type, e, dataKey, options, color,opacity) {
-    handleFreehand(this, type, e, dataKey, options, color,opacity);
+  _handleFreehand(t, e, d, o, c, op) {
+    handleFreehand(this, t, e, d, o, c, op);
   }
 }
 
 // Instantiate on DOM ready
 window.addEventListener('DOMContentLoaded', () => {
-  const drawer = new DrawingTools({ selector: '.w-control', strokeWidth:2, roughness:2 });
+  const drawer = new DrawingTools({ selector: '.w-control', strokeWidth: 2, roughness: 2 });
   window.drawer = drawer;
   drawer.init();
 });

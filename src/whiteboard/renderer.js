@@ -1,10 +1,10 @@
-/**
- * Renderer for drawing all shapes and their bounding borders, now supporting per-shape rotation
- */
 import { getZeroXPoint, getShapeBounds } from './utils.js';
 import { drawArrowHead } from './tools/arrow-tool.js';
 import { getStroke } from 'perfect-freehand';
 
+/**
+ * Renderer for drawing all shapes and their bounding borders, now supporting per-shape rotation
+ */
 export function redrawAll(drawingTools) {
   // Remove completed text editors
   document.querySelectorAll('.annotation-text-editor.completed').forEach(el => el.remove());
@@ -42,7 +42,7 @@ export function redrawAll(drawingTools) {
         -w / 2, -h / 2,
         w, h,
         {
-          stroke: 'black',
+          stroke: r.color,
           strokeWidth: drawingTools.strokeWidth,
           roughness: drawingTools.roughness,
           seed: r.seed
@@ -67,7 +67,7 @@ export function redrawAll(drawingTools) {
       drawingTools.canvasManager.drawRough.ellipse(
         0, 0, w, h,
         {
-          stroke: 'black',
+          stroke: e.color,
           strokeWidth: drawingTools.strokeWidth,
           roughness: drawingTools.roughness,
           seed: e.seed
@@ -95,7 +95,7 @@ export function redrawAll(drawingTools) {
         x1 - cx, y1 - cy,
         x2 - cx, y2 - cy,
         {
-          stroke: 'black',
+          stroke: l.color,
           strokeWidth: drawingTools.strokeWidth,
           roughness: drawingTools.roughness,
           seed: l.seed
@@ -123,14 +123,14 @@ export function redrawAll(drawingTools) {
         x1 - cx, y1 - cy,
         x2 - cx, y2 - cy,
         {
-          stroke: 'black',
+          stroke: a.color,
           strokeWidth: drawingTools.strokeWidth,
           roughness: drawingTools.roughness,
           seed: a.seed
         }
       );
       drawArrowHead(
-        drawingTools,
+        Object.assign({}, drawingTools, { selectedColor: a.color }),
         x1 - cx,
         y1 - cy,
         x2 - cx,
@@ -141,7 +141,7 @@ export function redrawAll(drawingTools) {
     });
   });
 
-  // pencil stroke
+  // pencil strokes
   drawingTools.shapesData.pencil.forEach((p, i) => {
     if (!p.points || p.points.length === 0) return;
     const id = `pencil-${i}`;
@@ -163,13 +163,13 @@ export function redrawAll(drawingTools) {
         j ? drawCtx.lineTo(rx, ry) : drawCtx.moveTo(rx, ry);
       });
       drawCtx.closePath();
-      drawCtx.fillStyle = 'black';
+      drawCtx.fillStyle = p.color;
       drawCtx.fill();
       drawCtx.restore();
     });
   });
 
-  // highlighter
+  // highlighter strokes
   drawingTools.shapesData.highlighter.forEach((h, i) => {
     if (!h.points || h.points.length === 0) return;
     const id = `highlighter-${i}`;
@@ -191,7 +191,7 @@ export function redrawAll(drawingTools) {
         j ? drawCtx.lineTo(rx, ry) : drawCtx.moveTo(rx, ry);
       });
       drawCtx.closePath();
-      drawCtx.fillStyle = drawingTools._hexToRgba(h.options.color, h.options.opacity);
+      drawCtx.fillStyle = drawingTools._hexToRgba(h.color, h.opacity);
       drawCtx.fill();
       drawCtx.restore();
     });
@@ -228,6 +228,7 @@ export function redrawAll(drawingTools) {
       lineHeight: 'normal',
       whiteSpace: 'pre-wrap',
       background: 'transparent',
+      color: t.color,
       zIndex: '-1',
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
     });

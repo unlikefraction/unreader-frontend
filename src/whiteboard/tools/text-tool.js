@@ -1,4 +1,4 @@
-import { getZeroXPoint } from '../utils.js';
+import { computeCoords, getZeroXPoint } from '../utils.js';
 
 /**
  * Text drawing tool
@@ -22,22 +22,24 @@ export function createTextEditor(drawingTools, e) {
 
   Object.assign(el.style, {
     position: 'absolute',
-    left: `${x}px`,
-    top: `${y}px`,
+    left: `${x}px`,  // absolute page position
+    top: `${y}px`,   
     display: 'inline-block',
     padding: '4px',
-    border: '1px solid',
+    border: '1px dashed rgba(0,0,0,0.3)',
     outline: 'none',
     background: 'rgba(255,255,255,0.8)',
-    zIndex: '-1000',
+    zIndex: '1000',
     fontSize: '24px',
-    marginTop: '-30px', // Center vertically
-    marginLeft: '-6px', // Center horizontally
+    color: drawingTools.selectedColor, // apply selected color
+    marginTop: '-0.5em',
+    marginLeft: '-0.25em'
   });
 
   document.body.appendChild(el);
   el.focus();
 
+  // Enter to finish
   el.addEventListener('keydown', ev => {
     if (ev.key === 'Enter') {
       ev.preventDefault();
@@ -47,10 +49,19 @@ export function createTextEditor(drawingTools, e) {
 
   el.addEventListener('blur', () => {
     const xRel = x - zeroX;
-    drawingTools.shapesData.text.push({ xRel, y: y, text: el.innerText });
+    const textValue = el.innerText;
+    // Persist text with color
+    drawingTools.shapesData.text.push({
+      xRel,
+      y,
+      text: textValue,
+      color: drawingTools.selectedColor,
+      fontSize: 24
+    });
     drawingTools.save();
     el.remove();
     drawingTools.redrawAll();
+    // revert to cursor
     const cursor = drawingTools.tools.find(t => t.classList.contains('cursor'));
     if (cursor) drawingTools.setActiveTool(cursor);
   });

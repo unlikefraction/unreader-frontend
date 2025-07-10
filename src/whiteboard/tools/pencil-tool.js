@@ -6,11 +6,29 @@ import { computeCoords, getZeroXPoint } from '../utils.js';
  */
 export function handlePencil(drawingTools, type, e) {
   if (!drawingTools.activeTool?.classList.contains('pencil')) return;
-  drawingTools._handleFreehand(type, e, 'pencil', drawingTools.pencilOptions, 'black', 1);
+  // Pass in the selectedColor instead of 'black'
+  drawingTools._handleFreehand(
+    type,
+    e,
+    'pencil',
+    drawingTools.pencilOptions,
+    drawingTools.selectedColor,
+    1
+  );
 }
 
-/** Generic freehand helper - Updated to not auto-switch tools */
-export function handleFreehand(drawingTools, type, e, dataKey, options, color, opacity) {
+/** 
+ * Generic freehand helper – doesn’t auto-switch tools 
+ */
+export function handleFreehand(
+  drawingTools,
+  type,
+  e,
+  dataKey,
+  options,
+  color,
+  opacity
+) {
   const { xRel, y } = computeCoords(e, getZeroXPoint);
   const zeroX = getZeroXPoint();
 
@@ -21,30 +39,52 @@ export function handleFreehand(drawingTools, type, e, dataKey, options, color, o
   } else if (type === 'mousemove' && drawingTools.isDrawing) {
     drawingTools.currentPoints.push({ xRel, y });
     drawingTools.canvasManager.clearPreview();
+
     const raw = drawingTools.currentPoints.map(pt => [pt.xRel, pt.y]);
     const stroke = getStroke(raw, options);
-    const poly = stroke.map(([x,y]) => [zeroX + x, y]);
-    drawingTools.canvasManager.previewCtx.beginPath();
-    poly.forEach(([px,py], i) => i ? drawingTools.canvasManager.previewCtx.lineTo(px,py) : drawingTools.canvasManager.previewCtx.moveTo(px,py));
-    drawingTools.canvasManager.previewCtx.closePath();
-    drawingTools.canvasManager.previewCtx.fillStyle = dataKey==='highlighter' ? drawingTools._hexToRgba(color, opacity) : color;
-    drawingTools.canvasManager.previewCtx.fill();
+    const poly = stroke.map(([px, py]) => [zeroX + px, py]);
+
+    const ctx = drawingTools.canvasManager.previewCtx;
+    ctx.beginPath();
+    poly.forEach(([px, py], i) =>
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)
+    );
+    ctx.closePath();
+    ctx.fillStyle =
+      dataKey === 'highlighter'
+        ? drawingTools._hexToRgba(color, opacity)
+        : color;
+    ctx.fill();
   } else if (type === 'mouseup' && drawingTools.isDrawing) {
     drawingTools.isDrawing = false;
     document.body.style.userSelect = 'auto';
     drawingTools.canvasManager.clearPreview();
 
-    drawingTools.shapesData[dataKey].push({ points: drawingTools.currentPoints, options });
+    // Persist the stroke data
+    drawingTools.shapesData[dataKey].push({
+      points: drawingTools.currentPoints,
+      options,
+      color,
+      opacity
+    });
+
     const raw = drawingTools.currentPoints.map(pt => [pt.xRel, pt.y]);
     const stroke = getStroke(raw, options);
-    const poly = stroke.map(([x,y]) => [zeroX + x, y]);
-    drawingTools.canvasManager.drawCtx.beginPath();
-    poly.forEach(([px,py], i) => i ? drawingTools.canvasManager.drawCtx.lineTo(px,py) : drawingTools.canvasManager.drawCtx.moveTo(px,py));
-    drawingTools.canvasManager.drawCtx.closePath();
-    drawingTools.canvasManager.drawCtx.fillStyle = dataKey==='highlighter' ? drawingTools._hexToRgba(color, opacity) : color;
-    drawingTools.canvasManager.drawCtx.fill();
+    const poly = stroke.map(([px, py]) => [zeroX + px, py]);
+
+    const ctx = drawingTools.canvasManager.drawCtx;
+    ctx.beginPath();
+    poly.forEach(([px, py], i) =>
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)
+    );
+    ctx.closePath();
+    ctx.fillStyle =
+      dataKey === 'highlighter'
+        ? drawingTools._hexToRgba(color, opacity)
+        : color;
+    ctx.fill();
 
     drawingTools.save();
-    // Removed the auto-switch to cursor tool - tools stay active for continuous drawing
+    // tool remains active for continuous drawing
   }
 }
