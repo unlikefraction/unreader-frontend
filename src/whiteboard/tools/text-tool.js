@@ -26,11 +26,13 @@ export function createTextEditor(drawingTools, e) {
     top: `${y}px`,
     display: 'inline-block',
     padding: '4px',
-    border: 'none',
+    border: '1px solid',
     outline: 'none',
     background: 'rgba(255,255,255,0.8)',
     zIndex: '-1000',
-    fontSize: '24px'
+    fontSize: '24px',
+    marginTop: '-30px', // Center vertically
+    marginLeft: '-6px', // Center horizontally
   });
 
   document.body.appendChild(el);

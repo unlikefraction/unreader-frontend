@@ -18,12 +18,12 @@ export function initSelectionHandler(drawingTools) {
     const cy = (bounds.minY + bounds.maxY) / 2;
     const rot = (shape.rotation || 0) * Math.PI / 180;
 
-    // draw rotated blue border
+    // draw bounding box
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(rot);
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = '#007bff';
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'black';
     ctx.strokeRect(
       bounds.minX - (bounds.minX + bounds.maxX) / 2,
       bounds.minY - (bounds.minY + bounds.maxY) / 2,
@@ -32,77 +32,70 @@ export function initSelectionHandler(drawingTools) {
     );
     ctx.restore();
 
-    // draw rotated red handle
-    const size = 20;
-    const localX = (bounds.maxX - bounds.minX) / 2 - size / 2;
-    const localY = bounds.minY - (bounds.minY + bounds.maxY) / 2 - size - 5;
+    // draw rotation handle
+    const circleSize = 15;
+    const margin = 10;
+    const localY = bounds.minY - (bounds.minY + bounds.maxY) / 2 - circleSize / 2 - margin;
+    const localX = 0;
+
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(rot);
-    ctx.fillStyle = 'red';
-    ctx.fillRect(localX, localY, size, size);
+    ctx.fillStyle = 'black';
+    ctx.beginPath();
+    ctx.arc(localX, localY, circleSize / 2, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
 
-    // store handle info for hit test
-    drawingTools.selectedShape.handle = { cx, cy, localX, localY, size, rot };
-  }
-
-  function getLocalCoords(e) {
-    // use the preview canvas element's DOM node
-    const canvas = drawingTools.canvasManager.previewCtx.canvas;
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+    // store handle region for hit-testing
+    drawingTools.selectedShape.handle = {
+      cx,
+      cy,
+      localX: localX - circleSize / 2,
+      localY: localY - circleSize / 2,
+      size: circleSize,
+      rot
     };
   }
 
+  function getLocalCoords(e) {
+    const canvas = drawingTools.canvasManager.previewCtx.canvas;
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
   document.addEventListener('mousedown', e => {
+    // only allow selection when no drawing tool is active
     if (commonVars.toolActive !== false) return;
     const { x, y } = getLocalCoords(e);
     let hit = null;
+    dragInfo = null;
 
-    // rotated handle hit-test via inverse rotation
+    // check rotation handle first
     const h = drawingTools.selectedShape?.handle;
     if (h) {
       const { cx, cy, localX, localY, size, rot } = h;
-      // translate into handle local coords
       const dx = x - cx;
       const dy = y - cy;
       const invCos = Math.cos(-rot);
       const invSin = Math.sin(-rot);
-      const hxLocal = dx * invCos - dy * invSin;
-      const hyLocal = dx * invSin + dy * invCos;
-      const half = size / 2;
-      const centerX = localX + half;
-      const centerY = localY + half;
-      if (
-        hxLocal >= centerX - half && hxLocal <= centerX + half &&
-        hyLocal >= centerY - half && hyLocal <= centerY + half
-      ) {
-        // start rotate
-        const sel = drawingTools.selectedShape;
-        const { minX, maxX, minY, maxY } = sel.bounds;
-        const zeroX = getZeroXPoint();
-        const cxShape = zeroX + (minX + maxX) / 2;
-        const cyShape = (minY + maxY) / 2;
+      const lx = dx * invCos - dy * invSin;
+      const ly = dx * invSin + dy * Math.cos(-rot);
+      if (lx >= localX && lx <= localX + size && ly >= localY && ly <= localY + size) {
         dragInfo = {
           mode: 'rotate',
-          type: sel.type,
-          index: sel.index,
-          cx: cxShape,
-          cy: cyShape,
-          startAng: Math.atan2(y - cyShape, x - cxShape),
-          origRot: drawingTools.shapesData[sel.type][sel.index].rotation || 0
+          type: drawingTools.selectedShape.type,
+          index: drawingTools.selectedShape.index,
+          cx,
+          cy,
+          startAng: Math.atan2(y - cy, x - cx),
+          origRot: drawingTools.shapesData[drawingTools.selectedShape.type][drawingTools.selectedShape.index].rotation || 0
         };
-        commonVars.beingEdited = true;
-        document.body.style.userSelect = 'none';
-        hit = sel;
       }
     }
 
-    // shape hit-test (rotated bounds)
-    if (!hit) {
+    // if not rotating, check shape body for move
+    if (!dragInfo) {
       outer: for (const type of Object.keys(drawingTools.shapesData)) {
         const list = drawingTools.shapesData[type];
         for (let i = list.length - 1; i >= 0; i--) {
@@ -111,38 +104,43 @@ export function initSelectionHandler(drawingTools) {
           const zeroX = getZeroXPoint();
           const cxShape = zeroX + (bounds.minX + bounds.maxX) / 2;
           const cyShape = (bounds.minY + bounds.maxY) / 2;
-          const rot = -((shape.rotation || 0) * Math.PI / 180);
+          const rotInv = -((shape.rotation || 0) * Math.PI / 180);
           const dx = x - cxShape;
           const dy = y - cyShape;
-          const localX = dx * Math.cos(rot) - dy * Math.sin(rot);
-          const localY = dx * Math.sin(rot) + dy * Math.cos(rot);
+          const localX = dx * Math.cos(rotInv) - dy * Math.sin(rotInv);
+          const localY = dx * Math.sin(rotInv) + dy * Math.cos(rotInv);
           const halfW = (bounds.maxX - bounds.minX) / 2;
           const halfH = (bounds.maxY - bounds.minY) / 2;
-          if (
-            localX >= -halfW && localX <= halfW &&
-            localY >= -halfH && localY <= halfH
-          ) {
+          if (localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH) {
             hit = { type, index: i };
-            const base = shape;
-            const info = { mode: 'move', type, index: i, startX: x, startY: y };
-            if (['rectangle','ellipse','text'].includes(type)) {
-              info.origX = base.xRel;
-              info.origY = base.y;
-            } else if (['line','arrow'].includes(type)) {
-              info.orig = { x1: base.x1Rel, y1: base.y1, x2: base.x2Rel, y2: base.y2 };
-            } else {
-              info.origPts = base.points.map(pt => ({ x: pt.xRel, y: pt.y }));
-            }
-            dragInfo = info;
-            commonVars.beingEdited = true;
-            document.body.style.userSelect = 'none';
+            // set up move drag info
+            dragInfo = {
+              mode: 'move',
+              type,
+              index: i,
+              startX: x,
+              startY: y,
+              origX: shape.xRel,
+              origY: shape.y,
+              origPoints: shape.points ? shape.points.map(pt => ({ x: pt.xRel, y: pt.y })) : null,
+              origEnds: shape.points ? null : { x1Rel: shape.x1Rel, y1: shape.y1, x2Rel: shape.x2Rel, y2: shape.y2 }
+            };
             break outer;
           }
         }
       }
     }
 
-    drawingTools.selectedShape = hit;
+    if (hit || dragInfo) {
+      // user clicked on or grabbed a shape → enter edit mode
+      commonVars.beingEdited = true;
+      drawingTools.selectedShape = hit || drawingTools.selectedShape;
+    } else if (drawingTools.selectedShape) {
+      // clicked outside any shape → deselect everything
+      drawingTools.selectedShape = null;
+      commonVars.beingEdited = false;
+    }
+
     drawingTools.canvasManager.clearPreview();
     drawingTools.redrawAll();
     drawPersistentHighlight();
@@ -150,7 +148,6 @@ export function initSelectionHandler(drawingTools) {
 
   document.addEventListener('mousemove', e => {
     if (!dragInfo) return;
-    commonVars.beingEdited = true;
     const { x, y } = getLocalCoords(e);
     const { mode, type, index } = dragInfo;
     const shape = drawingTools.shapesData[type][index];
@@ -158,19 +155,14 @@ export function initSelectionHandler(drawingTools) {
     if (mode === 'move') {
       const dx = x - dragInfo.startX;
       const dy = y - dragInfo.startY;
-      if (['rectangle','ellipse','text'].includes(type)) {
+      if (dragInfo.origPoints) {
+        shape.points.forEach((pt, i) => {
+          pt.xRel = dragInfo.origPoints[i].x + dx;
+          pt.y    = dragInfo.origPoints[i].y + dy;
+        });
+      } else {
         shape.xRel = dragInfo.origX + dx;
         shape.y    = dragInfo.origY + dy;
-      } else if (['line','arrow'].includes(type)) {
-        shape.x1Rel = dragInfo.orig.x1 + dx;
-        shape.y1    = dragInfo.orig.y1 + dy;
-        shape.x2Rel = dragInfo.orig.x2 + dx;
-        shape.y2    = dragInfo.orig.y2 + dy;
-      } else {
-        shape.points.forEach((pt, i) => {
-          pt.xRel = dragInfo.origPts[i].x + dx;
-          pt.y    = dragInfo.origPts[i].y + dy;
-        });
       }
     } else if (mode === 'rotate') {
       const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
@@ -186,10 +178,23 @@ export function initSelectionHandler(drawingTools) {
     if (!dragInfo) return;
     drawingTools.save();
     dragInfo = null;
-    commonVars.beingEdited = true;
-    document.body.style.userSelect = 'auto';
+    // remain in beingEdited=true until user clicks away
     drawingTools.canvasManager.clearPreview();
     drawingTools.redrawAll();
     drawPersistentHighlight();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (!drawingTools.selectedShape) return;
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      const { type, index } = drawingTools.selectedShape;
+      drawingTools.shapesData[type].splice(index, 1);
+      drawingTools.selectedShape = null;
+      commonVars.beingEdited = false;
+      drawingTools.canvasManager.clearPreview();
+      drawingTools.redrawAll();
+      drawingTools.save();
+      e.preventDefault();
+    }
   });
 }
