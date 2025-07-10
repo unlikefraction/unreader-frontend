@@ -65,20 +65,17 @@ export function initSelectionHandler(drawingTools) {
   }
 
   document.addEventListener('mousedown', e => {
-    // only allow selection when no drawing tool is active
     if (commonVars.toolActive !== false) return;
     const { x, y } = getLocalCoords(e);
     let hit = null;
     dragInfo = null;
 
-    // check rotation handle first
+    // rotation handle
     const h = drawingTools.selectedShape?.handle;
     if (h) {
       const { cx, cy, localX, localY, size, rot } = h;
-      const dx = x - cx;
-      const dy = y - cy;
-      const invCos = Math.cos(-rot);
-      const invSin = Math.sin(-rot);
+      const dx = x - cx, dy = y - cy;
+      const invCos = Math.cos(-rot), invSin = Math.sin(-rot);
       const lx = dx * invCos - dy * invSin;
       const ly = dx * invSin + dy * Math.cos(-rot);
       if (lx >= localX && lx <= localX + size && ly >= localY && ly <= localY + size) {
@@ -86,15 +83,14 @@ export function initSelectionHandler(drawingTools) {
           mode: 'rotate',
           type: drawingTools.selectedShape.type,
           index: drawingTools.selectedShape.index,
-          cx,
-          cy,
+          cx, cy,
           startAng: Math.atan2(y - cy, x - cx),
           origRot: drawingTools.shapesData[drawingTools.selectedShape.type][drawingTools.selectedShape.index].rotation || 0
         };
       }
     }
 
-    // if not rotating, check shape body for move
+    // shape/line/arrow body
     if (!dragInfo) {
       outer: for (const type of Object.keys(drawingTools.shapesData)) {
         const list = drawingTools.shapesData[type];
@@ -111,20 +107,39 @@ export function initSelectionHandler(drawingTools) {
           const localY = dx * Math.sin(rotInv) + dy * Math.cos(rotInv);
           const halfW = (bounds.maxX - bounds.minX) / 2;
           const halfH = (bounds.maxY - bounds.minY) / 2;
+
           if (localX >= -halfW && localX <= halfW && localY >= -halfH && localY <= halfH) {
             hit = { type, index: i };
-            // set up move drag info
-            dragInfo = {
+
+            // determine what to store for movement
+            const info = {
               mode: 'move',
               type,
               index: i,
               startX: x,
-              startY: y,
-              origX: shape.xRel,
-              origY: shape.y,
-              origPoints: shape.points ? shape.points.map(pt => ({ x: pt.xRel, y: pt.y })) : null,
-              origEnds: shape.points ? null : { x1Rel: shape.x1Rel, y1: shape.y1, x2Rel: shape.x2Rel, y2: shape.y2 }
+              startY: y
             };
+
+            // for polygon/rectangle/etc.
+            if (shape.points) {
+              info.origPoints = shape.points.map(pt => ({ x: pt.xRel, y: pt.y }));
+            }
+            // for lines and arrows
+            else if ('x1Rel' in shape && 'x2Rel' in shape) {
+              info.origEnds = {
+                x1Rel: shape.x1Rel,
+                y1: shape.y1,
+                x2Rel: shape.x2Rel,
+                y2: shape.y2
+              };
+            }
+            // fallback for other shapes with a single origin
+            else {
+              info.origX = shape.xRel;
+              info.origY = shape.y;
+            }
+
+            dragInfo = info;
             break outer;
           }
         }
@@ -132,11 +147,9 @@ export function initSelectionHandler(drawingTools) {
     }
 
     if (hit || dragInfo) {
-      // user clicked on or grabbed a shape → enter edit mode
       commonVars.beingEdited = true;
       drawingTools.selectedShape = hit || drawingTools.selectedShape;
     } else if (drawingTools.selectedShape) {
-      // clicked outside any shape → deselect everything
       drawingTools.selectedShape = null;
       commonVars.beingEdited = false;
     }
@@ -155,16 +168,28 @@ export function initSelectionHandler(drawingTools) {
     if (mode === 'move') {
       const dx = x - dragInfo.startX;
       const dy = y - dragInfo.startY;
+
+      // polygons and freeform points
       if (dragInfo.origPoints) {
         shape.points.forEach((pt, i) => {
           pt.xRel = dragInfo.origPoints[i].x + dx;
           pt.y    = dragInfo.origPoints[i].y + dy;
         });
-      } else {
+      }
+      // lines and arrows
+      else if (dragInfo.origEnds) {
+        shape.x1Rel = dragInfo.origEnds.x1Rel + dx;
+        shape.y1    = dragInfo.origEnds.y1    + dy;
+        shape.x2Rel = dragInfo.origEnds.x2Rel + dx;
+        shape.y2    = dragInfo.origEnds.y2    + dy;
+      }
+      // other single-origin shapes
+      else {
         shape.xRel = dragInfo.origX + dx;
         shape.y    = dragInfo.origY + dy;
       }
-    } else if (mode === 'rotate') {
+    }
+    else if (mode === 'rotate') {
       const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
       shape.rotation = dragInfo.origRot + (ang - dragInfo.startAng) * 180 / Math.PI;
     }
@@ -178,7 +203,6 @@ export function initSelectionHandler(drawingTools) {
     if (!dragInfo) return;
     drawingTools.save();
     dragInfo = null;
-    // remain in beingEdited=true until user clicks away
     drawingTools.canvasManager.clearPreview();
     drawingTools.redrawAll();
     drawPersistentHighlight();

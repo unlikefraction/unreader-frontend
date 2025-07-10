@@ -31,7 +31,7 @@ export class ParagraphSeeker {
                 this._lastBeingEdited = beingEdited;
                 this.refreshParagraphNavigation();
             }
-        }, 1000);
+        }, 100);
 
         if (!ParagraphSeeker._mouseListenersAdded) {
             document.addEventListener('mouseup', () => {
