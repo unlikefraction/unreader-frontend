@@ -24,7 +24,10 @@
   <body>
     <div id="app">
       <nav>
-        <h2 class="logo">º/º</h2>
+        <div class="logoContainer">
+          <div class="sleep">z</div>
+          <h2 class="logo">º/º</h2>
+        </div>
         <div class="links">
           <a href="/">pricing</a>
           <a href="/">sign up / login →</a>
@@ -99,33 +102,35 @@
 
       <div class="leftControls">
         <div class="emptyDiv"></div>
-        <div class="whiteboardControls">
-          <div class="w-control cursor active">
-            <i class="ph ph-cursor"></i>
-          </div>
-          <div class="w-control highlighter">
-            <i class="ph ph-highlighter"></i>
-          </div>
-          <div class="w-control pencil">
-            <i class="ph ph-pencil"></i>
-          </div>
-          <div class="w-control text">
-            <i class="ph ph-text-t"></i>
-          </div>
-          <div class="w-control line">
-            <i class="ph ph-minus"></i>
-          </div>
-          <div class="w-control arrow">
-            <i class="ph ph-arrow-up-right"></i>
-          </div>
-          <div class="w-control eraser">
-            <i class="ph ph-eraser"></i>
-          </div>
-          <div class="w-control rectangle">
-            <i class="ph ph-rectangle"></i>
-          </div>
-          <div class="w-control circle">
-            <i class="ph ph-circle"></i>
+        <div class="mainControls">
+          <div class="whiteboardControls">
+            <div class="w-control cursor active">
+              <i class="ph ph-cursor"></i>
+            </div>
+            <div class="w-control highlighter">
+              <i class="ph ph-highlighter"></i>
+            </div>
+            <div class="w-control pencil">
+              <i class="ph ph-pencil"></i>
+            </div>
+            <div class="w-control text">
+              <i class="ph ph-text-t"></i>
+            </div>
+            <div class="w-control line">
+              <i class="ph ph-minus"></i>
+            </div>
+            <div class="w-control arrow">
+              <i class="ph ph-arrow-up-right"></i>
+            </div>
+            <div class="w-control eraser">
+              <i class="ph ph-eraser"></i>
+            </div>
+            <div class="w-control rectangle">
+              <i class="ph ph-rectangle"></i>
+            </div>
+            <div class="w-control circle">
+              <i class="ph ph-circle"></i>
+            </div>
           </div>
         </div>
         <div class="bookDetails">
@@ -137,5 +142,6 @@
     <script type="module" src="/src/audio/main.js"></script>
     <script type="module" src="/src/whiteboard/main-drawing-tools.js"></script>
     <script type="module" src="/src/keyboard.js"></script>
+    <script src="./src/basic/logo-animation.js"></script>
   </body>
 </html>

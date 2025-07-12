@@ -1,0 +1,288 @@
+.oath{
+    position: absolute;
+    right: 40px;
+    top: 100px;
+}
+
+.mainContent{
+    position: relative;
+    top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 46px;
+}
+
+.bookCoverAndProgress{
+    display: flex;
+    gap: 56px;
+}
+
+.bookBasicDetails{
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.progressBook{
+    display: flex;
+    gap: 6px;
+}
+
+.prgressBarBook{
+    flex: 0 0 100%;
+    width: 100%;
+    height: 20px;
+    background: #fff;
+    border: 1px solid #DDDDDD;
+    border-radius: 30px;
+    box-shadow: inset 0px 0px 7px 2px #EAEAEA;
+}
+
+.progressFilledBook{
+    width: 41%;
+    height: 100%;
+    background: #CF3F35;
+    box-shadow: inset 0px 0px 7px 2px #9B2830;
+    border-radius: 50px;
+}
+
+.arrowBookProgress{
+    display: flex;
+    flex: 1;
+}
+
+.progressTextBook{
+    font-size: 16px;
+    font-family: 'excalifont', sans-serif;
+    white-space: nowrap;
+    margin-top: -1rem;
+    color: #000;
+}
+
+.book-wrapper-detailed {
+    width: 200px;
+    position: relative;
+    margin: 0 auto;
+}
+
+
+.bookCoverDetailed{
+    display: flex;
+    margin-left: -2.3rem;
+    gap: 14px;
+}
+
+.editBookCover{
+    font-size: 1.5rem;
+    font-weight: 600;
+    cursor: pointer;
+    height: 25px;
+    transition: 0.2s all;
+    color: #373737;
+}
+
+.editBookCover:hover{
+    color: #6d6d6d;
+}
+
+.bookCurrentProgress{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.markingProgress{
+    display: flex;
+    flex-direction: column;
+    margin-top: 2rem;
+}
+
+.startDate{
+    position: relative;
+    left: 1rem;
+    top: -0.3rem;
+    display: flex;
+}
+
+.arrowStartDay{
+    margin-top: 0.3rem;
+}
+
+.startDateText{
+    font-size: 16px;
+    font-family: 'excalifont', sans-serif;
+    color: #000;
+    margin-left: 6px;
+}
+
+.progressMarkings{
+    display: grid;
+    grid-template-columns: repeat(15, 1fr);
+    grid-auto-rows: auto;    /* each row height adapts to content */
+    gap: 8px;               
+}
+
+.progressDot{
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #B7B7B7;
+}
+
+.progressDot.start{
+    width: 22px;
+    height: 22px;
+    margin-top: -2px;
+    background-color: #CF3F35;
+    display: inline-block;               /* make it respect width/height */
+    clip-path: polygon(
+      50% 0%,    /* top point */
+      100% 38%,  /* top-right */
+      82% 100%,  /* bottom-right */
+      18% 100%,  /* bottom-left */
+      0% 38%     /* top-left */
+    );
+    border-radius: 0 !important;
+    border: none;
+    
+}
+
+.progressDot.completed{
+    background: #CF3F35;
+    border: none;
+}
+
+.progressDot.today{
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none'><circle cx='10' cy='10' r='9.5' stroke='%23373737' stroke-opacity='0.36'/><circle cx='10' cy='10' r='7.5' stroke='%23373737' stroke-opacity='0.36'/><circle cx='10' cy='10' r='5.5' stroke='%23373737' stroke-opacity='0.36'/><circle cx='10' cy='10' r='3.5' stroke='%23373737' stroke-opacity='0.36'/><circle cx='10' cy='10' r='1.5' stroke='%23373737' stroke-opacity='0.36'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    border: none
+}
+
+.progressDot.todayCompleted{
+    width: 20px;
+    height: 20px;
+    display: inline-block;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' fill='none'><circle cx='10' cy='10' r='9.5' stroke='%23CF3F35' stroke-opacity='1'/><circle cx='10' cy='10' r='7.5' stroke='%23CF3F35' stroke-opacity='1'/><circle cx='10' cy='10' r='5.5' stroke='%23CF3F35' stroke-opacity='1'/><circle cx='10' cy='10' r='3.5' stroke='%23CF3F35' stroke-opacity='1'/><circle cx='10' cy='10' r='1.5' stroke='%23CF3F35' stroke-opacity='1'/></svg>");
+    background-repeat: no-repeat;
+    background-size: contain;
+    border: none
+}
+
+.bookActionButtons{
+    display: flex;
+    gap: 12px;
+}
+
+.bookActionButtons button{
+    padding: 8px 25px;
+    border-radius: 50px;
+    cursor: pointer;
+    border: none;
+    outline: none;
+    transition: 0.2s all;
+}
+
+.readBook{
+    background: #373737;
+    color: #fff;
+}
+
+.readBook:hover{
+    background: #000;
+}
+
+.markComplete{
+    border: 1px solid #B7B7B7 !important;
+    background: none;
+}
+
+.markComplete:hover{
+    background: #ededed;
+}
+
+.bottomSection{
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+}
+
+.bookBasicInfo{
+    display: flex;
+    flex-direction: column;
+}
+
+.title{
+    display: flex;
+    margin-left: -2rem;
+    gap: 10px;
+    align-items: center;
+}
+
+.editTitle{
+    font-size: 1.3rem;
+    font-weight: 600;
+    cursor: pointer;
+    height: 25px;
+    transition: 0.2s all;
+    color: #373737;
+}
+
+.editTitle:hover{
+    color: #6d6d6d;
+}
+
+.bookTitle{
+    font-size: 22px;
+    font-weight: 500;
+    color: #373737;
+    width: 100%;
+    border: none;
+    outline: none;
+}
+
+.bookTitle:focus {
+    border: 1px solid #1c1c1c; /* pick your highlight color */
+  }
+
+.bookAuthor{
+    font-size: 16px;
+    color: #7D7D7D;
+    font-weight: 400;
+}
+
+.thoughts{
+    display: flex;
+    flex-direction: column;
+}
+
+.topSectionThoughts{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.topSectionThoughts .headingThoughts{
+    font-size: 21px;
+    font-weight: 500;
+    color: #373737;
+}
+
+.topSectionThoughts .autosaveInfo{
+    font-size: 12px;
+    color: #000;
+    font-family: "Space Mono", monospace;
+}
+
+.thoughtsInput{
+    height: 200px;
+    margin-top: 0.5rem;
+    outline: none;
+    border: none;
+    line-height: 26px;
+    font-size: 16px;
+    color: #373737;
+}
