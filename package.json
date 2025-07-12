@@ -12,6 +12,7 @@
     "vite": "^6.3.5"
   },
   "dependencies": {
+    "@clerk/clerk-js": "^5.71.0",
     "howler": "^2.2.4",
     "konva": "^9.3.20",
     "perfect-freehand": "^1.2.2",

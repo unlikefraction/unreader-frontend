@@ -1,3 +1,5 @@
+// ------canvas-manager.js--------
+
 import rough from 'roughjs';
 
 /**

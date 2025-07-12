@@ -1,3 +1,5 @@
+// -----main.js-----
+
 import { AudioCore } from './audio-core.js';
 import { TextProcessor } from './text-processor.js';
 import { WordHighlighter } from './word-highlighter.js';

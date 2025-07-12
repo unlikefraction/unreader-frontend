@@ -1,3 +1,5 @@
+// -------playback-controls.js--------
+
 /**
  * Playback speed control and device management
  */

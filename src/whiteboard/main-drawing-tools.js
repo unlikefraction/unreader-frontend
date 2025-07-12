@@ -1,3 +1,6 @@
+// -----main-drawing-tools.js-----
+
+
 import { commonVars } from '../common-vars.js';
 import { CanvasManager } from './canvas-manager.js';
 import { saveShapesData, loadShapesData, clearAllShapesData } from './storage.js';
@@ -12,6 +15,7 @@ import { handleText, createTextEditor } from './tools/text-tool.js';
 import { handleEraser } from './tools/eraser-tool.js';
 import { isClickOnTool, hexToRgba } from './utils.js';
 import { initSelectionHandler } from './selection.js';
+import { initVersioning } from './version.js';
 
 /**
  * Class to manage drawing annotations on the document
@@ -331,6 +335,7 @@ export class DrawingTools {
 // Instantiate on DOM ready
 window.addEventListener('DOMContentLoaded', () => {
   const drawer = new DrawingTools({ selector: '.w-control', strokeWidth: 2, roughness: 2 });
+  initVersioning(drawer, {maxHistory : 10});
   window.drawer = drawer;
   drawer.init();
 });

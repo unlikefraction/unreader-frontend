@@ -1,3 +1,5 @@
+// -----highlighter-tool.js-----
+
 import { getStroke } from 'perfect-freehand';
 import { computeCoords, getZeroXPoint } from '../utils.js';
 

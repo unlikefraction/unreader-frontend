@@ -1,3 +1,5 @@
+// -----read-along.js-----------
+
 /**
  * Read-along functionality and text positioning
  */

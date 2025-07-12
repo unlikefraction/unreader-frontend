@@ -1,3 +1,5 @@
+// ---------renderer.js---------
+
 import { getZeroXPoint, getShapeBounds } from './utils.js';
 import { drawArrowHead } from './tools/arrow-tool.js';
 import { getStroke } from 'perfect-freehand';

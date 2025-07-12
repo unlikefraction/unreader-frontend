@@ -1,3 +1,5 @@
+// -------text-processor.js-------
+
 /**
  * Text processing and word timing management
  */

@@ -1,3 +1,6 @@
+// ----paragraph-seeker.js-----
+
+
 import { commonVars } from '../common-vars.js';
 
 export class ParagraphSeeker {

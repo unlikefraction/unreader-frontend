@@ -1,3 +1,6 @@
+// ------eraser-tool.js-----
+
+
 import { getStroke } from 'perfect-freehand';
 import {
   computeCoords,

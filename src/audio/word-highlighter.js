@@ -1,3 +1,6 @@
+// -----word-highlighter.js-------
+
+
 /**
  * Word highlighting and synchronization with audio
  */

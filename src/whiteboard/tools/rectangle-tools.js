@@ -1,3 +1,6 @@
+// --------rectangle-tools.js---------
+
+
 import { computeCoords, getZeroXPoint } from '../utils.js';
 
 /**

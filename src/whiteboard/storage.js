@@ -1,3 +1,6 @@
+// -----storage.js-------
+
+
 /**
  * Storage management for drawing annotations
  */
