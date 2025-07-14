@@ -741,3 +741,71 @@ mark{
 .all-highlighted{
   background: rebeccapurple;
 }
+
+/* Grab that exact span and give it a yellow background */
+span.highlight[data-index="302"] {
+  position: relative;
+  padding: 2px 6px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+
+  /* two-layer backgrounds: 
+     1) your translucent fill in the padding-box 
+     2) your solid gradient in the border-box */
+  background: 
+    linear-gradient(
+      90deg,
+      #FFE6CB 0%,
+      #FEF2C0   100%
+    ) padding-box,
+    linear-gradient(
+      90deg,
+      #fd9a2e 0%,
+      #fbcb04 100%
+    ) border-box;
+  background-clip: padding-box, border-box;
+  cursor: pointer;
+  z-index: 100000000;
+}
+
+
+span.highlight[data-index="302"]::after {
+  content: 'click to copy';
+  position: absolute;
+  top: calc(100% + 8px);  /* 4px gap below the span */
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  padding: 7px 15px;
+  background: linear-gradient(
+    90deg,
+    #fd9a2e 0%,
+    #fbcb04 100%
+  );
+  color: rgb(0, 0, 0);
+  border-radius: 20px;        /* subtle rounding */
+  white-space: nowrap;       /* prevent wrapping */
+  pointer-events: none;      /* so it doesn’t block clicks */
+  z-index: 10;               /* over other content */
+  font-weight: 300;  
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+span.highlight[data-index="320"] {
+  position: relative;       /* establishes a positioning context */
+  z-index: -1;               /* text stays on top of the pseudo-bg */
+}
+
+span.highlight[data-index="320"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 110%;
+  width: 155px;             /* width of your SVG */
+  height: 51px;            /* height of your SVG */
+  transform: translate(-50%, -50%);  /* center it on the span */
+  background: url('/assets/letsGo.svg') 
+              no-repeat 
+              center/contain;
+  z-index: -2;            /* send it behind the text */
+}
