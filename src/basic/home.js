@@ -7,6 +7,11 @@ var books = [
   { id: "2", name: "Keep Going",       coverUrl: "https://i.imgur.com/UIPQEwk.png", autor: "Austin Kleon" },
   { id: "3", name: "Steve Jobs",       coverUrl: "https://i.imgur.com/nwzWCgm.png", autor: "Walter Isaacson" },
   { id: "4", name: "How to draw comics the marvel way",        coverUrl: "https://i.imgur.com/YdfU4Bw.png", autor: "Stan Lee" },
+  { id: "5", name: "Zero to One",        coverUrl: "https://i.imgur.com/sVNy4Ct.png", autor: "Peter Thiel" },
+  { id: "1", name: "Creativity, INC.", coverUrl: "https://i.imgur.com/SPv9Rg7.png", autor: "Ed Catmull" },
+  { id: "2", name: "Keep Going",       coverUrl: "https://i.imgur.com/UIPQEwk.png", autor: "Austin Kleon" },
+  { id: "3", name: "Steve Jobs",       coverUrl: "https://i.imgur.com/nwzWCgm.png", autor: "Walter Isaacson" },
+  { id: "4", name: "How to draw comics the marvel way",        coverUrl: "https://i.imgur.com/YdfU4Bw.png", autor: "Stan Lee" },
   { id: "5", name: "Zero to One",        coverUrl: "https://i.imgur.com/sVNy4Ct.png", autor: "Peter Thiel" }
 ];
 

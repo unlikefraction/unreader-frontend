@@ -660,7 +660,7 @@ nav{
 
 .topSectionInbox .descriptionInbox{
   font-size: 14px;
-  font-weight: 300;
+  font-weight: 400;
 }
 
 .inboxPopup .messages{
@@ -692,7 +692,7 @@ nav{
 
 .messageContent{
   font-size: 16px;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 22px;
 }
 
@@ -787,7 +787,7 @@ span.highlight[data-index="302"]::after {
   white-space: nowrap;       /* prevent wrapping */
   pointer-events: none;      /* so it doesn’t block clicks */
   z-index: 10;               /* over other content */
-  font-weight: 300;  
+  font-weight: 400;  
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
 }
 
