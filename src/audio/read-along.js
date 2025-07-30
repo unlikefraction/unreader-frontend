@@ -80,7 +80,7 @@ export class ReadAlong {
       const ctrl = document.querySelector('.read-along.control');
       if (ctrl) ctrl.classList.toggle('active', active);
   
-      console.log(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
+      print(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
   
       // If enabling and we have a word, scroll to it
       if (active && this.highlighter.currentHighlightedWord) {
@@ -92,7 +92,7 @@ export class ReadAlong {
     setupHeightSetter() {
       this.heightSetter = document.getElementById('heightSetter');
       if (!this.heightSetter) {
-        console.warn('heightSetter element not found');
+        printError('heightSetter element not found');
         return;
       }
       if (!this.heightSetter.style.top) {
@@ -156,7 +156,7 @@ export class ReadAlong {
     setupReadAlongControl() {
       const ctrl = document.querySelector('.read-along.control');
       if (!ctrl) {
-        console.warn('Read-along control not found');
+        printError('Read-along control not found');
         return;
       }
       ctrl.addEventListener('click', () => this.toggle());

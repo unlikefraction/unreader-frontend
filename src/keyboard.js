@@ -57,17 +57,17 @@ function getDrawingSystem() {
 function handleDrawingShortcut(toolClass) {
   const drawer = getDrawingSystem();
   if (!drawer) {
-    console.warn('Drawing system not available');
+    printError('Drawing system not available');
     return false;
   }
 
   const tool = document.querySelector(`.w-control.${toolClass}`);
   if (tool) {
     drawer.setActiveTool(tool);
-    console.log(`🎨 Switched to ${toolClass} tool`);
+    print(`🎨 Switched to ${toolClass} tool`);
     return true;
   } else {
-    console.warn(`Tool with class ${toolClass} not found`);
+    printError(`Tool with class ${toolClass} not found`);
     return false;
   }
 }
@@ -76,7 +76,7 @@ function handleDrawingShortcut(toolClass) {
 function handleAudioShortcut(audioAction) {
   const audioSystem = getAudioSystem();
   if (!audioSystem) {
-    console.warn('Audio system not available');
+    printError('Audio system not available');
     return false;
   }
 
@@ -88,25 +88,25 @@ function handleAudioShortcut(audioAction) {
       } else if (audioSystem.toggleAudio) {
         audioSystem.toggleAudio();
       }
-      console.log('🎵 Toggled audio playback');
+      print('🎵 Toggled audio playback');
       return true;
       
     case 'forward':
       if (audioSystem.forward) {
         audioSystem.forward();
-        console.log('⏭️ Audio forward +10s');
+        print('⏭️ Audio forward +10s');
       }
       return true;
       
     case 'rewind':
       if (audioSystem.rewind) {
         audioSystem.rewind();
-        console.log('⏮️ Audio rewind -10s');
+        print('⏮️ Audio rewind -10s');
       }
       return true;
       
     default:
-      console.warn(`Unknown audio action: ${audioAction}`);
+      printError(`Unknown audio action: ${audioAction}`);
       return false;
   }
 }
@@ -122,15 +122,15 @@ function waitForSystems(callback, maxAttempts = 50) {
     const drawingReady = getDrawingSystem() !== null;
     
     if (audioReady && drawingReady) {
-      console.log('✅ All systems ready for shortcuts');
+      print('✅ All systems ready for shortcuts');
       callback();
       return;
     }
     
     if (attempts >= maxAttempts) {
-      console.warn('⚠️ Timeout waiting for systems to be ready');
-      console.log(`Audio system: ${audioReady ? 'Ready' : 'Not ready'}`);
-      console.log(`Drawing system: ${drawingReady ? 'Ready' : 'Not ready'}`);
+      printError('⚠️ Timeout waiting for systems to be ready');
+      print(`Audio system: ${audioReady ? 'Ready' : 'Not ready'}`);
+      print(`Drawing system: ${drawingReady ? 'Ready' : 'Not ready'}`);
       callback(); // Proceed anyway
       return;
     }
@@ -143,7 +143,7 @@ function waitForSystems(callback, maxAttempts = 50) {
 
 // Initialize shortcuts
 function initializeShortcuts() {
-  console.log('⌨️ Initializing keyboard shortcuts...');
+  print('⌨️ Initializing keyboard shortcuts...');
   
   // Main keydown event listener
   document.addEventListener('keydown', (e) => {
@@ -155,7 +155,7 @@ function initializeShortcuts() {
     // Handle reload shortcut (Ctrl+R / Cmd+R)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
       e.preventDefault();
-      console.log('🔄 Reloading page...');
+      print('🔄 Reloading page...');
       window.location.reload();
       return;
     }
@@ -178,32 +178,32 @@ function initializeShortcuts() {
   });
   
   // Log available shortcuts
-  console.log('📋 Available shortcuts:');
-  console.log('Drawing tools:', Object.entries(DRAWING_SHORTCUTS).map(([key, tool]) => `${key} → ${tool}`));
-  console.log('Audio controls:', Object.entries(AUDIO_SHORTCUTS).map(([key, action]) => `${key} → ${action}`));
-  console.log('Other: Ctrl+R → reload');
+  print('📋 Available shortcuts:');
+  print('Drawing tools:', Object.entries(DRAWING_SHORTCUTS).map(([key, tool]) => `${key} → ${tool}`));
+  print('Audio controls:', Object.entries(AUDIO_SHORTCUTS).map(([key, action]) => `${key} → ${action}`));
+  print('Other: Ctrl+R → reload');
 }
 
 // Public API for controlling shortcuts
 export const ShortcutManager = {
   enable() {
     SETTINGS.enabled = true;
-    console.log('✅ Shortcuts enabled');
+    print('✅ Shortcuts enabled');
   },
   
   disable() {
     SETTINGS.enabled = false;
-    console.log('❌ Shortcuts disabled');
+    print('❌ Shortcuts disabled');
   },
   
   toggle() {
     SETTINGS.enabled = !SETTINGS.enabled;
-    console.log(`🔄 Shortcuts ${SETTINGS.enabled ? 'enabled' : 'disabled'}`);
+    print(`🔄 Shortcuts ${SETTINGS.enabled ? 'enabled' : 'disabled'}`);
   },
   
   setPreventInInputs(prevent) {
     SETTINGS.preventInInputs = prevent;
-    console.log(`🎯 Prevent shortcuts in inputs: ${prevent}`);
+    print(`🎯 Prevent shortcuts in inputs: ${prevent}`);
   },
   
   isEnabled() {

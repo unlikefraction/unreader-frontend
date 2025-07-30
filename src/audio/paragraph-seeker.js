@@ -165,7 +165,7 @@ export class ParagraphSeeker {
         }
 
         this.audioCore.sound?.seek(timing.time_start);
-        if (log) console.log(`Seeked to ${timing.time_start}s`);
+        if (log) print(`Seeked to ${timing.time_start}s`);
         return { success: true, timestamp: timing.time_start, match, timing };
     }
 
@@ -335,7 +335,7 @@ export class ParagraphSeeker {
 
     enableParagraphNavigation() {
         this.setupParagraphHoverNavigation();
-        console.log('✅ Paragraph hover navigation enabled');
+        print('✅ Paragraph hover navigation enabled');
     }
 
     disableParagraphNavigation() {
@@ -343,7 +343,7 @@ export class ParagraphSeeker {
             .forEach(el => el.remove());
         if (this.scrollListener) window.removeEventListener('scroll', this.scrollListener);
         if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
-        console.log('❌ Paragraph hover navigation disabled');
+        print('❌ Paragraph hover navigation disabled');
     }
 
     setupDynamicUpdates() {
@@ -367,11 +367,11 @@ export class ParagraphSeeker {
 
     setMinProbabilityThreshold(threshold) {
         this.minProbabilityThreshold = Math.min(1, Math.max(0, threshold));
-        console.log(`📊 Min probability threshold set to: ${this.minProbabilityThreshold}`);
+        print(`📊 Min probability threshold set to: ${this.minProbabilityThreshold}`);
     }
 
     setContextWindow(windowSize) {
         this.contextWindow = Math.min(50, Math.max(5, windowSize));
-        console.log(`🔍 Context window set to: ${this.contextWindow} words`);
+        print(`🔍 Context window set to: ${this.contextWindow} words`);
     }
 }

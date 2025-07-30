@@ -15,7 +15,7 @@ export class PlaybackControls {
     createPlaybackSlider(containerSelector, onSpeedChange = null) {
       const playBackSlider = document.querySelector(containerSelector);
       if (!playBackSlider) {
-        console.warn('Playback slider container not found');
+        printError('Playback slider container not found');
         return null;
       }
   
@@ -24,7 +24,7 @@ export class PlaybackControls {
       const valueDisplay = thumb.querySelector('.value');
   
       if (!slider || !thumb || !valueDisplay) {
-        console.warn('Playback slider elements not found');
+        printError('Playback slider elements not found');
         return null;
       }
   
@@ -142,7 +142,7 @@ export class PlaybackControls {
       });
       
       if (this.sliderAPI) {
-        console.log('🔗 Speed slider connected to audio');
+        print('🔗 Speed slider connected to audio');
       }
     }
   
@@ -162,7 +162,7 @@ export class PlaybackControls {
           const dest = Howler.ctx.createMediaStreamDestination();
           Howler.masterGain.connect(dest);
           howlerOutput.srcObject = dest.stream;
-          console.log('🔗 Howler output routed to custom audio element');
+          print('🔗 Howler output routed to custom audio element');
         }
       
         // Select elements for device lists
@@ -170,7 +170,7 @@ export class PlaybackControls {
         const inputSelect = document.querySelector('#input-device select.device-select');
         
         if (!outputSelect || !inputSelect) {
-          console.warn('Device select elements not found');
+          printError('Device select elements not found');
           return;
         }
   
@@ -181,10 +181,10 @@ export class PlaybackControls {
           if (currentStream) currentStream.getTracks().forEach(t => t.stop());
           try {
             currentStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: id }}});
-            console.log(`🎤 Input device selected: ${id}`);
+            print(`🎤 Input device selected: ${id}`);
             // No additional input handling at this time
           } catch (e) {
-            console.error('Input device error:', e);
+            printError('Input device error:', e);
           }
         }
       
@@ -193,15 +193,15 @@ export class PlaybackControls {
           if (howlerOutput.setSinkId) {
             try {
               await howlerOutput.setSinkId(id);
-              console.log(`🔈 Output device set to: ${id}`);
+              print(`🔈 Output device set to: ${id}`);
             } catch(e) {
-              console.warn('sinkId failed on Howler output:', e);
+              printError('sinkId failed on Howler output:', e);
             }
           } else {
             document.querySelectorAll('audio').forEach(async audio => {
               if (audio.setSinkId) {
                 try { await audio.setSinkId(id); }
-                catch(err){ console.warn('sinkId fallback failed', err); }
+                catch(err){ printError('sinkId fallback failed', err); }
               }
             });
           }
@@ -233,7 +233,7 @@ export class PlaybackControls {
         if (outputSelect.options.length) outputSelect.dispatchEvent(new Event('change'));
   
       } catch (error) {
-        console.error('Error setting up device selection:', error);
+        printError('Error setting up device selection:', error);
       }
     }
   
@@ -242,7 +242,7 @@ export class PlaybackControls {
       const settingsD = document.querySelector('.settingsDialog');
       
       if (!gearBtn || !settingsD) {
-        console.warn('Settings dialog elements not found');
+        printError('Settings dialog elements not found');
         return;
       }
   

@@ -27,12 +27,12 @@ export const defaultShapesData = {
       const saved = localStorage.getItem('annotations');
       if (saved) {
         const shapesData = JSON.parse(saved);
-        console.log(shapesData)
+        print(shapesData)
         // Ensure all shape types exist in case new types were added
         return Object.assign({...defaultShapesData}, shapesData);
       }
     } catch (error) {
-      console.warn('Failed to load annotations from localStorage:', error);
+      printError('Failed to load annotations from localStorage:', error);
     }
     // Return default if no saved data or corrupted
     return {...defaultShapesData};

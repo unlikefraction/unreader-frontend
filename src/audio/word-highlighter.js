@@ -35,7 +35,7 @@ export class WordHighlighter {
           this.textProcessor.wordSpans[i].classList.add('highlight');
           this.highlightedIndices.add(i);
           this.currentHighlightedWord = this.textProcessor.wordSpans[i];
-          console.log(`✨ Highlighted word "${this.textProcessor.wordSpans[i].textContent}" at index ${i} ${reason}`);
+          print(`✨ Highlighted word "${this.textProcessor.wordSpans[i].textContent}" at index ${i} ${reason}`);
         }
       }
       this.lastHighlightedIndex = Math.max(this.lastHighlightedIndex, actualEndIndex + 1);
@@ -61,7 +61,7 @@ export class WordHighlighter {
         const endIndex = Math.min(wordsToHighlight - 1, this.textProcessor.wordSpans.length - 1);
         this.highlightWordsInRange(0, endIndex, '(initial words before first timed word)');
         
-        console.log(`🌟 Highlighted ${wordsToHighlight} initial words (${timeElapsed.toFixed(3)}s elapsed)`);
+        print(`🌟 Highlighted ${wordsToHighlight} initial words (${timeElapsed.toFixed(3)}s elapsed)`);
       }
       
       if (currentTime >= firstTimedWord.time_start) {
@@ -75,7 +75,7 @@ export class WordHighlighter {
       if (currentTime >= lookaheadTime && !this.processedTimingIndices.has(index)) {
         this.processedTimingIndices.add(index);
         
-        console.log(`🎯 Processing word: "${wordData.word}" (${this.lookaheadMs}ms early) at ${wordData.time_start.toFixed(5)}s (current: ${currentTime.toFixed(5)}s)`);
+        print(`🎯 Processing word: "${wordData.word}" (${this.lookaheadMs}ms early) at ${wordData.time_start.toFixed(5)}s (current: ${currentTime.toFixed(5)}s)`);
         
         const bestMatch = this.textProcessor.findBestWordMatch(wordData.word, index, null, this.lastHighlightedIndex);
         
@@ -140,7 +140,7 @@ export class WordHighlighter {
   
     findCurrentWordAndHighlight(currentTime) {
       if (!this.textProcessor.wordTimings || this.textProcessor.wordTimings.length === 0) {
-        console.log(`⚠️ No word timings available for time: ${currentTime.toFixed(3)}s`);
+        print(`⚠️ No word timings available for time: ${currentTime.toFixed(3)}s`);
         return null;
       }
   
@@ -148,7 +148,7 @@ export class WordHighlighter {
         const wordData = this.textProcessor.wordTimings[i];
         
         if (currentTime >= wordData.time_start && currentTime <= wordData.time_end) {
-          console.log(`🎯 Found current word: "${wordData.word}" at ${currentTime.toFixed(3)}s`);
+          print(`🎯 Found current word: "${wordData.word}" at ${currentTime.toFixed(3)}s`);
           
           const bestMatch = this.textProcessor.findBestWordMatch(wordData.word, i, null, this.lastHighlightedIndex);
           
@@ -178,7 +178,7 @@ export class WordHighlighter {
       }
   
       if (closestWord) {
-        console.log(`🎯 Found closest previous word: "${closestWord.word}" at ${currentTime.toFixed(3)}s`);
+        print(`🎯 Found closest previous word: "${closestWord.word}" at ${currentTime.toFixed(3)}s`);
         
         const bestMatch = this.textProcessor.findBestWordMatch(closestWord.word, closestIndex, null, this.lastHighlightedIndex);
         
@@ -191,7 +191,7 @@ export class WordHighlighter {
         }
       }
   
-      console.log(`⚠️ No suitable word found for time: ${currentTime.toFixed(3)}s`);
+      print(`⚠️ No suitable word found for time: ${currentTime.toFixed(3)}s`);
       return null;
     }
   
@@ -250,7 +250,7 @@ export class WordHighlighter {
     }
   
     handleSeek(currentTime) {
-      console.log(`🔄 Handling seek to: ${currentTime.toFixed(5)}s`);
+      print(`🔄 Handling seek to: ${currentTime.toFixed(5)}s`);
       
       // Always clear all highlights on any seek/rewind
       this.clearAllHighlights();
@@ -264,7 +264,7 @@ export class WordHighlighter {
       const currentWord = this.findCurrentWordAndHighlight(currentTime);
       
       if (currentWord) {
-        console.log(`✅ Highlighted word after seek: "${currentWord.wordData.word}"`);
+        print(`✅ Highlighted word after seek: "${currentWord.wordData.word}"`);
       } else {
         // If no current word found, estimate position based on time
         this.estimatePositionFromTime(currentTime);
@@ -273,11 +273,11 @@ export class WordHighlighter {
   
     handleAudioEnd(audioDuration) {
       const finalTime = audioDuration;
-      console.log(`🏁 Audio ended at: ${finalTime.toFixed(5)}s`);
-      console.log(`📊 Total highlighted words: ${this.highlightedIndices.size}/${this.textProcessor.wordSpans.length}`);
+      print(`🏁 Audio ended at: ${finalTime.toFixed(5)}s`);
+      print(`📊 Total highlighted words: ${this.highlightedIndices.size}/${this.textProcessor.wordSpans.length}`);
       
       if (this.highlightedIndices.size < this.textProcessor.wordSpans.length) {
-        console.log(`🔧 Highlighting remaining ${this.textProcessor.wordSpans.length - this.highlightedIndices.size} words`);
+        print(`🔧 Highlighting remaining ${this.textProcessor.wordSpans.length - this.highlightedIndices.size} words`);
         this.highlightWordsInRange(this.lastHighlightedIndex, this.textProcessor.wordSpans.length - 1, 
           '(ensuring all words highlighted at end)');
       }
@@ -285,7 +285,7 @@ export class WordHighlighter {
   
     async highlightWord(time, audioDuration) {
       try {
-        console.log(`Audio time: ${time.toFixed(5)}s`);
+        print(`Audio time: ${time.toFixed(5)}s`);
         
         this.handleInitialWords(time);
         
@@ -307,7 +307,7 @@ export class WordHighlighter {
         }
         
       } catch (error) {
-        console.error('Error highlighting words:', error);
+        printError('Error highlighting words:', error);
       }
     }
   

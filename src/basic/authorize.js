@@ -19,7 +19,7 @@ window.onload = function() {
   // Only Google: parse the hash fragment
   if (!window.location.hash.includes("access_token")) {
     document.body.textContent = "⚠️ No access_token found in URL.";
-    console.error("Google login not initiated or invalid redirect.");
+    printError("Google login not initiated or invalid redirect.");
     return;
   }
 
@@ -28,7 +28,7 @@ window.onload = function() {
 
   if (!googleToken) {
     document.body.textContent = "⚠️ Token missing—login failed.";
-    console.error("No access_token in URL hash.");
+    printError("No access_token in URL hash.");
     return;
   }
 
@@ -64,8 +64,8 @@ window.onload = function() {
       }, 3000);
 
     } catch (err) {
-      document.body.textContent = "⚠️ Login error. Check console.";
-      console.error("Error exchanging Google token:", err);
+      document.body.textContent = "⚠️ Login Failed, try again.";
+      printError("Error exchanging Google token:", err);
     }
   })();
 };

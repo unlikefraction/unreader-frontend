@@ -78,11 +78,11 @@ function loginWithApple() {
         if (popup && !popup.closed) popup.close();
         window.location.href = "home.html";
       } else if (res.status !== 404) {
-        console.error("Apple token polling error:", res.status, await res.text());
+        printError("Apple token polling error:", res.status, await res.text());
       }
       // 404 → not ready yet, keep polling
     } catch (err) {
-      console.error("Polling network error:", err);
+      printError("Polling network error:", err);
     }
   }, 1000);
 }
@@ -115,11 +115,11 @@ async function fetchUserInfo() {
     }
     
     const data = await res.json();
-    console.log('✅ User Info:', data);
+    print('✅ User Info:', data);
     return data;
     
   } catch (err) {
-    console.error('⚠️ Error in fetchUserInfo():', err);
+    printError('⚠️ Error in fetchUserInfo():', err);
     // you could show a UI error state here
     throw err;
   }
@@ -129,8 +129,8 @@ async function fetchUserInfo() {
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     const user = await fetchUserInfo();
-    console.log(user)
+    print(user)
   } catch {
-    console.log("dance")
+    print("dance")
   }
 });

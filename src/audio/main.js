@@ -60,29 +60,29 @@ export class AudioSystem {
 
   // Public API methods
   async init() {
-    console.log('🎵 Initializing audio system...');
+    print('🎵 Initializing audio system...');
     
     try {
       // Initialize text processor first
       await this.textProcessor.init();
-      console.log('✅ Text processor initialized');
+      print('✅ Text processor initialized');
       
       // Setup audio core
       this.audioCore.setupAudio();
-      console.log('✅ Audio core initialized');
+      print('✅ Audio core initialized');
       
       // Enable paragraph hover navigation if available
       if (this.paragraphSeeker && typeof this.paragraphSeeker.enableParagraphNavigation === 'function') {
         this.paragraphSeeker.enableParagraphNavigation();
-        console.log('✅ Paragraph navigation enabled');
+        print('✅ Paragraph navigation enabled');
       } else {
-        console.log('⚠️ Paragraph navigation not available (method missing)');
+        print('⚠️ Paragraph navigation not available (method missing)');
       }
       
-      console.log('🚀 Audio system ready!');
+      print('🚀 Audio system ready!');
       
     } catch (error) {
-      console.error('❌ Error initializing audio system:', error);
+      printError('❌ Error initializing audio system:', error);
       throw error;
     }
   }
@@ -167,12 +167,12 @@ export class AudioSystem {
 
   // NEW: Convenience methods
   async seekToText(text) {
-    console.log(`🔍 Seeking to text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+    print(`🔍 Seeking to text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
     return await this.seekToParagraph(text);
   }
 
   async seekToSentence(sentence) {
-    console.log(`🔍 Seeking to sentence: "${sentence}"`);
+    print(`🔍 Seeking to sentence: "${sentence}"`);
     return await this.seekToParagraph(sentence);
   }
 
@@ -181,11 +181,11 @@ export class AudioSystem {
     const paragraphs = this.extractParagraphs();
     
     if (paragraphs.length === 0) {
-      console.warn('No paragraphs found in text');
+      printError('No paragraphs found in text');
       return [];
     }
     
-    console.log(`📝 Found ${paragraphs.length} paragraphs`);
+    print(`📝 Found ${paragraphs.length} paragraphs`);
     
     // Create clickable paragraph navigation
     const navItems = paragraphs.map((paragraph, index) => ({
@@ -195,9 +195,9 @@ export class AudioSystem {
       seekTo: async () => {
         const result = await this.seekToParagraph(paragraph);
         if (result.success) {
-          console.log(`✅ Navigated to paragraph ${index + 1}`);
+          print(`✅ Navigated to paragraph ${index + 1}`);
         } else {
-          console.warn(`❌ Failed to navigate to paragraph ${index + 1}:`, result.error);
+          printError(`❌ Failed to navigate to paragraph ${index + 1}:`, result.error);
         }
         return result;
       }
@@ -211,7 +211,7 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.enableParagraphNavigation === 'function') {
       this.paragraphSeeker.enableParagraphNavigation();
     } else {
-      console.warn('Paragraph navigation not available');
+      printError('Paragraph navigation not available');
     }
   }
 
@@ -219,7 +219,7 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.disableParagraphNavigation === 'function') {
       this.paragraphSeeker.disableParagraphNavigation();
     } else {
-      console.warn('Paragraph navigation not available');
+      printError('Paragraph navigation not available');
     }
   }
 
@@ -227,7 +227,7 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.refreshParagraphNavigation === 'function') {
       this.paragraphSeeker.refreshParagraphNavigation();
     } else {
-      console.warn('Paragraph navigation not available');
+      printError('Paragraph navigation not available');
     }
   }
 
@@ -238,7 +238,7 @@ export class AudioSystem {
     if (this.audioCore.sound) {
       this.audioCore.sound.unload();
     }
-    console.log('🧹 Audio system destroyed');
+    print('🧹 Audio system destroyed');
   }
 }
 
@@ -256,7 +256,7 @@ window.audioSetup = audioSystem; // Keep backward compatibility
 
 // Initialize the system
 audioSystem.init().catch(error => {
-  console.error('Failed to initialize audio system:', error);
+  printError('Failed to initialize audio system:', error);
 });
 
 // Add some convenience global functions for easy testing
