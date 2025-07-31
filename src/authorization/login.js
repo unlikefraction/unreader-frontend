@@ -47,11 +47,9 @@ function openGooglePopup() {
 
 // ---------- APPLE LOGIN + POLLING ----------
 function loginWithApple() {
-  // 1) generate a unique state
   const state = generateUUID();
   sessionStorage.setItem("appleAuthState", state);
 
-  // 2) open Apple auth popup
   const url =
     `https://appleid.apple.com/auth/authorize?` +
     `response_type=${encodeURIComponent(APPLE_RESPONSE_TYPE)}` +
@@ -63,7 +61,6 @@ function loginWithApple() {
 
   const popup = window.open(url, "_blank", "width=500,height=600");
 
-  // 3) start polling backend for token
   const intervalId = setInterval(async () => {
     try {
       const res = await fetch(
@@ -72,15 +69,26 @@ function loginWithApple() {
       );
 
       if (res.status === 200) {
-        const { token } = await res.json();
+        const { token, is_new_user, user } = await res.json();
         setAuthCookie(token, 30);
         clearInterval(intervalId);
         if (popup && !popup.closed) popup.close();
-        window.location.href = "home.html";
+
+        // Conditional redirect based on user status
+        if (is_new_user) {
+          // First-time login — onboarding incomplete
+          document.cookie = `onboardingComplete=false; path=/; SameSite=Lax; Secure`;
+          window.location.href = "accountSetup.html";
+        } else {
+          // Returning user — assume onboarding already complete
+          document.cookie = `onboardingComplete=true; path=/; SameSite=Lax; Secure`;
+          window.location.href = "home.html";
+        }        
+
       } else if (res.status !== 404) {
         printError("Apple token polling error:", res.status, await res.text());
       }
-      // 404 → not ready yet, keep polling
+
     } catch (err) {
       printError("Polling network error:", err);
     }
@@ -90,47 +98,3 @@ function loginWithApple() {
 // expose for your buttons
 window.openGooglePopup = openGooglePopup;
 window.loginWithApple   = loginWithApple;
-
-
-// demoApi.js
-
-/**
- * Fetch the current user’s info from the backend.
- * @returns {Promise<Object>} Resolves to the user info JSON.
- */
-async function fetchUserInfo() {
-  const url = `${window.API_URLS.BASE}/user/info/`;
-  
-  try {
-    const res = await fetch(url, {
-      method: 'GET',
-      credentials: 'include',         // send cookies
-      headers: {
-        'Accept': 'application/json'  // we expect JSON back
-      }
-    });
-    
-    if (!res.ok) {
-      throw new Error(`Failed to fetch user info: ${res.status} ${res.statusText}`);
-    }
-    
-    const data = await res.json();
-    print('✅ User Info:', data);
-    return data;
-    
-  } catch (err) {
-    printError('⚠️ Error in fetchUserInfo():', err);
-    // you could show a UI error state here
-    throw err;
-  }
-}
-
-// Example usage: on page load, get user info and render their name
-window.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const user = await fetchUserInfo();
-    print(user)
-  } catch {
-    print("dance")
-  }
-});

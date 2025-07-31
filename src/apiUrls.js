@@ -8,4 +8,6 @@ window.API_URLS = {
   BASE: API_BASE_URL,
   APPLE_TOKEN: `${API_BASE_URL}/user/auth/apple/token/`,
   GOOGLE_AUTH: `${API_BASE_URL}/user/auth/google/`,
+  USER: `${API_BASE_URL}/user/`,
+  BOOK: `${API_BASE_URL}/book/`,
 };

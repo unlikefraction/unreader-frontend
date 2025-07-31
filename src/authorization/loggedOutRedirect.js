@@ -14,7 +14,7 @@
   
     // If there’s *no* token, send ’em to login.
     if (!token) {
-      window.location.replace('login.html');
+      window.location.replace('/');
     }
   })();
   

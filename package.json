@@ -16,6 +16,7 @@
     "howler": "^2.2.4",
     "konva": "^9.3.20",
     "perfect-freehand": "^1.2.2",
+    "posthog-js": "^1.258.3",
     "roughjs": "^4.6.6",
     "soundtouch": "^5.0.0",
     "soundtouchjs": "^0.2.1",

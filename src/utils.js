@@ -1,12 +1,17 @@
-const debuggingVal = false
+// Toggle this to true/false to enable/disable debug logs
+let debugging = true;
 
-function print(message, debugging=debuggingVal) {
+function setDebugging(val) {
+    debugging = val;
+}
+
+function print(message) {
     if (debugging) {
         console.log(message);
     }
 }
 
-function printError(message, debugging=debuggingVal) {
+function printError(message) {
     if (debugging) {
         console.error(message);
     }

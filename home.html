@@ -24,13 +24,15 @@
 <body>
     <div id="app">
         <nav>
+            <a href="/">
             <div class="logoContainer">
                 <div class="sleep">z</div>
                 <h2 class="logo">º/º</h2>
             </div>
+        </a>
           <div class="links">
             <div class="credits">
-                <p class="credit">$ 37.58</p>
+                <p class="credit">$ --</p>
             </div>
             <a href="/">Account</a>
           </div>
@@ -71,9 +73,11 @@
 
 
     <script src="./src/utils.js"></script>
+    <script type="module" src="./src/analytics.js"></script>
     <script src="./src/apiUrls.js"></script>
     <script src="./src/basic/logo-animation.js"></script>
-    <script src="./src/basic/loggedOutRedirect.js"></script>
+    <script src="./src/authorization/loggedOutRedirect.js"></script>
     <script src="./src/basic/home.js"></script>
+    <script src="./src/user/userDetails.js"></script>
 </body>
 </html>

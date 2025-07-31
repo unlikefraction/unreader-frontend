@@ -1,5 +1,21 @@
-// 1) Your “demo” name
-var name = "shubh";
+window.addEventListener("DOMContentLoaded", () => {
+  // initial render
+  const name = localStorage.getItem("name") || "bro";
+  titleEl.textContent = `what we reading today, ${name}?`;
+  subEl.textContent   = "or starting a new book?";
+  renderBooks(books);
+  searchInput.addEventListener("input", handleSearch);
+
+  // poll for name changes every 1 second, 10 times
+  let count = 0;
+  const intervalId = setInterval(() => {
+    const freshName = localStorage.getItem("name") || "bro";
+    titleEl.textContent = `what we reading today, ${freshName}?`;
+    count++;
+    if (count >= 20) clearInterval(intervalId);
+  }, 100);
+});
+
 
 // 2) In-memory book list
 var books = [
@@ -59,11 +75,3 @@ function handleSearch() {
   });
   renderBooks(filtered);
 }
-
-// 6) Init on DOM ready
-window.addEventListener("DOMContentLoaded", () => {
-  titleEl.textContent = `what we reading today, ${name}?`;
-  subEl.textContent   = "or starting a new book?";
-  renderBooks(books);
-  searchInput.addEventListener("input", handleSearch);
-});
