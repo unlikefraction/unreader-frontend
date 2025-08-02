@@ -27,7 +27,7 @@ export const defaultShapesData = {
       const saved = localStorage.getItem('annotations');
       if (saved) {
         const shapesData = JSON.parse(saved);
-        print(shapesData)
+        printl(shapesData)
         // Ensure all shape types exist in case new types were added
         return Object.assign({...defaultShapesData}, shapesData);
       }

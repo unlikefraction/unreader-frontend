@@ -142,7 +142,7 @@ export class PlaybackControls {
       });
       
       if (this.sliderAPI) {
-        print('🔗 Speed slider connected to audio');
+        printl('🔗 Speed slider connected to audio');
       }
     }
   
@@ -162,7 +162,7 @@ export class PlaybackControls {
           const dest = Howler.ctx.createMediaStreamDestination();
           Howler.masterGain.connect(dest);
           howlerOutput.srcObject = dest.stream;
-          print('🔗 Howler output routed to custom audio element');
+          printl('🔗 Howler output routed to custom audio element');
         }
       
         // Select elements for device lists
@@ -181,7 +181,7 @@ export class PlaybackControls {
           if (currentStream) currentStream.getTracks().forEach(t => t.stop());
           try {
             currentStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: id }}});
-            print(`🎤 Input device selected: ${id}`);
+            printl(`🎤 Input device selected: ${id}`);
             // No additional input handling at this time
           } catch (e) {
             printError('Input device error:', e);
@@ -193,7 +193,7 @@ export class PlaybackControls {
           if (howlerOutput.setSinkId) {
             try {
               await howlerOutput.setSinkId(id);
-              print(`🔈 Output device set to: ${id}`);
+              printl(`🔈 Output device set to: ${id}`);
             } catch(e) {
               printError('sinkId failed on Howler output:', e);
             }

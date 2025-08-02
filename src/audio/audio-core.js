@@ -47,17 +47,17 @@ export class AudioCore {
         },
         onseek: () => {
           const currentTime = this.getCurrentTime();
-          print(`🔄 Audio seeked to: ${currentTime.toFixed(5)}s`);
+          printl(`🔄 Audio seeked to: ${currentTime.toFixed(5)}s`);
           if (this.onSeekCallback) this.onSeekCallback(currentTime);
         },
         onplay: () => {
           const startTime = this.getCurrentTime();
-          print(`▶️ Audio started playing from: ${startTime.toFixed(5)}s`);
+          printl(`▶️ Audio started playing from: ${startTime.toFixed(5)}s`);
           if (this.onPlayCallback) this.onPlayCallback(startTime);
         },
         onpause: () => {
           const pauseTime = this.getCurrentTime();
-          print(`⏸️ Audio paused at: ${pauseTime.toFixed(5)}s`);
+          printl(`⏸️ Audio paused at: ${pauseTime.toFixed(5)}s`);
           if (this.onPauseCallback) this.onPauseCallback(pauseTime);
         }
       });
@@ -68,7 +68,7 @@ export class AudioCore {
     this.playbackSpeed = speed;
     if (this.sound) {
       this.sound.rate(speed);
-      print(`⚡ Playback speed set to ${speed.toFixed(1)}x (pitch preserved)`);
+      printl(`⚡ Playback speed set to ${speed.toFixed(1)}x (pitch preserved)`);
     }
   }
 

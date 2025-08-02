@@ -80,7 +80,7 @@ export class ReadAlong {
       const ctrl = document.querySelector('.read-along.control');
       if (ctrl) ctrl.classList.toggle('active', active);
   
-      print(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
+      printl(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
   
       // If enabling and we have a word, scroll to it
       if (active && this.highlighter.currentHighlightedWord) {

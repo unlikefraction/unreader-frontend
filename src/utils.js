@@ -5,7 +5,7 @@ function setDebugging(val) {
     debugging = val;
 }
 
-function print(message) {
+function printl(message) {
     if (debugging) {
         console.log(message);
     }

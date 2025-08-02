@@ -91,13 +91,13 @@ async function updateUserInfo(name) {
 
     const data = await res.json();
     if (data.success) {
-        print(`✅ Updated fields: ${data.updated.join(', ')}`);
+        printl(`✅ Updated fields: ${data.updated.join(', ')}`);
 
         // Set onboardingComplete cookie if not already set
         const onboardingStatus = getCookie('onboardingComplete');
         if (onboardingStatus !== 'true') {
             setCookie('onboardingComplete', 'true');
-            print('🎉 onboardingComplete cookie set.');
+            printl('🎉 onboardingComplete cookie set.');
         }
     }
 

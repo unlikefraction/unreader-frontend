@@ -52,15 +52,15 @@ export class TextProcessor {
         }
       });
   
-      print(`📝 Total words in document: ${this.wordSpans.length}`);
-      print(`📄 Total paragraphs processed: ${paragraphs.length}`);
-      print(`⏱️ Offset applied: ${this.offsetMs}ms`);
+      printl(`📝 Total words in document: ${this.wordSpans.length}`);
+      printl(`📄 Total paragraphs processed: ${paragraphs.length}`);
+      printl(`⏱️ Offset applied: ${this.offsetMs}ms`);
     }
   
     async loadWordTimings() {
       const response = await fetch(this.timingFile);
       this.wordTimings = await response.json();
-      print(`🎵 Loaded ${this.wordTimings.length} word timings`);
+      printl(`🎵 Loaded ${this.wordTimings.length} word timings`);
       
       // Apply offset to all timings
       const offsetSeconds = this.offsetMs / 1000;
@@ -71,7 +71,7 @@ export class TextProcessor {
       }));
       
       if (this.offsetMs !== 0) {
-        print(`🔧 Applied ${this.offsetMs}ms offset to all timings`);
+        printl(`🔧 Applied ${this.offsetMs}ms offset to all timings`);
       }
     }
   

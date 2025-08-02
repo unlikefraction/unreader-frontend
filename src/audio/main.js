@@ -60,26 +60,26 @@ export class AudioSystem {
 
   // Public API methods
   async init() {
-    print('🎵 Initializing audio system...');
+    printl('🎵 Initializing audio system...');
     
     try {
       // Initialize text processor first
       await this.textProcessor.init();
-      print('✅ Text processor initialized');
+      printl('✅ Text processor initialized');
       
       // Setup audio core
       this.audioCore.setupAudio();
-      print('✅ Audio core initialized');
+      printl('✅ Audio core initialized');
       
       // Enable paragraph hover navigation if available
       if (this.paragraphSeeker && typeof this.paragraphSeeker.enableParagraphNavigation === 'function') {
         this.paragraphSeeker.enableParagraphNavigation();
-        print('✅ Paragraph navigation enabled');
+        printl('✅ Paragraph navigation enabled');
       } else {
-        print('⚠️ Paragraph navigation not available (method missing)');
+        printl('⚠️ Paragraph navigation not available (method missing)');
       }
       
-      print('🚀 Audio system ready!');
+      printl('🚀 Audio system ready!');
       
     } catch (error) {
       printError('❌ Error initializing audio system:', error);
@@ -167,12 +167,12 @@ export class AudioSystem {
 
   // NEW: Convenience methods
   async seekToText(text) {
-    print(`🔍 Seeking to text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+    printl(`🔍 Seeking to text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
     return await this.seekToParagraph(text);
   }
 
   async seekToSentence(sentence) {
-    print(`🔍 Seeking to sentence: "${sentence}"`);
+    printl(`🔍 Seeking to sentence: "${sentence}"`);
     return await this.seekToParagraph(sentence);
   }
 
@@ -185,7 +185,7 @@ export class AudioSystem {
       return [];
     }
     
-    print(`📝 Found ${paragraphs.length} paragraphs`);
+    printl(`📝 Found ${paragraphs.length} paragraphs`);
     
     // Create clickable paragraph navigation
     const navItems = paragraphs.map((paragraph, index) => ({
@@ -195,7 +195,7 @@ export class AudioSystem {
       seekTo: async () => {
         const result = await this.seekToParagraph(paragraph);
         if (result.success) {
-          print(`✅ Navigated to paragraph ${index + 1}`);
+          printl(`✅ Navigated to paragraph ${index + 1}`);
         } else {
           printError(`❌ Failed to navigate to paragraph ${index + 1}:`, result.error);
         }
@@ -238,7 +238,7 @@ export class AudioSystem {
     if (this.audioCore.sound) {
       this.audioCore.sound.unload();
     }
-    print('🧹 Audio system destroyed');
+    printl('🧹 Audio system destroyed');
   }
 }
 

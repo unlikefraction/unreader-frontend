@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unreader - Library</title>
+    <link rel="stylesheet" href="./src/styles/style.css">
+    <link rel="stylesheet" href="./src/styles/home.css">
+    <link rel="preload"
+      href="https://cdn.jsdelivr.net/fontsource/fonts/apfel-grotezk@latest/latin-400-normal.woff2"
+      as="font" type="font/woff2" crossorigin>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <nav>
+            <a href="/">
+                <div class="logoContainer">
+                    <div class="sleep">z</div>
+                    <h2 class="logo">º/º</h2>
+                </div>
+            </a>
+            <div class="links">
+                <div class="credits">
+                    <p class="credit">$ --</p>
+                </div>
+                <a href="/">Account</a>
+            </div>
+        </nav>
+
+        <div class="mainContent">
+            <label for="epubUploader">Please upload your epub file</label>
+            <input type="file" accept=".epub" class="epubUploader">
+
+            <label for="searchBook">Search for your book</label>
+            <input type="text" class="searchBook" placeholder="Search for your book title here">
+
+            <div class="displayGoogleBooks"></div>
+
+            <div class="createBookDetails"></div>
+        </div>
+    </div>
+
+
+
+    <script src="./src/utils.js"></script>
+    <script type="module" src="./src/analytics.js"></script>
+    <script src="./src/apiUrls.js"></script>
+    <script src="./src/basic/logo-animation.js"></script>
+    <script src="./src/authorization/loggedOutRedirect.js"></script>
+    <script src="./src/user/userDetails.js"></script>
+    <script type="module" src="./src/books/googleBook.js"></script>
+    <script type="module" src="./src/books/createBook.js"></script>
+</body>
+</html>     
