@@ -158,7 +158,8 @@ export function createBookDetails({ imageUrl, title, authors, google_books_id, s
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`Book ${data.created ? 'created' : 'already exists'} with ID ${data.book_id}`);
+        window.location.href = `/bookDetails.html?id=${data.book_id}`;
+        printl(`Book ${data.created ? 'created' : 'already exists'} with ID ${data.book_id}`);
       } else {
         printError('Create Book Error:', data);
         alert(`Error creating book: ${data.detail || res.statusText}`);

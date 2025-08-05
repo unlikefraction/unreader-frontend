@@ -72,7 +72,7 @@ function getCookie(name) {
     }
   }
   
-// Kick it off now, then every 30 seconds (30,000ms)
+// Kick it off now, then every 10 seconds (10,000ms)
 updateUserDetails();
-setInterval(updateUserDetails, 30 * 1000);
+setInterval(updateUserDetails, 10 * 1000);
   

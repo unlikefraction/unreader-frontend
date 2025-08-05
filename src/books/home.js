@@ -30,7 +30,7 @@ window.addEventListener("DOMContentLoaded", () => {
       const item = document.createElement("div");
       item.className = "book-items";
       item.innerHTML = `
-        <div class="main-book-wrap">
+        <a href="/bookDetails.html?id=${book.id}" class="main-book-wrap">
           <div class="book-cover"
                data-name="${book.title.toLowerCase()}"
                data-author="${book.authors.join(", ").toLowerCase()}">
@@ -42,11 +42,11 @@ window.addEventListener("DOMContentLoaded", () => {
               <div class="light"></div>
             </div>
           </div>
-        </div>
+        </a>
       `;
       bookWrapper.appendChild(item);
     });
-  }
+  }  
 
   // search handler: title, subtitle or any author
   function handleSearch() {
