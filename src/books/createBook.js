@@ -1,187 +1,417 @@
-import { initEpubUploader } from './upload.js';
+/*******************************
+ * Unreader — Add a Book (createBook.js)
+ *******************************/
 
-// Variables to store book details
-let bookImageUrl = '';
-let bookTitle = '';
-let bookAuthors = '';
-let bookGoogleId = '';
-let bookSubtitle = '';
-let bookPublisher = '';
-let bookPublishedDate = '';
-let bookLanguage = '';
-let bookFileUrl = ''; // will be set later
-
-// Initialize the EPUB uploader on page load
-initEpubUploader('.epubUploader', (url) => {
-  bookFileUrl = url;
-});
-
-/**
- * Helper to get a cookie value by name
- */
+/* ================================
+   HELPERS
+===================================*/
 function getCookie(name) {
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-  if (parts.length === 2) return parts.pop().split(';').shift();
-  return null;
+  // Escape special regex characters in the cookie name
+  const escaped = name.replace(/([.*+?^${}()|[\]\\])/g, "\\$1");
+  const match = document.cookie.match(new RegExp("(?:^|; )" + escaped + "=([^;]*)"));
+  return match ? decodeURIComponent(match[1]) : null;
 }
 
-/**
- * Renders an editable book-detail panel and handles book creation.
- * Clears previous search results before rendering.
- */
-export function createBookDetails({ imageUrl, title, authors, google_books_id, subtitle, publisher, published_date, language }) {
-  // Assign values to module-scoped vars
-  bookImageUrl = imageUrl;
-  bookTitle = title;
-  bookAuthors = authors;
-  bookGoogleId = google_books_id;
-  bookSubtitle = subtitle || '';
-  bookPublisher = publisher || '';
-  bookPublishedDate = published_date || '';
-  bookLanguage = language || 'en';
+function debounce(fn, delay) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
+}
 
-  // Clear any existing results
-  const displayDiv = document.querySelector('.displayGoogleBooks');
-  displayDiv.innerHTML = '';
-
-  // Container for details
-  const detailsContainer = document.querySelector('.createBookDetails');
-  detailsContainer.innerHTML = '';
-
-  // Editable image URL input and preview
-  const imgInput = document.createElement('input');
-  imgInput.type = 'text';
-  imgInput.value = bookImageUrl;
-  imgInput.className = 'bookImageUrlInput';
-  imgInput.addEventListener('input', (e) => {
-    bookImageUrl = e.target.value;
-    imgPreview.src = bookImageUrl;
+function setStep(n) {
+  document.querySelectorAll(".stepDot").forEach(d => {
+    const stepNum = Number(d.dataset.step);
+    d.classList.toggle("active", stepNum === n);
+    d.classList.toggle("stepCompleted", stepNum < n);
   });
-
-  const imgPreview = document.createElement('img');
-  imgPreview.src = bookImageUrl;
-  imgPreview.alt = bookTitle;
-  imgPreview.className = 'bookImagePreview';
-
-  // Editable title
-  const titleInput = document.createElement('input');
-  titleInput.type = 'text';
-  titleInput.value = bookTitle;
-  titleInput.className = 'bookTitleInput';
-  titleInput.addEventListener('input', (e) => {
-    bookTitle = e.target.value;
+  ["step1", "step2", "step3"].forEach((id, i) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = (i + 1 === n) ? "" : "none";
+    el.classList.toggle("stepCompleted", (i + 1) < n);
   });
+}
 
-  // Authors (non-editable)
-  const authorsEl = document.createElement('p');
-  authorsEl.textContent = bookAuthors;
-  authorsEl.className = 'bookAuthors';
+function showOverlay(msg = "Please wait...") {
+  const o = document.getElementById("loadingOverlay");
+  if (!o) return;
+  o.style.display = "flex";
+  const t = o.querySelector(".loadingText");
+  if (t) t.textContent = msg;
+}
+function hideOverlay() {
+  const o = document.getElementById("loadingOverlay");
+  if (o) o.style.display = "none";
+}
 
-  // Editable subtitle
-  const subtitleInput = document.createElement('input');
-  subtitleInput.type = 'text';
-  subtitleInput.value = bookSubtitle;
-  subtitleInput.className = 'bookSubtitleInput';
-  subtitleInput.addEventListener('input', (e) => {
-    bookSubtitle = e.target.value;
+/* ================================
+   CONSTANTS / STATE
+===================================*/
+const DEFAULT_THUMBNAIL =
+  "https://books.google.com/books/content?id=ZnagEAAAQBAJ&printsec=frontcover&img=1&zoom=6&edge=curl";
+
+let uploadedFileUrl   = "";
+let uploadedFilename  = "";
+let pickedDetails     = null;
+let selectedOath      = "fire_oath";
+let lastClickedItemEl = null;
+
+/* ================================
+   STEP 1 — Upload
+===================================*/
+const dropZone     = document.getElementById("dropZone");
+const fileInput    = document.getElementById("fileInput");
+const uploadStatus = document.getElementById("uploadStatus");
+const dzHint       = document.getElementById("dzHint");
+
+["dragenter", "dragover"].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.add("hover");
   });
-
-  // Publisher (non-editable)
-  const publisherEl = document.createElement('p');
-  publisherEl.textContent = bookPublisher;
-  publisherEl.className = 'bookPublisher';
-
-  // Published date (non-editable)
-  const publishedDateEl = document.createElement('p');
-  publishedDateEl.textContent = bookPublishedDate;
-  publishedDateEl.className = 'bookPublishedDate';
-
-  // Language (non-editable)
-  const languageEl = document.createElement('p');
-  languageEl.textContent = bookLanguage;
-  languageEl.className = 'bookLanguage';
-
-  // Oath selection dropdown
-  const oathLabel = document.createElement('label');
-  oathLabel.textContent = 'Choose an oath (credits will be deducted): ';
-  oathLabel.htmlFor = 'oathSelect';
-
-  const oathSelect = document.createElement('select');
-  oathSelect.id = 'oathSelect';
-  oathSelect.className = 'bookOathSelect';
-  ['whisper_oath', 'fire_oath', 'blood_oath'].forEach((oath) => {
-    const option = document.createElement('option');
-    option.value = oath;
-    // Humanize option text
-    option.textContent = oath.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-    oathSelect.appendChild(option);
+});
+["dragleave", "drop"].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("hover");
   });
+});
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("drop", e => {
+  const f = [...e.dataTransfer.files].find(f => /\.epub$/i.test(f.name));
+  if (!f) return alert("Drop a .epub file");
+  handleUpload(f);
+});
+fileInput.addEventListener("change", () => {
+  const f = fileInput.files[0];
+  if (!f) return;
+  if (!/\.epub$/i.test(f.name)) return alert("Please choose a .epub");
+  handleUpload(f);
+});
 
-  // Create Book button
-  const createBtn = document.createElement('button');
-  createBtn.textContent = 'Create Book';
-  createBtn.addEventListener('click', async () => {
-    if (!bookTitle || !bookAuthors || !bookFileUrl) {
-      alert('Title, authors, and EPUB file are required.');
+async function handleUpload(file) {
+  const token = getCookie("authToken");
+  if (!token) {
+    alert("You're not logged in. Please log in first.");
+    return;
+  }
+
+  uploadedFilename = file.name.replace(/\.epub$/i, "");
+  uploadStatus.innerHTML = `<span class="spinner"></span> Uploading ${file.name}…`;
+  dzHint.textContent = file.name;
+
+  try {
+    const form = new FormData();
+    form.append("book_file", file);
+
+    showOverlay("Uploading EPUB…");
+    const res = await fetch(`${API_URLS.BOOK}assets/upload/`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: form
+    });
+    hideOverlay();
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      uploadStatus.textContent = `Upload failed (${res.status}).`;
+      console.error("Upload error:", data);
       return;
     }
 
-    const token = getCookie('authToken');
-    if (!token) {
-      alert('Authentication token missing. Please log in.');
+    uploadedFileUrl = data.files?.[file.name];
+    uploadStatus.textContent = "✅ Uploaded.";
+    initStep2();
+    setStep(2);
+
+  } catch (err) {
+    hideOverlay();
+    console.error(err);
+    uploadStatus.textContent = "Unexpected error while uploading.";
+  }
+}
+
+/* ================================
+   STEP 2 — Choose book
+===================================*/
+const searchInput  = document.getElementById("searchInput");
+const bookList     = document.getElementById("bookList");
+const pickedBox    = document.getElementById("pickedBox");
+const searchStatus = document.getElementById("searchStatus");
+
+function initStep2() {
+  searchInput.value = uploadedFilename || "";
+  bookList.innerHTML = "";
+  pickedBox.className = "pickedBox";
+  pickedBox.innerHTML = `
+    <i class="ph ph-book-open" style="font-size:20px"></i>
+    <span>no book selected</span>
+  `;
+  if (searchInput.value.trim()) doSearch(searchInput.value.trim());
+}
+
+searchInput.addEventListener("input", debounce(e => {
+  const q = e.target.value.trim();
+  if (!q) { bookList.innerHTML = ""; return; }
+  doSearch(q);
+}, 300));
+
+async function doSearch(q) {
+  try {
+    searchStatus.textContent = "";
+    bookList.innerHTML = `<div class="status"><span class="spinner"></span> Searching…</div>`;
+    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}`);
+    if (!r.ok) throw new Error(`Books API ${r.status}`);
+    const data = await r.json();
+    renderSearch(data.items || []);
+  } catch (err) {
+    console.error(err);
+    bookList.innerHTML = "";
+    searchStatus.textContent = "Problem searching Google Books.";
+  }
+}
+
+function getYear(publishedDate = "") {
+  const m = publishedDate.match(/\d{4}/);
+  return m ? m[0] : "";
+}
+
+function renderSearch(items) {
+  bookList.innerHTML = "";
+  if (!items.length) {
+    bookList.innerHTML = `<div class="status">No results. Try refining your title.</div>`;
+    return;
+  }
+  items.forEach(item => {
+    const info    = item.volumeInfo || {};
+    const img     = (info.imageLinks && (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail)) || DEFAULT_THUMBNAIL;
+    const title   = info.title || "Untitled";
+    const authors = (info.authors || []).join(", ") || "Unknown author";
+    const year    = getYear(info.publishedDate || "");
+
+    const el = document.createElement("div");
+    el.className = "bookItem";
+    el.innerHTML = `
+      <img src="${img}" alt="${title}"/>
+      <div class="meta">
+        <h3>${title}</h3>
+        <p>${authors}${year ? ` • ${year}` : ""}</p>
+      </div>
+      <i class="ph ph-check-circle bookTick" aria-hidden="true"></i>
+    `;
+    el.addEventListener("click", () => selectBook(item, el));
+    bookList.appendChild(el);
+  });
+}
+
+function selectBook(book, el) {
+  if (lastClickedItemEl) lastClickedItemEl.classList.remove("active");
+  el.classList.add("active");
+  lastClickedItemEl = el;
+
+  const info = book.volumeInfo || {};
+  const year = getYear(info.publishedDate || "");
+  pickedDetails = {
+    imageUrl: (info.imageLinks && (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail)) || DEFAULT_THUMBNAIL,
+    title: info.title || "",
+    authors: (info.authors || []).join("|"),
+    google_books_id: book.id,
+    subtitle: info.subtitle || "",
+    publisher: info.publisher || "",
+    published_date: info.publishedDate || "",
+    language: info.language || "en"
+  };
+
+  pickedBox.className = "pickedBox bookSelected";
+  pickedBox.innerHTML = `
+    <div class="book-cover">
+      <div class="book-inside"></div>
+      <div class="book-image">
+        <img src="${pickedDetails.imageUrl}"
+              alt="Cover of ${pickedDetails.title}">
+        <div class="effect"></div>
+        <div class="light"></div>
+      </div>
+    </div>
+    <div class="pickedMeta">
+      <div class="mataDeta">
+        <h4>${pickedDetails.title}</h4>
+        <p>${pickedDetails.authors ? pickedDetails.authors.replace(/\|/g, ", ") : "Unknown author"}${year ? ` • ${year}` : ""}</p>
+      </div>
+      <button id="confirmBookBtn" class="btn">yes, continue   →</button>
+    </div>
+  `;
+}
+
+document.addEventListener("click", e => {
+  if (e.target && e.target.id === "confirmBookBtn") {
+    if (!pickedDetails || !uploadedFileUrl) {
+      alert("Pick a book and upload an EPUB first.");
+      return;
+    }
+    initStep3();
+    setStep(3);
+  }
+});
+
+/* ================================
+   STEP 3 — Oath + Create  (UPDATED)
+===================================*/
+const oathTabs     = document.getElementById("oathTabs");
+const oathBadge    = document.getElementById("oathBadge");
+const oathCopy     = document.getElementById("oathCopy");
+const oathImg      = document.getElementById("oathImg");
+const takeOathBtn  = document.getElementById("takeOathBtn");
+const createStatus = document.getElementById("createStatus");
+
+/* price + gradient map per oath */
+const OATHS = {
+  whisper_oath: {
+    label: "Whisper Oath",
+    price: 1,
+    gradient: "linear-gradient(90deg, #0C3C57 0%, #2B769C 49.5%, #689BAF 100%)"
+  },
+  fire_oath: {
+    label: "Fire Oath",
+    price: 4,
+    gradient: "linear-gradient(90deg, #070302 0%, #9F0E01 49.5%, #FD9A2E 100%)"
+  },
+  blood_oath: {
+    label: "Blood Oath",
+    price: 10,
+    gradient: "linear-gradient(90deg, #29160D 0%, #972219 49.5%, #91160F 100%)"
+  }
+};
+
+function ordinal(n) {
+  const s = ["th","st","nd","rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function formatBadgeDate(d = new Date()) {
+  const day = ordinal(d.getDate());
+  const month = d.toLocaleString(undefined, { month: "long" });
+  const year = d.getFullYear();
+  return `${day} ${month}, ${year}`;
+}
+
+function initStep3() {
+  /* tabs */
+  oathTabs.innerHTML = "";
+  Object.entries(OATHS).forEach(([value, meta]) => {
+    const b = document.createElement("button");
+    b.className = "oathTab" + (value === selectedOath ? " active" : "");
+    b.textContent = meta.label;
+    b.addEventListener("click", () => {
+      selectedOath = value;
+      document.querySelectorAll(".oathTab").forEach(x => x.classList.remove("active"));
+      b.classList.add("active");
+      renderOathCopy();
+    });
+    oathTabs.appendChild(b);
+  });
+
+  renderOathCopy();
+}
+
+function renderOathCopy() {
+  const { label, price, gradient } = OATHS[selectedOath];
+
+  // date badge + full gradient
+  oathBadge.textContent = formatBadgeDate(new Date());
+  oathBadge.style.background = gradient;
+
+  // oath image
+  const oathKey = selectedOath.toLowerCase();
+  if (["fire_oath", "whisper_oath", "blood_oath"].includes(oathKey)) {
+    oathImg.src = `/assets/${oathKey.replace("_", "")}.png`;
+  }
+
+  // username (capitalize first letter)
+  let username = (localStorage.getItem("name") || "").trim();
+  username = username ? username.charAt(0).toUpperCase() + username.slice(1) : "—";
+
+  const title = pickedDetails?.title || "the selected book";
+
+  // extract first two colors from the full gradient
+  const firstTwo = gradient.match(/#[0-9A-Fa-f]{3,6}/g)?.slice(0, 2) || ["#000", "#000"];
+  const twoColorGradient = `linear-gradient(90deg, ${firstTwo[0]} 0%, ${firstTwo[1]} 50%)`;
+
+  // gradient label style
+  const labelHTML = `<span style="
+      background: ${twoColorGradient};
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      color: transparent;
+    ">${label}</span>`;
+
+  oathCopy.innerHTML = `I, <strong>${username}</strong>, hereby take the <strong>${labelHTML}</strong> to read “<u>${title}</u>”, and <strong>wager $${price}</strong>, which I shall receive if, and only if, I complete the book.`;
+}
+
+
+takeOathBtn.addEventListener("click", createBookOnBackend);
+
+async function createBookOnBackend() {
+  const token = getCookie("authToken");
+  if (!token) {
+    alert("Please log in to continue.");
+    return;
+  }
+
+  takeOathBtn.disabled = true;
+  takeOathBtn.innerHTML = `<span class="spinner"></span> Processing…`;
+  createStatus.textContent = "";
+  showOverlay("Creating your book…");
+
+  const payload = {
+    title: pickedDetails.title,
+    authors: pickedDetails.authors,
+    google_books_id: pickedDetails.google_books_id,
+    book_file_url: uploadedFileUrl,
+    oath: selectedOath,
+    subtitle: pickedDetails.subtitle,
+    cover_image_url: pickedDetails.imageUrl,
+    publisher: pickedDetails.publisher,
+    published_date: pickedDetails.published_date,
+    isbns: "",
+    language: pickedDetails.language
+  };
+
+  try {
+    const res = await fetch(`${API_URLS.BOOK}create/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    hideOverlay();
+
+    if (!res.ok) {
+      console.error("Create Book Error:", data);
+      createStatus.textContent = data?.detail || "Error creating book.";
+      takeOathBtn.disabled = false;
+      takeOathBtn.textContent = "I take the oath, continue →";
       return;
     }
 
-    const payload = {
-      title: bookTitle,
-      authors: bookAuthors,
-      google_books_id: bookGoogleId,
-      book_file_url: bookFileUrl,
-      oath: oathSelect.value,
-      subtitle: bookSubtitle,
-      cover_image_url: bookImageUrl,
-      publisher: bookPublisher,
-      published_date: bookPublishedDate,
-      isbns: '',
-      language: bookLanguage
-    };
+    createStatus.textContent = "✅ Done. Redirecting…";
+    setTimeout(() => {
+      window.location.href = `/bookDetails.html?id=${data.book_id}`;
+    }, 600);
 
-    try {
-      const res = await fetch(`${window.API_URLS.BOOK}create/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        window.location.href = `/bookDetails.html?id=${data.book_id}`;
-        printl(`Book ${data.created ? 'created' : 'already exists'} with ID ${data.book_id}`);
-      } else {
-        printError('Create Book Error:', data);
-        alert(`Error creating book: ${data.detail || res.statusText}`);
-      }
-    } catch (err) {
-      printError(err);
-      alert('Network error while creating book.');
-    }
-  });
-
-  // Append all elements
-  detailsContainer.appendChild(imgInput);
-  detailsContainer.appendChild(imgPreview);
-  detailsContainer.appendChild(titleInput);
-  detailsContainer.appendChild(authorsEl);
-  detailsContainer.appendChild(subtitleInput);
-  detailsContainer.appendChild(publisherEl);
-  detailsContainer.appendChild(publishedDateEl);
-  detailsContainer.appendChild(languageEl);
-  detailsContainer.appendChild(oathLabel);
-  detailsContainer.appendChild(oathSelect);
-  detailsContainer.appendChild(createBtn);
-
-  displayDiv.appendChild(detailsContainer);
+  } catch (err) {
+    hideOverlay();
+    console.error(err);
+    createStatus.textContent = "Network error while creating the book.";
+    takeOathBtn.disabled = false;
+    takeOathBtn.textContent = "I take the oath, continue →";
+  }
 }

@@ -1,25 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Unreader - Library</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Add a Book | Unreader</title>
     <link rel="stylesheet" href="./src/styles/style.css">
     <link rel="stylesheet" href="./src/styles/home.css">
+    <link rel="stylesheet" href="./src/styles/credits.css">
+    <link rel="stylesheet" href="./src/styles/newBook.css">
+
     <link rel="preload"
       href="https://cdn.jsdelivr.net/fontsource/fonts/apfel-grotezk@latest/latin-400-normal.woff2"
       as="font" type="font/woff2" crossorigin>
-    <link
-      rel="stylesheet"
-      type="text/css"
-      href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" type="text/css"
+      href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css" />
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
@@ -37,30 +33,79 @@
                 <a href="account.html">Account</a>
             </div>
         </nav>
+    </div>
 
-        <div class="mainContent">
-            <label for="epubUploader">Please upload your epub file</label>
-            <input type="file" accept=".epub" class="epubUploader">
+    <div class="remainingApp">
+        <div class="wrap">
+            <!-- STEP 1 -->
+            <section id="step1">
+                <h1>upload your epub</h1>
+                <div id="dropZone" class="dropZone">
+                  <i class="ph ph-upload icon"></i>
+                  <div class="hint" id="dzHint">click to choose book’s epub<br/>or drag & drop here</div>
+                  <input id="fileInput" class="visuallyHidden" type="file" accept=".epub"/>
+                </div>
+                <div class="center actionsRow"></div>
+                <div class="status" id="uploadStatus"></div>
+            </section>
 
-            <label for="searchBook">Search for your book</label>
-            <input type="text" class="searchBook" placeholder="Search for your book title here">
+            <!-- STEP 2 -->
+            <section id="step2" style="display:none">
+                <p class="headingInfo">is this the book you’ve uploaded?</p>
 
-            <div class="displayGoogleBooks"></div>
+                <div class="selectedRow">
+                  <div class="pickedBox" id="pickedBox">
+                    <i class="ph ph-books" style="font-size:20px"></i>
+                    <span>no book selected</span>
+                  </div>
+                </div>
 
-            <div class="createBookDetails"></div>
+                <div style="color: #373737; margin: 42px 0 10px 0; font-size: 18px;">searching for</div>
+                <input id="searchInput" class="searchBar" type="text" placeholder="Search for your book title here"/>
+                <div class="bookList" id="bookList"></div>
+                <div class="status" id="searchStatus"></div>
+            </section>
+
+            <!-- STEP 3 -->
+            <section id="step3" style="display:none">
+              <div class="oathTabs" id="oathTabs"></div>
+
+              <div class="oathCard">
+                <div>
+                  <div class="oathBadge" id="oathBadge"></div>
+                  <p class="oathCopy" id="oathCopy" style="margin:10px 0 0"></p>
+                </div>
+                <!-- One image element whose src swaps per oath -->
+                <img class="oathImg" id="oathImg" alt="oath" src="/assets/fireoath.png"/>
+              </div>
+
+              <div class="continueRow">
+                <button class="btn" id="takeOathBtn">I take the oath, continue →</button>
+              </div>
+              <div class="status" id="createStatus"></div>
+              <div class="footerGap"></div>
+            </section>
+        </div>
+
+        <div class="stepsHeader" id="stepsHeader">
+            <div class="stepDot active" data-step="1">1</div>
+            <div class="stepDot" data-step="2">2</div>
+            <div class="stepDot" data-step="3">3</div>
         </div>
     </div>
 
-
+    <!-- Loading overlay (used across steps) -->
+    <div id="loadingOverlay" class="loadingOverlay" style="display:none;">
+      <div class="loadingSpinner"></div>
+      <div class="loadingText">Please wait…</div>
+    </div>
 
     <script src="./src/utils.js"></script>
     <script type="module" src="./src/analytics.js"></script>
+    <script type="module" src="./src/user/userDetails.js"></script>
     <script src="./src/apiUrls.js"></script>
     <script src="./src/basic/logo-animation.js"></script>
     <script src="./src/authorization/loggedOutRedirect.js"></script>
-    <script src="./src/user/userDetails.js"></script>
-    <script type="module" src="./src/books/upload.js"></script>
-    <script type="module" src="./src/books/googleBook.js"></script>
-    <script type="module" src="./src/books/createBook.js"></script>
+    <script src="./src/books/createBook.js"></script>
 </body>
-</html>     
+</html>
