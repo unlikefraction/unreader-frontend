@@ -1,5 +1,7 @@
+// -----audioAndTextGen.js------
+
 import { AudioCore } from '../audio/audio-core.js';
-import { TextProcessor } from '../audio/text-processor.js';
+import { TextProcessor } from '../audio/text-processor-v2.js';
 import { WordHighlighter } from '../audio/word-highlighter.js';
 import { ReadAlong } from '../audio/read-along.js';
 import { PlaybackControls } from '../audio/playback-controls.js';
@@ -9,10 +11,16 @@ import { ParagraphSeeker } from '../audio/paragraph-seeker.js';
  * Main audio system that orchestrates all components
  */
 export class AudioSystem {
-  constructor(audioFile, timingFile, textFile, offsetMs = 0) {
+  constructor(audioFile, timingFile, textFile, offsetMs = 0, containerEl = null) {
+    this.container = containerEl;
     // Initialize core components
     this.audioCore = new AudioCore(audioFile, offsetMs);
-    this.textProcessor = new TextProcessor(textFile, timingFile, offsetMs);
+    this.textProcessor = new TextProcessor(
+        textFile,
+        timingFile,
+        offsetMs,
+        this.container.querySelector('.mainContent')  // ← scoped query
+    );
     this.highlighter = new WordHighlighter(this.textProcessor);
     this.readAlong = new ReadAlong(this.highlighter);
     this.playbackControls = new PlaybackControls(this.audioCore);

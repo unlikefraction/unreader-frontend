@@ -10,4 +10,5 @@ window.API_URLS = {
   GOOGLE_AUTH: `${API_BASE_URL}/user/auth/google/`,
   USER: `${API_BASE_URL}/user/`,
   BOOK: `${API_BASE_URL}/book/`,
+  PAYMENT: `${API_BASE_URL}/payment/`,
 };

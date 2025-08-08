@@ -6,6 +6,7 @@
     <title>Unreader - Library</title>
     <link rel="stylesheet" href="./src/styles/style.css">
     <link rel="stylesheet" href="./src/styles/home.css">
+    <link rel="stylesheet" href="./src/styles/account.css">
     <link rel="preload"
       href="https://cdn.jsdelivr.net/fontsource/fonts/apfel-grotezk@latest/latin-400-normal.woff2"
       as="font" type="font/woff2" crossorigin>
@@ -20,6 +21,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
@@ -37,20 +41,33 @@
                 <a href="account.html">Account</a>
             </div>
         </nav>
+    </div>
 
-        <div class="mainContent">
-            <label for="epubUploader">Please upload your epub file</label>
-            <input type="file" accept=".epub" class="epubUploader">
+    <div class="homePage">
+        <div class="topSection">
+            <img src="/assets/dino.png" alt="Dinosaur">
+            <div class="creditsSection">
+                <h2 class="creditRemaining"><span class="dollarIcon">$</span>--</h2>
+                <button class="addCreditsButton"><a href="credits.html">add credits</a></button>
+            </div>
+        </div>
 
-            <label for="searchBook">Search for your book</label>
-            <input type="text" class="searchBook" placeholder="Search for your book title here">
-
-            <div class="displayGoogleBooks"></div>
-
-            <div class="createBookDetails"></div>
+        <div class="usageSection">
+            <div class="usageHeader">
+                <h3 class="usageHeading">usage history</h3>
+                <select class="usageHistory">
+                    <option value="daily">daily</option>
+                    <option value="weekly">weekly</option>
+                    <option value="monthly">monthly</option>
+                </select>
+            </div>
+            <div class="usage">
+                <h3 class="noUsage">ready when you are! start reading to see your credit usage details here</h3>
+            </div>
         </div>
     </div>
 
+    <br><br><br><br>
 
 
     <script src="./src/utils.js"></script>
@@ -59,8 +76,5 @@
     <script src="./src/basic/logo-animation.js"></script>
     <script src="./src/authorization/loggedOutRedirect.js"></script>
     <script src="./src/user/userDetails.js"></script>
-    <script type="module" src="./src/books/upload.js"></script>
-    <script type="module" src="./src/books/googleBook.js"></script>
-    <script type="module" src="./src/books/createBook.js"></script>
 </body>
-</html>     
+</html>
