@@ -27,16 +27,9 @@
     <main class="authWrap">
       <h1 class="authTitle">let’s get you started</h1>
 
-      <div class="authButtons">
-        <button class="oauthBtn" type="button" onclick="openGooglePopup()" aria-label="Continue with Google">
-          <span class="oauthText">continue with google</span>
-          <img class="oauthIcon" src="/assets/google.svg" alt="" aria-hidden="true" />
-        </button>
-
-        <button class="oauthBtn" type="button" onclick="loginWithApple()" aria-label="Continue with Apple">
-          <span class="oauthText">continue with apple</span>
-          <img class="oauthIcon" src="/assets/apple.svg" alt="" aria-hidden="true" />
-        </button>
+      <div class="authButtons authButtonsOg">
+        <img src="/assets/googleOg.png" alt="login with google" onclick="openGooglePopup()">
+        <img src="/assets/appleOg.png" alt="login with apple" onclick="loginWithApple()">
       </div>
     </main>
 
@@ -54,7 +47,7 @@
       }
     
       document.querySelector(".logInLink").href = weightedRandom(options, weights);
-    </script>    
+    </script>
 
     <script src="./src/utils.js"></script>
     <script type="module" src="./src/analytics.js"></script>
