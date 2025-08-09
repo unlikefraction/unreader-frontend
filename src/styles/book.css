@@ -4,8 +4,12 @@
     top: 100px;
 }
 
-.mainContent{
+.mainBookDetails{
     position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 8rem;
+    width: 750px;
     top: 20px;
     display: flex;
     flex-direction: column;

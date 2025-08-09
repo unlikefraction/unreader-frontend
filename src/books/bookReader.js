@@ -1,45 +1,23 @@
-import { AudioSystem } from "./audioAndTextGen.js";
+import { AudioSystem } from "./audioAndTextGen";
 
-const pages = [
-  {
-    audio: '/audio/suckAtReading.wav',
-    timing: '/order/word_timings_ordered.json',
-    text: '/transcript/landing.html',
-    offset: -100
-  },
-  {
-    audio: '/audio/suckAtReading.wav',
-    timing: '/order/word_timings_ordered.json',
-    text: '/transcript/landing.html',
-    offset: -100
-  },
-  // ...
-];
-  
-window.pageSystems = [];
+// Create and initialize the audio system
+const audioSystem = new AudioSystem(
+  '/audio/suckAtReading.wav',
+  '/order/word_timings_ordered.json',
+  '/transcript/landing.html',
+  -100
+);
 
-const root = document.querySelector('.bookContainer'); // some container div
+// Make it globally available
+window.audioSystem = audioSystem;
+window.audioSetup = audioSystem; // Keep backward compatibility
 
-(async () => {
-    for (let index = 0; index < pages.length; index++) {
-      const page = pages[index];
-  
-      const pageDiv = document.createElement('div');
-      pageDiv.className = 'audioPage';
-      pageDiv.id = `page-${index}`;
-      pageDiv.innerHTML = `<div class="mainContent"></div>`;
-      root.appendChild(pageDiv);
-  
-      const system = new AudioSystem(
-        page.audio,
-        page.timing,
-        page.text,
-        page.offset || 0,
-        pageDiv
-      );
-  
-      await system.init(); // now this actually waits!
-      window.pageSystems.push(system);
-    }
-  })();
-  
+// Initialize the system
+audioSystem.init().catch(error => {
+  printError('Failed to initialize audio system:', error);
+});
+
+// Add some convenience global functions for easy testing
+window.seekToParagraph = (text) => audioSystem.seekToParagraph(text);
+window.seekToText = (text) => audioSystem.seekToText(text);
+window.extractParagraphs = () => audioSystem.extractParagraphs();
