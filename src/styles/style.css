@@ -603,13 +603,12 @@ nav a{
 
 .paragraph-hover-nav {
   display: flex;
-  width: 40px;
-  height: 40px;
   border-radius: 50%;
   background: #fff;
-  margin-left: -2.5rem;
+  margin-left: -1.6rem;
   text-align: center;
   cursor: pointer;
+  margin-top: 1.2rem;
 }
 
 .paragraph-hover-nav i{
@@ -621,12 +620,13 @@ nav a{
   top: 50%;
   left: 50%;
   background: #fff;
-  width: 30px;
-  height: 30px;
+  font-size: 1.2rem;
   text-align: center;
   border-radius: 50%;
-  border: 2px solid #000;
   font-weight: 600;
+  padding: 0.4rem;
+  border: 2px solid #000;
+  color: #000;
 }
 
 .inboxPopup{
@@ -753,7 +753,7 @@ mark{
 }
 
 /* Grab that exact span and give it a yellow background */
-span.highlight[data-index="302"] {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="302"] {
   position: relative;
   padding: 2px 6px;
   border: 2px solid transparent;
@@ -779,7 +779,7 @@ span.highlight[data-index="302"] {
 }
 
 
-span.highlight[data-index="302"]::after {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="302"]::after {
   content: 'click to copy';
   position: absolute;
   top: calc(100% + 8px);  /* 4px gap below the span */
@@ -801,12 +801,12 @@ span.highlight[data-index="302"]::after {
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
 }
 
-span.highlight[data-index="320"] {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="320"] {
   position: relative;       /* establishes a positioning context */
   z-index: -1;               /* text stays on top of the pseudo-bg */
 }
 
-span.highlight[data-index="320"]::before {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="320"]::before {
   content: "";
   position: absolute;
   top: 50%;
@@ -818,4 +818,21 @@ span.highlight[data-index="320"]::before {
               no-repeat 
               center/contain;
   z-index: -2;            /* send it behind the text */
+}
+
+
+.pageCompleted{
+  opacity: 1 !important;
+}
+
+.pageCompleted::after {
+  pointer-events: none; /* keep hover chips clickable underneath */
+}
+
+.pageCompleted span{
+  color: #000 !important;
+}
+
+.pageRemaining span{
+  color: #ABABAB !important;
 }

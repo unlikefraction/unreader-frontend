@@ -1,18 +1,19 @@
 // ----audio-core.js---------
-
 import { Howl, Howler } from 'howler';
 
 /**
  * Core audio functionality using Howler.js
  */
 export class AudioCore {
+  static _controlsBound = false; // avoid binding play/ff/rw multiple times
+
   constructor(audioFile, offsetMs = 0) {
     this.audioFile = audioFile;
     this.offsetMs = offsetMs;
     this.sound = null;
     this.isPlaying = false;
     this.playbackSpeed = 1.0;
-    
+
     // Event callbacks
     this.onPlayCallback = null;
     this.onPauseCallback = null;
@@ -34,30 +35,30 @@ export class AudioCore {
           if (this.onEndCallback) this.onEndCallback();
         },
         onloaderror: (id, error) => {
-          printError('Audio loading error:', error);
+          printError?.('Audio loading error:', error);
           this.isPlaying = false;
           this.updatePlayButton(false);
           if (this.onErrorCallback) this.onErrorCallback(error);
         },
         onplayerror: (id, error) => {
-          printError('Audio play error:', error);
+          printError?.('Audio play error:', error);
           this.isPlaying = false;
           this.updatePlayButton(false);
           if (this.onErrorCallback) this.onErrorCallback(error);
         },
         onseek: () => {
           const currentTime = this.getCurrentTime();
-          printl(`🔄 Audio seeked to: ${currentTime.toFixed(5)}s`);
+          printl?.(`🔄 Audio seeked to: ${currentTime.toFixed(5)}s`);
           if (this.onSeekCallback) this.onSeekCallback(currentTime);
         },
         onplay: () => {
           const startTime = this.getCurrentTime();
-          printl(`▶️ Audio started playing from: ${startTime.toFixed(5)}s`);
+          printl?.(`▶️ Audio started playing from: ${startTime.toFixed(5)}s`);
           if (this.onPlayCallback) this.onPlayCallback(startTime);
         },
         onpause: () => {
           const pauseTime = this.getCurrentTime();
-          printl(`⏸️ Audio paused at: ${pauseTime.toFixed(5)}s`);
+          printl?.(`⏸️ Audio paused at: ${pauseTime.toFixed(5)}s`);
           if (this.onPauseCallback) this.onPauseCallback(pauseTime);
         }
       });
@@ -68,21 +69,20 @@ export class AudioCore {
     this.playbackSpeed = speed;
     if (this.sound) {
       this.sound.rate(speed);
-      printl(`⚡ Playback speed set to ${speed.toFixed(1)}x (pitch preserved)`);
+      printl?.(`⚡ Playback speed set to ${speed.toFixed(1)}x (pitch preserved)`);
     }
   }
 
   async playAudio() {
     try {
       this.setupAudio();
-      
       if (!this.sound.playing()) {
         this.sound.play();
         this.updatePlayButton(true);
         this.isPlaying = true;
       }
     } catch (error) {
-      printError('Error playing audio:', error);
+      printError?.('Error playing audio:', error);
       this.updatePlayButton(false);
       this.isPlaying = false;
       if (this.onErrorCallback) this.onErrorCallback(error);
@@ -113,7 +113,7 @@ export class AudioCore {
       this.sound.seek(newTime);
     }
   }
-  
+
   rewind() {
     if (this.sound) {
       const currentTime = this.sound.seek();
@@ -147,47 +147,27 @@ export class AudioCore {
   }
 
   // Event callback setters
-  onPlay(callback) {
-    this.onPlayCallback = callback;
-  }
-
-  onPause(callback) {
-    this.onPauseCallback = callback;
-  }
-
-  onEnd(callback) {
-    this.onEndCallback = callback;
-  }
-
-  onSeek(callback) {
-    this.onSeekCallback = callback;
-  }
-
-  onError(callback) {
-    this.onErrorCallback = callback;
-  }
+  onPlay(callback) { this.onPlayCallback = callback; }
+  onPause(callback) { this.onPauseCallback = callback; }
+  onEnd(callback) { this.onEndCallback = callback; }
+  onSeek(callback) { this.onSeekCallback = callback; }
+  onError(callback) { this.onErrorCallback = callback; }
 
   setupEventListeners() {
+    if (AudioCore._controlsBound) return; // only bind once (first page)
     const playButton = document.querySelector('.playButton');
     const forward = document.querySelector('.forward');
     const rewind = document.querySelector('.rewind');
-  
+
     if (playButton) {
-      playButton.addEventListener('click', () => {
-        this.toggleAudio();
-      });
+      playButton.addEventListener('click', () => this.toggleAudio());
     }
-  
     if (forward) {
-      forward.addEventListener('click', () => {
-        this.forward();
-      });
+      forward.addEventListener('click', () => this.forward());
     }
-  
     if (rewind) {
-      rewind.addEventListener('click', () => {
-        this.rewind();
-      });
+      rewind.addEventListener('click', () => this.rewind());
     }
+    AudioCore._controlsBound = true;
   }
 }

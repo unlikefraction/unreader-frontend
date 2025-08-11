@@ -4,7 +4,13 @@
  * Text processing and word timing management
  */
 export class TextProcessor {
-  constructor(textFile, timingFile, offsetMs = 0) {
+  /**
+   * @param {string} textFile - URL/path to HTML containing <p> paragraphs
+   * @param {string} timingFile - URL/path to JSON [{word,time_start,time_end}, ...]
+   * @param {number} offsetMs - shift timings by ms
+   * @param {string|null} pageKey - OPTIONAL unique key so multiple pages can share the same files without colliding
+   */
+  constructor(textFile, timingFile, offsetMs = 0, pageKey = null) {
     this.textFile = textFile;
     this.timingFile = timingFile;
     this.offsetMs = offsetMs;
@@ -12,9 +18,12 @@ export class TextProcessor {
     this.wordSpans = [];
     this.referenceWords = 10; // Number of reference words for context matching
 
-    // Stable, page-specific identifier from textFile (no collisions across pages)
-    this.pageId = this.#slugify(textFile);
-    this.container = null; // will be the <p class="mainContent" ...>
+    // Stable, page-specific identifier (unique across pages even if files are identical)
+    const key = pageKey ?? `${textFile}|${timingFile}|${offsetMs}`;
+    this.pageId = this.#slugify(key);
+
+    // will be the <p class="mainContent" ...>
+    this.container = null;
   }
 
   #slugify(s) {
@@ -34,23 +43,25 @@ export class TextProcessor {
       document.body.appendChild(containerDiv);
       printl?.(`🔧 Created <div.mainContainer>`);
     }
-  
+
     // Check if our page's <p> already exists
     let el = containerDiv.querySelector(
       `p.mainContent[data-page-id="${this.pageId}"]`
     );
-  
+
     if (!el) {
       el = document.createElement("p");
       el.className = "mainContent";
       el.dataset.pageId = this.pageId;
       el.id = `mainContent-${this.pageId}`;
+      // Anchor paragraph overlays (hover areas/buttons) relative to this page only
+      el.style.position = el.style.position || "relative";
       containerDiv.appendChild(el);
       printl?.(`🔧 Created <p.mainContent> for pageId=${this.pageId} inside mainContainer`);
     }
-  
+
     this.container = el;
-  }  
+  }
 
   async separateText() {
     this.#ensureMainContent();
@@ -80,7 +91,8 @@ export class TextProcessor {
             span.textContent = word;
             span.dataset.originalWord = word.toLowerCase().replace(/[^\w]/g, "");
             span.dataset.index = this.wordSpans.length;
-            // keep everything scoped to this container
+
+            // Keep everything scoped to this container
             this.container.appendChild(span);
             this.container.appendChild(document.createTextNode(" "));
             this.wordSpans.push(span);
