@@ -7,27 +7,26 @@ import { ReadAlong } from '../audio/read-along.js';
 import { ParagraphSeeker } from '../audio/paragraph-seeker.js';
 
 /**
- * Main audio system that orchestrates all components for a single page.
- * This version is UI-agnostic (no per-instance button/slider bindings).
- * Global controls are wired in MultiPageReader.
+ * Single-page audio/text orchestrator (UI-agnostic).
+ * ReadAlong is a singleton shared across pages.
  */
 export class AudioSystem {
   constructor(audioFile, timingFile, textFile, offsetMs = 0) {
-    // Core pieces
     this.audioCore = new AudioCore(audioFile, offsetMs);
     this.textProcessor = new TextProcessor(textFile, timingFile, offsetMs);
     this.highlighter = new WordHighlighter(this.textProcessor);
-    this.readAlong = new ReadAlong(this.highlighter);
-    this.paragraphSeeker = new ParagraphSeeker(this.textProcessor, this.audioCore);
 
-    // internal state
-    this._armed = false; // logical active flag for MultiPageReader
+    // 🔸 singleton read-along
+    this.readAlong = ReadAlong.get(this.highlighter);
+
+    this.paragraphSeeker = new ParagraphSeeker(this.textProcessor, this.audioCore);
+    this._armed = false;
 
     this.setupConnections();
   }
 
   setupConnections() {
-    // when audio starts, start highlighting ticks
+    // Start/stop highlight loop with audio
     this.audioCore.onPlay(() => {
       this.highlighter.startHighlighting(
         () => this.audioCore.getCurrentTime(),
@@ -48,11 +47,14 @@ export class AudioSystem {
       this.highlighter.handleSeek(currentTime);
     });
 
-    // IMPORTANT: do NOT bind any per-instance DOM controls here.
-    // MultiPageReader owns the global play/pause/seek/speed UI.
+    // 🔸 Notify read-along whenever words are painted
+    const original = this.highlighter.highlightWordsInRange.bind(this.highlighter);
+    this.highlighter.highlightWordsInRange = (startIndex, endIndex, reason = '') => {
+      original(startIndex, endIndex, reason);
+      this.readAlong.onWordHighlighted();
+    };
   }
 
-  // Boot the page: load text + timings, prepare audio, enable hover nav
   async init() {
     printl('🎵 Initializing audio system...');
     try {
@@ -62,11 +64,8 @@ export class AudioSystem {
       this.audioCore.setupAudio();
       printl('✅ Audio core initialized');
 
-      // Keep paragraph navigation on for cross-page hover/jump behavior
-      if (this.paragraphSeeker?.enableParagraphNavigation) {
-        this.paragraphSeeker.enableParagraphNavigation();
-        printl('✅ Paragraph navigation enabled');
-      }
+      this.paragraphSeeker.enableParagraphNavigation?.();
+      printl('✅ Paragraph navigation enabled');
 
       printl('🚀 Audio system ready!');
     } catch (error) {
@@ -75,19 +74,17 @@ export class AudioSystem {
     }
   }
 
-  // ---------- arm/disarm for MultiPageReader ----------
-  // Arm: mark as active page (no DOM class here; reader handles styling)
+  // ---------- arm/disarm ----------
   arm() {
     this._armed = true;
-    // read-along stays available; it only moves on highlight events while playing
+    // ensure singleton follows the active page’s highlighter
+    this.readAlong.rebindHighlighter(this.highlighter);
   }
 
-  // Disarm: pause/stop highlight loop; keep paragraph hover enabled for cross-page jumps
   disarm() {
     this._armed = false;
     try {
       this.highlighter.stopHighlighting();
-      // don't clear highlights here—reader decides when to clear/keep
       this.audioCore.pauseAudio();
     } catch {}
   }
@@ -128,33 +125,10 @@ export class AudioSystem {
     return await this.seekToParagraph(sentence);
   }
 
-  // Optional: build a nav list of paragraphs with tiny helpers
-  async createParagraphNavigation() {
-    const paragraphs = this.extractParagraphs();
-    if (paragraphs.length === 0) {
-      printError('No paragraphs found in text');
-      return [];
-    }
-    printl(`📝 Found ${paragraphs.length} paragraphs`);
-    return paragraphs.map((paragraph, index) => ({
-      index,
-      text: paragraph,
-      preview: paragraph.substring(0, 100) + (paragraph.length > 100 ? '...' : ''),
-      seekTo: async () => {
-        const result = await this.seekToParagraph(paragraph);
-        if (result.success) printl(`✅ Navigated to paragraph ${index + 1}`);
-        else printError(`❌ Failed to navigate to paragraph ${index + 1}:`, result.error);
-        return result;
-      }
-    }));
-  }
-
-  // Expose nav toggles if you ever need them
   enableParagraphNavigation()  { this.paragraphSeeker?.enableParagraphNavigation?.(); }
   disableParagraphNavigation() { this.paragraphSeeker?.disableParagraphNavigation?.(); }
   refreshParagraphNavigation() { this.paragraphSeeker?.refreshParagraphNavigation?.(); }
 
-  // ---------- cleanup ----------
   destroy() {
     try {
       this.highlighter.stopHighlighting();

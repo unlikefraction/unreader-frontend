@@ -1,11 +1,21 @@
 // -----read-along.js-----------
 /**
- * Read-along functionality and text positioning
+ * Read-along functionality and text positioning (singleton).
  */
 export class ReadAlong {
-  static _uiBound = false; // bind global UI once
+  static _instance = null;
+
+  static get(highlighter) {
+    if (!ReadAlong._instance) {
+      ReadAlong._instance = new ReadAlong(highlighter);
+    } else if (highlighter) {
+      ReadAlong._instance.rebindHighlighter(highlighter);
+    }
+    return ReadAlong._instance;
+  }
 
   constructor(highlighter) {
+    // DO NOT call this directly; use ReadAlong.get()
     this.highlighter      = highlighter;
 
     // read-along state
@@ -20,84 +30,36 @@ export class ReadAlong {
     this.startY           = 0;
     this.startTop         = 0;
 
-    this.setupHeightSetter();
-    this.setupReadAlongControl();
-    this.setupScrollDetection();
+    // one-time UI bindings
+    this._bindUI();
   }
 
-  /** Listen for scroll and debounce end */
-  setupScrollDetection() {
-    if (ReadAlong._uiBound) return;
+  // ---------- UI binding (one-time) ----------
+  _bindUI() {
+    // heightSetter
+    this.heightSetter = document.getElementById('heightSetter');
+    if (!this.heightSetter) {
+      printError?.('heightSetter element not found');
+    } else {
+      if (!this.heightSetter.style.top) this.heightSetter.style.top = '50%';
+      this._setupHeightSetterDragging();
+    }
+
+    // read-along toggle control
+    const ctrl = document.querySelector('.read-along.control');
+    if (!ctrl) {
+      printError?.('Read-along control not found');
+    } else {
+      this._onCtrlClick = () => this.toggle();
+      ctrl.addEventListener('click', this._onCtrlClick);
+    }
+
+    // scroll detection
     this._boundOnScroll = this.onScroll.bind(this);
     window.addEventListener('scroll', this._boundOnScroll, { passive: true });
   }
 
-  onScroll() {
-    if (!this.isUserScrolling) this.isUserScrolling = true;
-
-    const wordEl = this.highlighter.currentHighlightedWord;
-    if (this.isActive && wordEl) {
-      const rect = wordEl.getBoundingClientRect();
-      if (rect.bottom < 0 || rect.top > window.innerHeight) {
-        this.setReadAlongActive(false);
-      }
-    }
-
-    clearTimeout(this.scrollTimeout);
-    this.scrollTimeout = setTimeout(() => this.onScrollEnd(), 250);
-  }
-
-  onScrollEnd() {
-    this.isUserScrolling = false;
-    this.evaluateReadAlongState();
-  }
-
-  evaluateReadAlongState() {
-    const wordEl = this.highlighter.currentHighlightedWord;
-    if (!this.heightSetter || !wordEl) return;
-
-    const rect      = wordEl.getBoundingClientRect();
-    const vpHeight  = window.innerHeight;
-    const linePct   = this.getCurrentTopPercent();
-    const lineY     = (linePct / 100) * vpHeight;
-    const diff      = rect.top - lineY;
-
-    if (Math.abs(diff) <= this.thresholdPx) {
-      this.setReadAlongActive(true);
-    } else {
-      this.setReadAlongActive(false);
-    }
-  }
-
-  setReadAlongActive(active) {
-    if (this.isActive === active) return;
-    this.isActive = active;
-
-    const ctrl = document.querySelector('.read-along.control');
-    if (ctrl) ctrl.classList.toggle('active', active);
-
-    printl?.(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
-
-    if (active && this.highlighter.currentHighlightedWord) {
-      this.updateTextPosition();
-    }
-  }
-
-  setupHeightSetter() {
-    if (ReadAlong._uiBound) return;
-    this.heightSetter = document.getElementById('heightSetter');
-    if (!this.heightSetter) {
-      printError?.('heightSetter element not found');
-      return;
-    }
-    if (!this.heightSetter.style.top) {
-      this.heightSetter.style.top = '50%';
-    }
-    this.setupHeightSetterDragging();
-  }
-
-  setupHeightSetterDragging() {
-    if (ReadAlong._uiBound) return;
+  _setupHeightSetterDragging() {
     if (!this.heightSetter) return;
 
     const startDrag = (clientY, e) => {
@@ -123,10 +85,10 @@ export class ReadAlong {
       this.heightSetter.style.cursor = 'grab';
     };
 
-    this._onMouseMove = e => onDrag(e.clientY, e);
-    this._onMouseUp = endDrag;
-    this._onTouchMove = e => onDrag(e.touches[0].clientY, e);
-    this._onTouchEnd = endDrag;
+    this._onMouseMove  = e => onDrag(e.clientY, e);
+    this._onMouseUp    = endDrag;
+    this._onTouchMove  = e => onDrag(e.touches[0].clientY, e);
+    this._onTouchEnd   = endDrag;
 
     this.heightSetter.addEventListener('mousedown', e => startDrag(e.clientY, e));
     document.addEventListener('mousemove', this._onMouseMove);
@@ -135,6 +97,55 @@ export class ReadAlong {
     this.heightSetter.addEventListener('touchstart', e => startDrag(e.touches[0].clientY, e));
     document.addEventListener('touchmove',  this._onTouchMove, { passive: false });
     document.addEventListener('touchend',   this._onTouchEnd);
+  }
+
+  // ---------- logic ----------
+  onScroll() {
+    if (!this.isUserScrolling) this.isUserScrolling = true;
+
+    const wordEl = this.highlighter?.currentHighlightedWord;
+    if (this.isActive && wordEl) {
+      const rect = wordEl.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight) {
+        this.setReadAlongActive(false);
+      }
+    }
+
+    clearTimeout(this.scrollTimeout);
+    this.scrollTimeout = setTimeout(() => this.onScrollEnd(), 250);
+  }
+
+  onScrollEnd() {
+    this.isUserScrolling = false;
+    this.evaluateReadAlongState();
+  }
+
+  evaluateReadAlongState() {
+    const wordEl = this.highlighter?.currentHighlightedWord;
+    if (!this.heightSetter || !wordEl) return;
+
+    const rect      = wordEl.getBoundingClientRect();
+    const vpHeight  = window.innerHeight;
+    const linePct   = this.getCurrentTopPercent();
+    const lineY     = (linePct / 100) * vpHeight;
+    const diff      = rect.top - lineY;
+
+    if (Math.abs(diff) <= this.thresholdPx) this.setReadAlongActive(true);
+    else this.setReadAlongActive(false);
+  }
+
+  setReadAlongActive(active) {
+    if (this.isActive === active) return;
+    this.isActive = active;
+
+    const ctrl = document.querySelector('.read-along.control');
+    if (ctrl) ctrl.classList.toggle('active', active);
+
+    printl?.(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
+
+    if (active && this.highlighter?.currentHighlightedWord) {
+      this.updateTextPosition();
+    }
   }
 
   getCurrentTopPercent() {
@@ -146,21 +157,9 @@ export class ReadAlong {
     if (!this.heightSetter) return;
     const clamped = Math.max(10, Math.min(90, pct));
     this.heightSetter.style.top = `${clamped}%`;
-    if (this.isActive && this.highlighter.currentHighlightedWord) {
+    if (this.isActive && this.highlighter?.currentHighlightedWord) {
       this.updateTextPosition();
     }
-  }
-
-  setupReadAlongControl() {
-    if (ReadAlong._uiBound) return;
-    const ctrl = document.querySelector('.read-along.control');
-    if (!ctrl) {
-      printError?.('Read-along control not found');
-      return;
-    }
-    this._onCtrlClick = () => this.toggle();
-    ctrl.addEventListener('click', this._onCtrlClick);
-    ReadAlong._uiBound = true;
   }
 
   toggle() {
@@ -168,7 +167,8 @@ export class ReadAlong {
   }
 
   updateTextPosition() {
-    if (!this.isActive || this.isUserScrolling || !this.highlighter.currentHighlightedWord || !this.heightSetter) return;
+    if (!this.isActive || this.isUserScrolling || !this.highlighter?.currentHighlightedWord || !this.heightSetter) return;
+
     const rect     = this.highlighter.currentHighlightedWord.getBoundingClientRect();
     const vpHeight = window.innerHeight;
     const linePct  = this.getCurrentTopPercent();
@@ -184,7 +184,6 @@ export class ReadAlong {
     else this.updateTextPosition();
   }
 
-  // When switching pages (optional): let a singleton ReadAlong follow a new highlighter
   rebindHighlighter(highlighter) {
     this.highlighter = highlighter;
   }
