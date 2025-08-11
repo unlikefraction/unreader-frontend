@@ -29,22 +29,21 @@ const SETTINGS = {
 // Check if target is an input field where we should skip shortcuts
 function isInputField(target) {
   const inputTypes = ['INPUT', 'TEXTAREA', 'SELECT'];
-  return inputTypes.includes(target.tagName) || 
+  return inputTypes.includes(target.tagName) ||
          target.contentEditable === 'true' ||
          target.isContentEditable ||
          target.classList.contains('annotation-text-editor');
 }
 
-// Get the active audio system (supports both old and new systems)
+// Get the active audio system (supports new MultiPageReader + legacy)
 function getAudioSystem() {
-  // Try new modular system first
-  if (window.audioSystem) {
-    return window.audioSystem;
-  }
-  // Fall back to old system for backward compatibility
-  if (window.audioSetup) {
-    return window.audioSetup;
-  }
+  // ✅ New: MultiPageReader
+  if (window.reader) return window.reader;
+
+  // Legacy fallbacks
+  if (window.audioSystem) return window.audioSystem;
+  if (window.audioSetup)  return window.audioSetup;
+
   return null;
 }
 
@@ -57,56 +56,69 @@ function getDrawingSystem() {
 function handleDrawingShortcut(toolClass) {
   const drawer = getDrawingSystem();
   if (!drawer) {
-    printError('Drawing system not available');
+    printError?.('Drawing system not available');
     return false;
   }
 
   const tool = document.querySelector(`.w-control.${toolClass}`);
   if (tool) {
     drawer.setActiveTool(tool);
-    printl(`🎨 Switched to ${toolClass} tool`);
+    printl?.(`🎨 Switched to ${toolClass} tool`);
     return true;
   } else {
-    printError(`Tool with class ${toolClass} not found`);
+    printError?.(`Tool with class ${toolClass} not found`);
     return false;
   }
 }
 
-// Handle audio shortcuts
+// Handle audio shortcuts (targets MultiPageReader API if present)
 function handleAudioShortcut(audioAction) {
-  const audioSystem = getAudioSystem();
-  if (!audioSystem) {
-    printError('Audio system not available');
+  const a = getAudioSystem();
+  if (!a) {
+    printError?.('Audio system not available');
     return false;
   }
 
+  // MultiPageReader methods: toggle(), forward(), rewind(), play(), pause()
+  // Legacy fallbacks supported as well.
   switch (audioAction) {
-    case 'playPause':
-      // Use the appropriate method based on system type
-      if (audioSystem.toggle) {
-        audioSystem.toggle();
-      } else if (audioSystem.toggleAudio) {
-        audioSystem.toggleAudio();
+    case 'playPause': {
+      if (typeof a.toggle === 'function') {
+        a.toggle();
+      } else if (typeof a.toggleAudio === 'function') {
+        a.toggleAudio();
+      } else if (typeof a.play === 'function' && typeof a.pause === 'function') {
+        // crude fallback
+        if (a.audioCore?.isPlaying) a.pause(); else a.play();
       }
-      printl('🎵 Toggled audio playback');
+      printl?.('🎵 Toggled audio playback');
       return true;
-      
-    case 'forward':
-      if (audioSystem.forward) {
-        audioSystem.forward();
-        printl('⏭️ Audio forward +10s');
+    }
+
+    case 'forward': {
+      if (typeof a.forward === 'function') {
+        a.forward();                // MultiPageReader: +10s default
+      } else if (typeof a.seek === 'function') {
+        const cur = a.getCurrentTime?.() ?? 0;
+        a.seek(cur + 10);
       }
+      printl?.('⏭️ Audio forward +10s');
       return true;
-      
-    case 'rewind':
-      if (audioSystem.rewind) {
-        audioSystem.rewind();
-        printl('⏮️ Audio rewind -10s');
+    }
+
+    case 'rewind': {
+      if (typeof a.rewind === 'function') {
+        a.rewind();                 // MultiPageReader: -10s default
+      } else if (typeof a.seek === 'function') {
+        const cur = a.getCurrentTime?.() ?? 0;
+        a.seek(Math.max(0, cur - 10));
       }
+      printl?.('⏮️ Audio rewind -10s');
       return true;
-      
+    }
+
     default:
-      printError(`Unknown audio action: ${audioAction}`);
+      printError?.(`Unknown audio action: ${audioAction}`);
       return false;
   }
 }
@@ -114,102 +126,102 @@ function handleAudioShortcut(audioAction) {
 // Wait for systems to be ready
 function waitForSystems(callback, maxAttempts = 50) {
   let attempts = 0;
-  
+
   const checkSystems = () => {
     attempts++;
-    
+
     const audioReady = getAudioSystem() !== null;
     const drawingReady = getDrawingSystem() !== null;
-    
+
     if (audioReady && drawingReady) {
-      printl('✅ All systems ready for shortcuts');
+      printl?.('✅ All systems ready for shortcuts');
       callback();
       return;
     }
-    
+
     if (attempts >= maxAttempts) {
-      printError('⚠️ Timeout waiting for systems to be ready');
-      printl(`Audio system: ${audioReady ? 'Ready' : 'Not ready'}`);
-      printl(`Drawing system: ${drawingReady ? 'Ready' : 'Not ready'}`);
+      printError?.('⚠️ Timeout waiting for systems to be ready');
+      printl?.(`Audio system: ${audioReady ? 'Ready' : 'Not ready'}`);
+      printl?.(`Drawing system: ${drawingReady ? 'Ready' : 'Not ready'}`);
       callback(); // Proceed anyway
       return;
     }
-    
+
     setTimeout(checkSystems, 100);
   };
-  
+
   checkSystems();
 }
 
 // Initialize shortcuts
 function initializeShortcuts() {
-  printl('⌨️ Initializing keyboard shortcuts...');
-  
-  // Main keydown event listener
+  printl?.('⌨️ Initializing keyboard shortcuts...');
+
   document.addEventListener('keydown', (e) => {
     if (!SETTINGS.enabled) return;
-    
+
     // Skip if user is typing in input fields
     if (SETTINGS.preventInInputs && isInputField(e.target)) return;
-    
-    // Handle reload shortcut (Ctrl+R / Cmd+R)
+
+    // Reload shortcut (Ctrl+R / Cmd+R)
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
       e.preventDefault();
-      printl('🔄 Reloading page...');
+      printl?.('🔄 Reloading page...');
       window.location.reload();
       return;
     }
-    
-    // Handle drawing tool shortcuts
+
+    // Drawing tool shortcuts
     const toolClass = DRAWING_SHORTCUTS[e.code];
     if (toolClass) {
       e.preventDefault();
       handleDrawingShortcut(toolClass);
       return;
     }
-    
-    // Handle audio shortcuts
+
+    // Audio shortcuts
     const audioAction = AUDIO_SHORTCUTS[e.code];
     if (audioAction) {
+      // Prevent space/arrow scrolling
       e.preventDefault();
       handleAudioShortcut(audioAction);
       return;
     }
   });
-  
+
   // Log available shortcuts
-  printl('📋 Available shortcuts:');
-  printl('Drawing tools:', Object.entries(DRAWING_SHORTCUTS).map(([key, tool]) => `${key} → ${tool}`));
-  printl('Audio controls:', Object.entries(AUDIO_SHORTCUTS).map(([key, action]) => `${key} → ${action}`));
-  printl('Other: Ctrl+R → reload');
+  printl?.('📋 Available shortcuts:');
+  printl?.('Drawing tools:', Object.entries(DRAWING_SHORTCUTS).map(([key, tool]) => `${key} → ${tool}`));
+  printl?.('Audio controls:', Object.entries(AUDIO_SHORTCUTS).map(([key, action]) => `${key} → ${action}`));
+  printl?.('Other: Ctrl+R → reload');
 }
 
 // Public API for controlling shortcuts
 export const ShortcutManager = {
   enable() {
     SETTINGS.enabled = true;
-    printl('✅ Shortcuts enabled');
+    printl?.('✅ Shortcuts enabled');
   },
-  
+
   disable() {
     SETTINGS.enabled = false;
-    printl('❌ Shortcuts disabled');
+    printl?.('❌ Shortcuts disabled');
   },
-  
+
   toggle() {
     SETTINGS.enabled = !SETTINGS.enabled;
-    printl(`🔄 Shortcuts ${SETTINGS.enabled ? 'enabled' : 'disabled'}`);
+    printl?.(`🔄 Shortcuts ${SETTINGS.enabled ? 'enabled' : 'disabled'}`);
   },
-  
+
   setPreventInInputs(prevent) {
     SETTINGS.preventInInputs = prevent;
-    printl(`🎯 Prevent shortcuts in inputs: ${prevent}`);
+    printl?.(`🎯 Prevent shortcuts in inputs: ${prevent}`);
   },
-  
+
   isEnabled() {
     return SETTINGS.enabled;
   },
-  
+
   getShortcuts() {
     return {
       drawing: { ...DRAWING_SHORTCUTS },
