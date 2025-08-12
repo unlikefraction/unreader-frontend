@@ -11,4 +11,5 @@ window.API_URLS = {
   USER: `${API_BASE_URL}/user/`,
   BOOK: `${API_BASE_URL}/book/`,
   PAYMENT: `${API_BASE_URL}/payment/`,
+  AUDIO: `${API_BASE_URL}/audio/`,
 };
