@@ -30,29 +30,58 @@ export class ReadAlong {
     this.startY           = 0;
     this.startTop         = 0;
 
+    // word-change monitor
+    this._rafId           = null;
+    this._lastWordEl      = null;
+
     // one-time UI bindings
     this._bindUI();
+
+    // start monitoring highlighted word changes
+    this._startMonitor();
   }
 
   // ---------- UI binding (one-time) ----------
   _bindUI() {
-    // heightSetter
+    // ensure heightSetter exists
     this.heightSetter = document.getElementById('heightSetter');
     if (!this.heightSetter) {
-      printError?.('heightSetter element not found');
-    } else {
-      if (!this.heightSetter.style.top) this.heightSetter.style.top = '50%';
-      this._setupHeightSetterDragging();
+      // create a minimal, styled fallback so dragging works even without CSS
+      this.heightSetter = document.createElement('div');
+      this.heightSetter.id = 'heightSetter';
+      Object.assign(this.heightSetter.style, {
+        position: 'fixed',
+        left: '0',
+        right: '0',
+        height: '0',
+        top: '50%',
+        borderTop: '2px dashed rgba(0,0,0,0.25)',
+        zIndex: '9999',
+        cursor: 'grab',
+        pointerEvents: 'auto'
+      });
+      document.body.appendChild(this.heightSetter);
     }
+    if (!this.heightSetter.style.top) this.heightSetter.style.top = '50%';
+    this._setupHeightSetterDragging();
 
     // read-along toggle control
-    const ctrl = document.querySelector('.read-along.control');
+    let ctrl = document.querySelector('.read-along.control');
     if (!ctrl) {
-      printError?.('Read-along control not found');
-    } else {
-      this._onCtrlClick = () => this.toggle();
-      ctrl.addEventListener('click', this._onCtrlClick);
+      ctrl = document.createElement('button');
+      ctrl.className = 'read-along control';
+      ctrl.type = 'button';
+      ctrl.textContent = 'Read-along';
+      Object.assign(ctrl.style, {
+        position: 'fixed',
+        bottom: '16px',
+        right: '16px',
+        zIndex: '10000'
+      });
+      document.body.appendChild(ctrl);
     }
+    this._onCtrlClick = () => this.toggle();
+    ctrl.addEventListener('click', this._onCtrlClick);
 
     // scroll detection
     this._boundOnScroll = this.onScroll.bind(this);
@@ -99,6 +128,25 @@ export class ReadAlong {
     document.addEventListener('touchend',   this._onTouchEnd);
   }
 
+  // ---------- word-change monitor (robust, event-agnostic) ----------
+  _startMonitor() {
+    const tick = () => {
+      const cur = this.highlighter?.currentHighlightedWord || null;
+      if (cur !== this._lastWordEl) {
+        this._lastWordEl = cur;
+        this.onWordHighlighted();
+      }
+      this._rafId = window.requestAnimationFrame(tick);
+    };
+    if (!this._rafId) this._rafId = window.requestAnimationFrame(tick);
+  }
+  _stopMonitor() {
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = null;
+    }
+  }
+
   // ---------- logic ----------
   onScroll() {
     if (!this.isUserScrolling) this.isUserScrolling = true;
@@ -140,8 +188,6 @@ export class ReadAlong {
 
     const ctrl = document.querySelector('.read-along.control');
     if (ctrl) ctrl.classList.toggle('active', active);
-
-    printl?.(`📖 Read-along ${active ? 'enabled' : 'disabled'}`);
 
     if (active && this.highlighter?.currentHighlightedWord) {
       this.updateTextPosition();
@@ -186,9 +232,11 @@ export class ReadAlong {
 
   rebindHighlighter(highlighter) {
     this.highlighter = highlighter;
+    this._lastWordEl = null; // force a refresh on next RAF tick
   }
 
   destroy() {
+    this._stopMonitor();
     if (this._boundOnScroll) window.removeEventListener('scroll', this._boundOnScroll);
     if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
     if (this._onMouseUp)   document.removeEventListener('mouseup', this._onMouseUp);

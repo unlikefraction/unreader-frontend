@@ -1,3 +1,5 @@
+// bookDetails.js
+
 // === Utility ===
 function getCookie(name) {
     const cookie = document.cookie
