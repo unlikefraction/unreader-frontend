@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>LiveKit Minimal Connect</title>
+  <style>
+    body { font-family: sans-serif; margin: 2em; }
+    input, textarea { width: 100%; box-sizing: border-box; margin-bottom: 1em; }
+    button { margin-right: 0.5em; }
+    pre { margin-top: 1em; }
+  </style>
+  <script type="module">
+    import { Room, createLocalAudioTrack, RoomEvent } from "https://cdn.jsdelivr.net/npm/livekit-client@latest/dist/livekit-client.esm.mjs";
+
+    let room;
+    let localMicTrack = null;
+
+    window.addEventListener("load", () => {
+      const urlInput = document.getElementById("lkUrl");
+      const tokenInput = document.getElementById("lkToken");
+      const connectBtn = document.getElementById("connectBtn");
+      const disconnectBtn = document.getElementById("disconnectBtn");
+      const toggleMuteBtn = document.getElementById("toggleMuteBtn");
+      const statusEl = document.getElementById("status");
+
+      async function joinSession() {
+        const url = urlInput.value.trim();
+        const token = tokenInput.value.trim();
+
+        if (!url || !token) {
+          alert("LiveKit URL and Token are required.");
+          return;
+        }
+
+        room = new Room();
+        statusEl.textContent = "🔄 Connecting...";
+
+        room
+          .on(RoomEvent.TrackSubscribed, (track) => {
+            if (track.kind === "audio") {
+              document.body.appendChild(track.attach());
+            }
+          })
+          .on(RoomEvent.Disconnected, () => {
+            statusEl.textContent = "🔴 Disconnected";
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            toggleMuteBtn.disabled = true;
+            toggleMuteBtn.textContent = 'Mute';
+            localMicTrack = null;
+            document.querySelectorAll('audio').forEach(el => el.remove());
+          });
+
+        try {
+          await room.connect(url, token);
+          statusEl.textContent = `🟢 Connected to room: ${room.name}`;
+
+          localMicTrack = await createLocalAudioTrack({ vad: true });
+          await room.localParticipant.publishTrack(localMicTrack);
+
+          connectBtn.disabled = true;
+          disconnectBtn.disabled = false;
+          toggleMuteBtn.disabled = false;
+        } catch (err) {
+          console.error(err);
+          statusEl.textContent = "❌ Connection Failed";
+          room = null;
+        }
+      }
+
+      async function toggleMute() {
+        if (!localMicTrack) return;
+
+        if (localMicTrack.isMuted) {
+          await localMicTrack.unmute();
+          toggleMuteBtn.textContent = "Mute";
+          statusEl.textContent = `🟢 Connected & Broadcasting`;
+        } else {
+          await localMicTrack.mute();
+          toggleMuteBtn.textContent = "Unmute";
+          statusEl.textContent = `🔇 Muted`;
+        }
+      }
+
+      connectBtn.onclick = joinSession;
+      disconnectBtn.onclick = () => room?.disconnect();
+      toggleMuteBtn.onclick = toggleMute;
+    });
+  </script>
+</head>
+<body>
+  <h1>🎤 LiveKit Minimal</h1>
+  <input id="lkUrl" type="text" placeholder="LiveKit URL (e.g. wss://your.livekit.server)" />
+  <textarea id="lkToken" rows="3" placeholder="Paste your token here..."></textarea>
+  <button id="connectBtn">Connect</button>
+  <button id="disconnectBtn" disabled>Disconnect</button>
+  <button id="toggleMuteBtn" disabled>Mute</button>
+  <pre id="status">⚪️ Not connected</pre>
+</body>
+</html>

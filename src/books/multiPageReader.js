@@ -399,6 +399,9 @@ export default class MultiPageReader {
     this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(true);
     this._startProgressTimer();
     this._saveLastPlayedCookie(this.active, this.getCurrentTime());
+
+    // [NEW]
+    try { window.app?.holdup?.noteLocalAudioActivity?.(true); } catch {}
   }
 
   pause() {
@@ -408,6 +411,9 @@ export default class MultiPageReader {
     this._syncPlayButton(false);
     this._stopProgressTimer();
     this._saveLastPlayedCookie(this.active, this.getCurrentTime());
+
+    // [NEW]
+    try { window.app?.holdup?.noteLocalAudioActivity?.(false); } catch {}
   }
 
   async toggle() {

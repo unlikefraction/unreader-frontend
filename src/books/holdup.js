@@ -1,4 +1,4 @@
-// -----holdup.js-----
+// -----holdup.js (minimal, starts muted, soft-mutes remote)-----
 function getCookie(name) {
     const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
     return m ? decodeURIComponent(m[2]) : null;
@@ -10,67 +10,109 @@ function getCookie(name) {
       .replace(/&[a-z0-9#]+;/gi, '')
       .replace(/[^a-z0-9]+/gi, '-')
       .replace(/^-+|-+$/g, '')
-      .slice(0, 48);
+      .slice(0, 64);
   }
   
   export class HoldupManager {
-    constructor({ userBookId, roomNameBase = 'book', callbacks = {} } = {}) {
+    /**
+     * @param {object} opts
+     * @param {string|number} opts.userBookId
+     * @param {string} opts.bookTitle
+     * @param {object} [opts.callbacks]
+     * @param {number} [opts.inactivityMs=300000]
+     */
+    constructor({ userBookId, bookTitle, callbacks = {}, inactivityMs = 300000 } = {}) {
       this.userBookId = userBookId;
-      this.roomNameBase = roomNameBase;
+      this.bookSlug = slugify(bookTitle || 'book');
   
+      this.lk = null;
       this.room = null;
       this.localMicTrack = null;
-      this.livekit = null;
   
-      this._pendingToggle = false;
       this._connected = false;
-      this._lastContext = null;
+      this._connecting = false;
+      this._currentPage = null;
+      this._currentRoomName = null;
   
-      this._remoteAudioTracks = new Set();  // track objects
-      this._remotePubs = new Set();         // publications (to unsubscribe)
+      // start fully muted by default
+      this._outputMuted = true; // remote/output mute state
   
       this._cb = {
         onEngageStart: typeof callbacks.onEngageStart === 'function' ? callbacks.onEngageStart : null,
         onEngageEnd: typeof callbacks.onEngageEnd === 'function' ? callbacks.onEngageEnd : null,
         onRemoteAudioStart: typeof callbacks.onRemoteAudioStart === 'function' ? callbacks.onRemoteAudioStart : null,
-        onRemoteAudioStop: typeof callbacks.onRemoteAudioStop === 'function' ? callbacks.onRemoteAudioStop : null
+        onRemoteAudioStop: typeof callbacks.onRemoteAudioStop === 'function' ? callbacks.onRemoteAudioStop : null,
       };
   
+      this._inactivityMs = Math.max(60000, inactivityMs | 0);
+      this._lastActivityAt = Date.now();
+      this._inactivityTimer = null;
+      this._localAudioActive = false;
+  
+      this._ensureStatusOutlet();
       this._bindHoldUpButton();
+      this._setStatus('Idle');
+      this._setHoldupBtn({ label: 'Unmute', disabled: false, active: false }); // since we start muted
     }
   
+    /* -------------------- UI helpers -------------------- */
+    _ensureStatusOutlet() {
+      const host = document.querySelector('.holdup') || document.body;
+      let banner = host.querySelector('.holdup-status');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.className = 'holdup-status';
+        banner.style.cssText = 'position:relative;font:600 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;opacity:.8;margin:.25rem 0;';
+        host.appendChild(banner);
+      }
+    }
+    _setStatus(text) {
+      const el = (document.querySelector('.holdup') || document).querySelector('.holdup-status');
+      if (el) el.textContent = text;
+    }
     _bindHoldUpButton() {
       const btn = document.querySelector('.hold-up');
       if (!btn) return;
-      btn.addEventListener('click', async () => {
-        try { await this.toggleMute(); } catch (e) { console.warn('Holdup toggle error:', e); }
-      });
+      btn.addEventListener('click', () => this.toggleMute().catch(e => console.warn('toggleMute err', e)));
     }
-    _setHoldupBtnState({ active = false, label = null } = {}) {
+    _setHoldupBtn({ label, disabled = false, active = false } = {}) {
       const btn = document.querySelector('.hold-up');
       if (!btn) return;
-      btn.classList.toggle('active', active);
       if (label) btn.textContent = label;
+      btn.disabled = !!disabled;
+      btn.classList.toggle('active', !!active);
     }
   
+    /* -------------------- activity / inactivity -------------------- */
+    bumpActivity() { this._lastActivityAt = Date.now(); }
+    noteLocalAudioActivity(isActive) { this._localAudioActive = !!isActive; this.bumpActivity(); }
+    _startInactivityWatch() {
+      if (this._inactivityTimer) clearInterval(this._inactivityTimer);
+      this._inactivityTimer = setInterval(() => {
+        const idleFor = Date.now() - this._lastActivityAt;
+        if (idleFor >= this._inactivityMs && !this._localAudioActive) {
+          this.disconnect().catch(() => {});
+          this._setStatus('Disconnected (idle)');
+        }
+      }, 15000);
+    }
+  
+    /* -------------------- livekit plumbing -------------------- */
     async _ensureLiveKit() {
-      if (this.livekit) return this.livekit;
+      if (this.lk) return this.lk;
       const mod = await import('https://cdn.jsdelivr.net/npm/livekit-client@latest/dist/livekit-client.esm.mjs');
-      this.livekit = {
-        Room: mod.Room,
-        RoomEvent: mod.RoomEvent,
-        createLocalAudioTrack: mod.createLocalAudioTrack,
-        DataPacket_Kind: mod.DataPacket_Kind,
-      };
-      return this.livekit;
+      this.lk = { Room: mod.Room, RoomEvent: mod.RoomEvent, createLocalAudioTrack: mod.createLocalAudioTrack };
+      return this.lk;
     }
-  
+    _roomNameFor(pageNumber) {
+      const pn = Number(pageNumber) || 0;
+      return `page-${pn}-${this.bookSlug}`;
+    }
     async _generateToken({ roomName, metadata }) {
       const token = getCookie('authToken');
       if (!token) throw new Error('Missing auth token');
       const base = window.API_URLS?.BASE;
       if (!base) throw new Error('Missing window.API_URLS.BASE');
-  
       const body = { room: roomName, userbook_id: Number(this.userBookId), metadata };
       const res = await fetch(`${base}/holdup/generate-token/`, {
         method: 'POST',
@@ -88,178 +130,161 @@ function getCookie(name) {
       return { roomUrl, token: jwt };
     }
   
-    _cleanupRemoteAudioTags() {
+    /* -------------------- remote audio soft-mute helpers -------------------- */
+    _applyOutputMuteState() {
+      // ensure every remote audio element respects our mute state
       document.querySelectorAll('audio[data-lk-remote]').forEach(el => {
-        try { el.pause(); } catch {}
-        try { el.srcObject = null; } catch {}
-        try { el.remove(); } catch {}
+        try {
+          el.muted = this._outputMuted;
+          el.volume = this._outputMuted ? 0 : 1;
+        } catch {}
       });
     }
   
-    _registerRemoteAudio(track, pub) {
-      this._remoteAudioTracks.add(track);
-      if (pub) this._remotePubs.add(pub);
-      try {
-        const el = track.attach();
-        el.setAttribute('data-lk-remote', '1');
-        document.body.appendChild(el);
-      } catch {}
-      if (this._cb.onRemoteAudioStart) try { this._cb.onRemoteAudioStart(); } catch {}
-    }
-  
-    _unregisterRemoteAudio(track, pub) {
-      try { track.detach().forEach(el => { try { el.remove(); } catch {} }); } catch {}
-      try { track.stop?.(); } catch {}
-      this._remoteAudioTracks.delete(track);
-      if (pub) this._remotePubs.delete(pub);
-      if (this._remoteAudioTracks.size === 0) {
-        if (this._cb.onRemoteAudioStop) try { this._cb.onRemoteAudioStop(); } catch {}
-      }
-    }
-  
-    /** Hard-cut all agent output right now */
-    cutOffRemoteOutput() {
-      try { this._remotePubs.forEach(pub => { try { pub.setSubscribed?.(false); } catch {} }); } catch {}
-      this._remoteAudioTracks.forEach(track => { this._unregisterRemoteAudio(track); });
-      this._cleanupRemoteAudioTags();
-      this._remoteAudioTracks.clear();
-      this._remotePubs.clear();
-    }
-  
-    /** Send a context update instantly via data channel */
-    async _sendContext(context) {
-      if (!context) return;
-      this._lastContext = context;
-      if (!this.room) return;
-      try {
-        const payload = {
-          type: 'context_update',
-          userBookId: this.userBookId,
-          pageNumber: context.pageNumber,
-          metadata: context.metadata,
-          ts: Date.now(),
-        };
-        const bytes = new TextEncoder().encode(JSON.stringify(payload));
-        await this.room.localParticipant.publishData(bytes, this.livekit.DataPacket_Kind.RELIABLE);
-      } catch (e) {
-        console.warn('Holdup context publish failed:', e);
-      }
-    }
-  
-    /** Connect once for the whole book; publish mic muted for instant engage */
-    async connectOnce(initialContext) {
+    /* -------------------- public API -------------------- */
+    async connectForPage({ pageNumber, metadata }) {
       await this._ensureLiveKit();
+      const roomName = this._roomNameFor(pageNumber);
   
-      if (this.room && this._connected) {
-        await this._sendContext(initialContext || this._lastContext);
-        return;
-      }
+      await this.disconnect(); // fresh room every page, per your request
   
-      const roomName = `book-${slugify(this.roomNameBase)}-${Number(this.userBookId) || 'anon'}`;
-      const { roomUrl, token } = await this._generateToken({ roomName, metadata: initialContext?.metadata });
+      this._connecting = true;
+      this._setStatus(`Connecting… (${roomName})`);
+      this._setHoldupBtn({ label: 'Connecting…', disabled: true, active: false });
   
-      const { Room, createLocalAudioTrack, RoomEvent } = this.livekit;
-      this.room = new Room();
+      const { Room, RoomEvent } = this.lk;
+      const { roomUrl, token } = await this._generateToken({ roomName, metadata });
   
-      this.room
-        .on(RoomEvent.TrackSubscribed, (track, pub) => { if (track.kind === 'audio') this._registerRemoteAudio(track, pub); })
-        .on(RoomEvent.TrackUnsubscribed, (track, pub) => { if (track.kind === 'audio') this._unregisterRemoteAudio(track, pub); })
-        .on(RoomEvent.TrackMuted, (pub) => { const t = pub?.audioTrack; if (t) this._unregisterRemoteAudio(t, pub); })
-        .on(RoomEvent.TrackStopped, (track, pub) => { if (track?.kind === 'audio') this._unregisterRemoteAudio(track, pub); })
-        .on(RoomEvent.Reconnecting, () => { console.warn('🔌 Holdup reconnecting…'); })
-        .on(RoomEvent.Reconnected, () => {
-          console.log('✅ Holdup reconnected');
-          // Re-send latest context after reconnection
-          this._sendContext(this._lastContext);
+      const room = new Room();
+      this.room = room;
+  
+      room
+        .on(RoomEvent.TrackSubscribed, (track) => {
+          if (track.kind === 'audio') {
+            const el = track.attach();
+            el.setAttribute('data-lk-remote', '1');
+            el.setAttribute('playsinline', '');
+            el.autoplay = true;
+            if (window.HOLDUP_DEBUG_AUDIO) el.controls = true;
+            el.style.cssText = window.HOLDUP_DEBUG_AUDIO
+              ? 'position:fixed;bottom:8px;left:8px;z-index:99999;'
+              : 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;';
+            document.body.appendChild(el);
+  
+            // honor our global output mute immediately
+            this._applyOutputMuteState();
+  
+            if (!this._outputMuted && this._cb.onRemoteAudioStart) {
+              try { this._cb.onRemoteAudioStart(); } catch {}
+            }
+          }
+        })
+        .on(RoomEvent.TrackUnsubscribed, (track) => {
+          if (track?.kind === 'audio') {
+            try { track.detach().forEach(n => n.remove()); } catch {}
+            if (this._cb.onRemoteAudioStop) { try { this._cb.onRemoteAudioStop(); } catch {} }
+          }
         })
         .on(RoomEvent.Disconnected, () => {
-          this._setHoldupBtnState({ active: false, label: 'Hold Up' });
-          this.localMicTrack = null;
-          this.cutOffRemoteOutput();
           this._connected = false;
+          this._connecting = false;
+          this._setStatus('Disconnected');
+          this._setHoldupBtn({ label: 'Unmute', disabled: false, active: false }); // default ui on next connect
+          this.localMicTrack = null;
+          document.querySelectorAll('audio[data-lk-remote]').forEach(el => { try { el.remove(); } catch {} });
         });
   
-      await this.room.connect(roomUrl, token);
-  
-      // Publish mic (start muted for instant unmute later)
-      this.localMicTrack = await createLocalAudioTrack({
-        vad: true,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-        channelCount: 1,
-        sampleRate: 48000,
-      });
-      await this.room.localParticipant.publishTrack(this.localMicTrack);
-      await this.localMicTrack.mute();
+      await room.connect(roomUrl, token);
+      try { await room.startAudio?.(); } catch {}
   
       this._connected = true;
-      this._setHoldupBtnState({ active: false, label: 'Hold Up' });
+      this._connecting = false;
+      this._currentPage = pageNumber;
+      this._currentRoomName = roomName;
   
-      // Push initial context
-      await this._sendContext(initialContext || this._lastContext);
-  
-      console.log(`🎙️ Holdup connected: ${this.room.name}`);
-    }
-  
-    /** Called by app on page change */
-    async updateContext({ pageNumber, metadata }) {
-      const ctx = { pageNumber, metadata };
-      this._lastContext = ctx;
-      if (!this._connected) {
-        await this.connectOnce(ctx);
-        return;
-      }
-      await this._sendContext(ctx);
-    }
-  
-    /** Single switch: connect if needed, then mute/unmute instantly */
-    async toggleMute() {
-      if (this._pendingToggle) return;
-      this._pendingToggle = true;
+      // publish mic and mute it immediately (start muted)
       try {
-        if (!this._connected || !this.room || !this.localMicTrack) {
-          await this.connectOnce(this._lastContext);
-        }
-        if (this.localMicTrack.isMuted) {
-          await this.localMicTrack.unmute();
-          try {
-            const bytes = new TextEncoder().encode(JSON.stringify({ type: 'engage_start', ts: Date.now() }));
-            await this.room.localParticipant.publishData(bytes, this.livekit.DataPacket_Kind.RELIABLE);
-          } catch {}
-          this._setHoldupBtnState({ active: true, label: 'Stop' });
-          if (this._cb.onEngageStart) try { this._cb.onEngageStart(); } catch {}
-        } else {
-          await this.localMicTrack.mute();
-          this.cutOffRemoteOutput();
-          try {
-            const bytes = new TextEncoder().encode(JSON.stringify({ type: 'engage_end', ts: Date.now() }));
-            await this.room.localParticipant.publishData(bytes, this.livekit.DataPacket_Kind.RELIABLE);
-          } catch {}
-          this._setHoldupBtnState({ active: false, label: 'Hold Up' });
-          if (this._cb.onEngageEnd) try { this._cb.onEngageEnd(); } catch {}
-        }
-      } finally {
-        this._pendingToggle = false;
+        this.localMicTrack = await this.lk.createLocalAudioTrack({ vad: true });
+        await room.localParticipant.publishTrack(this.localMicTrack);
+        await this.localMicTrack.mute(); // 🔇 mic starts muted
+      } catch (e) {
+        console.warn('[Holdup] mic publish failed (continuing):', e);
+        this.localMicTrack = null;
       }
+  
+      // ensure remote audio is also muted on first load
+      this._outputMuted = true;
+      this._applyOutputMuteState();
+  
+      this._setStatus('Connected (muted)');
+      this._setHoldupBtn({ label: 'Unmute', disabled: false, active: false });
+      this._startInactivityWatch();
+      this.bumpActivity();
+    }
+  
+    async switchToPage({ pageNumber, metadata }) {
+      this._setStatus('Switching page…');
+      this._setHoldupBtn({ label: 'Connecting…', disabled: true, active: false });
+      await this.connectForPage({ pageNumber, metadata });
+    }
+  
+    async toggleMute() {
+      if (this._connecting) return;
+      if (!this.room) return;
+  
+      // try to ensure mic exists when user wants to unmute; but it's optional
+      if (!this.localMicTrack) {
+        try {
+          this.localMicTrack = await this.lk.createLocalAudioTrack({ vad: true });
+          await this.room.localParticipant.publishTrack(this.localMicTrack);
+          await this.localMicTrack.mute();
+        } catch (e) {
+          console.warn('[Holdup] cannot create mic on toggle (still muting/unmuting remote):', e);
+        }
+      }
+  
+      const micIsMuted = this.localMicTrack ? (this.localMicTrack.isMuted ?? true) : true;
+      const currentlyMuted = this._outputMuted && micIsMuted;
+  
+      if (currentlyMuted) {
+        // UNMUTE: remote first, then mic
+        this._outputMuted = false;
+        this._applyOutputMuteState();
+        try { await this.localMicTrack?.unmute?.(); } catch {}
+  
+        this._setHoldupBtn({ label: 'Mute', disabled: false, active: true });
+        this._setStatus('Listening…');
+        if (this._cb.onEngageStart) { try { this._cb.onEngageStart(); } catch {} }
+      } else {
+        // MUTE: slam remote output to 0 *immediately*, then mute mic
+        this._outputMuted = true;
+        this._applyOutputMuteState(); // 🔇 instant: no more agent voice
+        try { await this.localMicTrack?.mute?.(); } catch {}
+  
+        this._setHoldupBtn({ label: 'Unmute', disabled: false, active: false });
+        this._setStatus('Connected (muted)');
+        if (this._cb.onEngageEnd) { try { this._cb.onEngageEnd(); } catch {} }
+      }
+  
+      this.bumpActivity();
     }
   
     async disconnect() {
-      try { if (this.room) await this.room.disconnect(); }
+      try { if (this._inactivityTimer) clearInterval(this._inactivityTimer); } catch {}
+      this._inactivityTimer = null;
+  
+      if (!this.room) return;
+  
+      try { await this.room.disconnect(); }
       catch (e) { console.warn('Holdup disconnect warning:', e); }
       finally {
-        this.localMicTrack = null;
-        this._setHoldupBtnState({ active: false, label: 'Hold Up' });
-        this.cutOffRemoteOutput();
-        this.room = null;
         this._connected = false;
+        this._connecting = false;
+        this.localMicTrack = null;
+        this.room = null;
+        this._setHoldupBtn({ label: 'Unmute', disabled: false, active: false });
+        document.querySelectorAll('audio[data-lk-remote]').forEach(el => { try { el.remove(); } catch {} });
       }
-    }
-  
-    // Back-compat: legacy callers can still call this
-    async startForPage({ pageIndex, pageNumber, metadata }) {
-      await this.connectOnce({ pageNumber, metadata });
-      await this.updateContext({ pageNumber, metadata });
     }
   }
   

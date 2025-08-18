@@ -23,9 +23,8 @@ function getCookie(name) {
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? decodeURIComponent(m[2]) : null;
 }
-function qs(name, url = window.location.href) {
-  const u = new URL(url);
-  return u.searchParams.get(name);
+function getQueryParam(name, url = window.location.href) {
+  try { return new URL(url).searchParams.get(name); } catch { return null; }
 }
 function blobUrlForHtml(html) {
   const blob = new Blob([html || '<p></p>'], { type: 'text/html;charset=utf-8' });
@@ -54,6 +53,7 @@ export default class AppController {
     this.pageDescriptors = [];
     this._pausedByHoldup = false;
     this._wasPlayingPreHoldup = false;
+    this._localAudioWatch = null; // tell Holdup about local audio activity
   }
 
   _pauseForHoldup() {
@@ -79,10 +79,12 @@ export default class AppController {
 
   async bootstrap() {
     try {
-      const userBookId = qs('id');
+      const userBookId = getQueryParam('id');
       if (!userBookId) throw new Error('Missing ?id=');
 
       const book = await fetchBook(userBookId);
+      const bookTitle = String(book?.title || '').trim() || 'book';
+
       const pages = Array.isArray(book.pages) ? [...book.pages] : [];
       pages.sort((a, b) => (a.page_number || 0) - (b.page_number || 0));
 
@@ -98,16 +100,17 @@ export default class AppController {
         pageKey: `ub-${book.user_book_id}-p${p.page_number}`
       }));
 
-      // Holdup: persistent connection + instant engage
+      // Holdup: now requires bookTitle; room => page-{n}-{slug(bookTitle)}
       this.holdup = new HoldupManager({
         userBookId,
-        roomNameBase: `book-${book.user_book_id || userBookId}`,
+        bookTitle,
         callbacks: {
           onEngageStart: () => this._pauseForHoldup(),
           onEngageEnd:   () => this._resumeAfterHoldup(),
           onRemoteAudioStart: () => this._pauseForHoldup(),
           onRemoteAudioStop:  () => this._resumeAfterHoldup()
-        }
+        },
+        inactivityMs: 300000 // 5 minutes
       });
 
       // Reader
@@ -121,11 +124,11 @@ export default class AppController {
         callbacks: {
           onActivePageChanged: async (index) => {
             try {
-              await this.holdup.updateContext({
-                pageNumber: this.pageDescriptors[index]?.page_number,
-                metadata: this._metadataForIndex(index)
-              });
-            } catch (e) { console.warn('Holdup updateContext error:', e); }
+              const pageNo = this.pageDescriptors[index]?.page_number;
+              const ctx = { pageNumber: pageNo, metadata: this._metadataForIndex(index) };
+              // Switch LiveKit room on page change, show loading in holdup status
+              await this.holdup.switchToPage(ctx);
+            } catch (e) { console.warn('Holdup switchToPage error:', e); }
           },
           onDestroyed: () => this.holdup?.disconnect()
         }
@@ -133,17 +136,29 @@ export default class AppController {
 
       await this.reader.init();
 
-      // Preconnect once (muted) and send initial context so first press is instant
+      // Initial per-page connect
       const startIndex = this.reader.getActive();
-      await this.holdup.connectOnce({
-        pageNumber: this.pageDescriptors[startIndex]?.page_number,
+      const startPageNo = this.pageDescriptors[startIndex]?.page_number;
+      await this.holdup.connectForPage({
+        pageNumber: startPageNo,
         metadata: this._metadataForIndex(startIndex)
       });
+
+      // Feed holdup with local audio activity (inactivity auto-disconnect)
+      this._localAudioWatch = setInterval(() => {
+        try {
+          const active = this.reader?.getActive?.() ?? -1;
+          const sys = this.reader?.instances?.[active];
+          const playing = !!sys?.audioCore?.isPlaying;
+          this.holdup?.noteLocalAudioActivity?.(playing);
+        } catch {}
+      }, 1500);
 
       window.addEventListener('beforeunload', () => {
         try { this.pageDescriptors.forEach(pg => URL.revokeObjectURL(pg.textBlobUrl)); } catch {}
         this.holdup?.disconnect();
         try { URL.revokeObjectURL(DEFAULT_AUDIO_FILE); } catch {}
+        if (this._localAudioWatch) clearInterval(this._localAudioWatch);
       });
 
       console.log('📚 AppController ready.');
