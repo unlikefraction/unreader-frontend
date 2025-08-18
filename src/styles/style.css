@@ -127,7 +127,7 @@ nav a{
 
 .mainContent{
   position: relative;
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 500;
   color: #ABABAB;
   min-width: 650px;
@@ -625,7 +625,7 @@ nav a{
   border-radius: 50%;
   font-weight: 600;
   padding: 0.4rem;
-  border: 2px solid #000;
+  border: 2.2px solid #000;
   color: #000;
 }
 
@@ -804,6 +804,7 @@ mark{
 #mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="320"] {
   position: relative;       /* establishes a positioning context */
   z-index: -1;               /* text stays on top of the pseudo-bg */
+  pointer-events: none;
 }
 
 #mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="320"]::before {
@@ -818,8 +819,8 @@ mark{
               no-repeat 
               center/contain;
   z-index: -2;            /* send it behind the text */
+  cursor: pointer;
 }
-
 
 .pageCompleted{
   opacity: 1 !important;
@@ -835,4 +836,26 @@ mark{
 
 .pageRemaining span{
   color: #ABABAB !important;
+}
+
+/* Default: animation on */
+[data-page-id="transcript-landing-html-order-word-timings-ordered-json-100"] 
+[data-paragraph-index="0"] {
+  display: block !important;
+  top: 0px !important;
+  left: -10px !important;
+}
+
+@keyframes pulseAnimation {
+  0%{
+    transform: scale(1);
+  }
+
+  50%{
+    transform: scale(1.2);
+  }
+
+  100%{
+    transform: scale(1);
+  }
 }

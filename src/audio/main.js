@@ -16,10 +16,14 @@ export class AudioSystem {
     this.audioCore = new AudioCore(audioFile, offsetMs);
     this.textProcessor = new TextProcessor(textFile, timingFile, offsetMs);
     this.highlighter = new WordHighlighter(this.textProcessor);
+    // ensure the 0.7 gate is applied even if defaults change later
+    if (typeof this.highlighter.minProbability === 'number') {
+      this.highlighter.minProbability = 0.7;
+    }
     this.readAlong = new ReadAlong(this.highlighter);
     this.playbackControls = new PlaybackControls(this.audioCore);
     this.paragraphSeeker = new ParagraphSeeker(this.textProcessor, this.audioCore);
-    
+
     // Setup component connections
     this.setupConnections();
   }
@@ -46,43 +50,60 @@ export class AudioSystem {
       this.highlighter.handleSeek(currentTime);
     });
 
-    // Connect highlighter to read-along
-    // Override the original highlightWordsInRange to notify read-along
+    // Connect highlighter to read-along: pass a concrete element if possible
     const originalHighlightWordsInRange = this.highlighter.highlightWordsInRange.bind(this.highlighter);
     this.highlighter.highlightWordsInRange = (startIndex, endIndex, reason = '') => {
       originalHighlightWordsInRange(startIndex, endIndex, reason);
-      this.readAlong.onWordHighlighted();
+      try {
+        const el =
+          this.highlighter.currentWordEl ||
+          this.highlighter.currentHighlightedWord ||
+          (typeof this.highlighter.getCurrentWordEl === 'function'
+            ? this.highlighter.getCurrentWordEl()
+            : null);
+        this.readAlong.onWordHighlighted(el || null);
+      } catch {
+        try { this.readAlong.onWordHighlighted(null); } catch {}
+      }
     };
 
     // Setup audio controls
-    this.audioCore.setupEventListeners();
+    if (typeof this.audioCore.setupEventListeners === 'function') {
+      this.audioCore.setupEventListeners();
+    }
   }
 
   // Public API methods
   async init() {
-    printl('🎵 Initializing audio system...');
-    
+    try { if (typeof printl === 'function') printl('🎵 Initializing audio system...'); } catch {}
+
     try {
       // Initialize text processor first
       await this.textProcessor.init();
-      printl('✅ Text processor initialized');
-      
+      try { if (typeof printl === 'function') printl('✅ Text processor initialized'); } catch {}
+
+      // Build the DOM spans before we start highlighting (MANDATORY)
+      if (typeof this.textProcessor.separateText === 'function') {
+        await this.textProcessor.separateText();
+        try { if (typeof printl === 'function') printl('✅ Text separated into word spans'); } catch {}
+      }
+
       // Setup audio core
       this.audioCore.setupAudio();
-      printl('✅ Audio core initialized');
-      
+      try { if (typeof printl === 'function') printl('✅ Audio core initialized'); } catch {}
+
       // Enable paragraph hover navigation if available
       if (this.paragraphSeeker && typeof this.paragraphSeeker.enableParagraphNavigation === 'function') {
         this.paragraphSeeker.enableParagraphNavigation();
-        printl('✅ Paragraph navigation enabled');
+        try { if (typeof printl === 'function') printl('✅ Paragraph navigation enabled'); } catch {}
       } else {
-        printl('⚠️ Paragraph navigation not available (method missing)');
+        try { if (typeof printl === 'function') printl('⚠️ Paragraph navigation not available (method missing)'); } catch {}
       }
-      
-      printl('🚀 Audio system ready!');
-      
+
+      try { if (typeof printl === 'function') printl('🚀 Audio system ready!'); } catch {}
+
     } catch (error) {
-      printError('❌ Error initializing audio system:', error);
+      try { if (typeof printError === 'function') printError('❌ Error initializing audio system:', error); else console.error('❌ Error initializing audio system:', error); } catch {}
       throw error;
     }
   }
@@ -127,11 +148,13 @@ export class AudioSystem {
 
   // Read-along control methods
   toggleReadAlong() {
-    this.readAlong.toggle();
+    if (typeof this.readAlong.toggle === 'function') return this.readAlong.toggle();
+    // fallback if API is different
+    if (typeof this.readAlong.toggleAuto === 'function') return this.readAlong.toggleAuto();
   }
 
   isReadAlongActive() {
-    return this.readAlong.isActive;
+    return !!this.readAlong.isActive;
   }
 
   // Playback control methods
@@ -143,7 +166,7 @@ export class AudioSystem {
     this.playbackControls.setSpeed(speed);
   }
 
-  // NEW: Paragraph seeking methods
+  // Paragraph seeking methods
   async seekToParagraph(paragraphText, options = {}) {
     return await this.paragraphSeeker.seekToParagraph(paragraphText, options);
   }
@@ -156,7 +179,7 @@ export class AudioSystem {
     return this.paragraphSeeker.extractParagraphs();
   }
 
-  // NEW: Configuration methods for paragraph seeking
+  // Configuration methods for paragraph seeking
   setParagraphSeekingThreshold(threshold) {
     this.paragraphSeeker.setMinProbabilityThreshold(threshold);
   }
@@ -165,28 +188,28 @@ export class AudioSystem {
     this.paragraphSeeker.setContextWindow(windowSize);
   }
 
-  // NEW: Convenience methods
+  // Convenience methods
   async seekToText(text) {
-    printl(`🔍 Seeking to text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+    try { if (typeof printl === 'function') printl(`🔍 Seeking to text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`); } catch {}
     return await this.seekToParagraph(text);
   }
 
   async seekToSentence(sentence) {
-    printl(`🔍 Seeking to sentence: "${sentence}"`);
+    try { if (typeof printl === 'function') printl(`🔍 Seeking to sentence: "${sentence}"`); } catch {}
     return await this.seekToParagraph(sentence);
   }
 
-  // NEW: Interactive paragraph navigation
+  // Interactive paragraph navigation
   async createParagraphNavigation() {
     const paragraphs = this.extractParagraphs();
-    
-    if (paragraphs.length === 0) {
-      printError('No paragraphs found in text');
+
+    if (!Array.isArray(paragraphs) || paragraphs.length === 0) {
+      try { if (typeof printError === 'function') printError('No paragraphs found in text'); else console.error('No paragraphs found in text'); } catch {}
       return [];
     }
-    
-    printl(`📝 Found ${paragraphs.length} paragraphs`);
-    
+
+    try { if (typeof printl === 'function') printl(`📝 Found ${paragraphs.length} paragraphs`); } catch {}
+
     // Create clickable paragraph navigation
     const navItems = paragraphs.map((paragraph, index) => ({
       index,
@@ -194,24 +217,24 @@ export class AudioSystem {
       preview: paragraph.substring(0, 100) + (paragraph.length > 100 ? '...' : ''),
       seekTo: async () => {
         const result = await this.seekToParagraph(paragraph);
-        if (result.success) {
-          printl(`✅ Navigated to paragraph ${index + 1}`);
+        if (result?.success) {
+          try { if (typeof printl === 'function') printl(`✅ Navigated to paragraph ${index + 1}`); } catch {}
         } else {
-          printError(`❌ Failed to navigate to paragraph ${index + 1}:`, result.error);
+          try { if (typeof printError === 'function') printError(`❌ Failed to navigate to paragraph ${index + 1}:`, result?.error); else console.error('Failed to navigate', result); } catch {}
         }
         return result;
       }
     }));
-    
+
     return navItems;
   }
 
-  // NEW: Paragraph navigation control methods
+  // Paragraph navigation control methods
   enableParagraphNavigation() {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.enableParagraphNavigation === 'function') {
       this.paragraphSeeker.enableParagraphNavigation();
     } else {
-      printError('Paragraph navigation not available');
+      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else console.error('Paragraph navigation not available'); } catch {}
     }
   }
 
@@ -219,7 +242,7 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.disableParagraphNavigation === 'function') {
       this.paragraphSeeker.disableParagraphNavigation();
     } else {
-      printError('Paragraph navigation not available');
+      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else console.error('Paragraph navigation not available'); } catch {}
     }
   }
 
@@ -227,18 +250,18 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.refreshParagraphNavigation === 'function') {
       this.paragraphSeeker.refreshParagraphNavigation();
     } else {
-      printError('Paragraph navigation not available');
+      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else console.error('Paragraph navigation not available'); } catch {}
     }
   }
 
   // Cleanup method
   destroy() {
     this.highlighter.stopHighlighting();
-    this.playbackControls.destroy();
-    if (this.audioCore.sound) {
-      this.audioCore.sound.unload();
+    this.playbackControls?.destroy?.();
+    if (this.audioCore?.sound) {
+      try { this.audioCore.sound.unload(); } catch {}
     }
-    printl('🧹 Audio system destroyed');
+    try { if (typeof printl === 'function') printl('🧹 Audio system destroyed'); } catch {}
   }
 }
 
@@ -256,7 +279,7 @@ window.audioSetup = audioSystem; // Keep backward compatibility
 
 // Initialize the system
 audioSystem.init().catch(error => {
-  printError('Failed to initialize audio system:', error);
+  try { if (typeof printError === 'function') printError('Failed to initialize audio system:', error); else console.error('Failed to initialize audio system:', error); } catch {}
 });
 
 // Add some convenience global functions for easy testing

@@ -182,9 +182,10 @@
     <br><br><br>
 
     <script>
+      // keep your weighted picker + href assignment
       const options = ["login.html", "loginOg.html"];
-      const weights = [0.5, 0.5]; // can be changed later if needed
-    
+      const weights = [0.5, 0.5]; // tweak as needed
+
       function weightedRandom(options, weights) {
         const sum = weights.reduce((a, b) => a + b, 0);
         let rand = Math.random() * sum;
@@ -192,9 +193,161 @@
           if (rand < weights[i]) return options[i];
           rand -= weights[i];
         }
+        // fallback (shouldn't happen if weights valid)
+        return options[0];
       }
-    
-      document.querySelector(".logInLink").href = weightedRandom(options, weights);
+
+      const chosenHref = weightedRandom(options, weights);
+      const linkEl = document.querySelector(".logInLink");
+      if (linkEl) linkEl.href = chosenHref;
+
+      /* === click/hover logic for the highlight spans === */
+      (() => {
+        const ROOT = '#mainContent-transcript-landing-html-order-word-timings-ordered-json-100';
+
+        // 302 = copy coupon
+        const SEL_COPY = `${ROOT} span.highlight[data-index="302"]`;
+
+        // 320/321/322 = redirect (bling)
+        const REDIRECT_INDEXES = [320, 321, 322];
+        const REDIRECT_SELECTORS = REDIRECT_INDEXES.map(i => `${ROOT} span.highlight[data-index="${i}"]`);
+
+        const q = (sel) => document.querySelector(sel);
+
+        // generic rect hit test (works even when pointer-events:none)
+        const hit = (el, x, y) => {
+          if (!el) return false;
+          const r = el.getBoundingClientRect();
+          return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+        };
+
+        // copy coupon with Clipboard API + fallback
+        async function copyCoupon(code = "I-UNREAD-IT-ALL") {
+          try {
+            await navigator.clipboard.writeText(code);
+          } catch {
+            const ta = document.createElement("textarea");
+            ta.value = code;
+            ta.style.position = "fixed";
+            ta.style.left = "-9999px";
+            document.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            try { document.execCommand("copy"); } finally { document.body.removeChild(ta); }
+          }
+        }
+
+        // float a tiny "copied" badge above the element, fade out in 1s, then remove
+        function showCopiedBadge(el) {
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          const badge = document.createElement("div");
+          badge.textContent = "copied";
+          Object.assign(badge.style, {
+            position: "fixed",
+            left: `${Math.round(r.left + r.width / 2)}px`,
+            top: `${Math.round(r.top - 30)}px`,
+            background: "#20bf6b",   // your updated style
+            transform: "translate(-50%, 0)",
+            fontSize: "18px",
+            lineHeight: "1",
+            padding: "8px 12px",
+            borderRadius: "12px",
+            color: "#fff",
+            fontWeight: "400",
+            pointerEvents: "none",
+            zIndex: "2147483647",
+            transition: "transform 1s ease, opacity 1s ease",
+            opacity: "1",
+            userSelect: "none"
+          });
+          document.body.appendChild(badge);
+
+          requestAnimationFrame(() => {
+            badge.style.transform = "translate(-50%, -35px)";
+            badge.style.opacity = "0";
+          });
+
+          setTimeout(() => { badge.remove(); }, 1050);
+        }
+
+        function redirectWeighted() {
+          const dest = weightedRandom(options, weights) || options[0];
+          // keep the .logInLink in sync, too
+          const link = document.querySelector(".logInLink");
+          if (link) link.href = dest;
+          window.location.href = dest;
+        }
+
+        // === overlay that forces pointer + captures clicks over 320/321/322 ===
+        const overlay = document.createElement('div');
+        Object.assign(overlay.style, {
+          position: 'fixed',
+          zIndex: '2147483646',
+          background: 'transparent',
+          pointerEvents: 'auto',
+          cursor: 'pointer',
+          display: 'none',
+          userSelect: 'none',
+        });
+        document.body.appendChild(overlay);
+
+        function findRedirectTargetAt(x, y) {
+          for (const sel of REDIRECT_SELECTORS) {
+            const el = q(sel);
+            if (hit(el, x, y)) return el;
+          }
+          return null;
+        }
+
+        function positionOverlayOver(el) {
+          const r = el.getBoundingClientRect();
+          overlay.style.left = `${r.left}px`;
+          overlay.style.top = `${r.top}px`;
+          overlay.style.width = `${r.width}px`;
+          overlay.style.height = `${r.height}px`;
+          overlay.style.display = 'block';
+        }
+
+        function hideOverlay() {
+          overlay.style.display = 'none';
+        }
+
+        // move overlay on mousemove; ensures pointer cursor even if underlying spans are non-interactive
+        document.addEventListener('mousemove', (e) => {
+          const { clientX: x, clientY: y } = e;
+
+          const target = findRedirectTargetAt(x, y);
+          if (target) {
+            positionOverlayOver(target);
+          } else {
+            hideOverlay();
+          }
+        }, { passive: true });
+
+        // clicks on overlay → redirect
+        overlay.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          redirectWeighted();
+        });
+
+        // keep overlay honest on layout changes
+        window.addEventListener('scroll', hideOverlay, { passive: true });
+        window.addEventListener('resize', hideOverlay);
+
+        // document click for the copy badge (302)
+        document.addEventListener("click", async (e) => {
+          const { clientX: x, clientY: y } = e;
+          const elCopy = q(SEL_COPY);
+          if (hit(elCopy, x, y)) {
+            await copyCoupon("I-UNREAD-IT-ALL");
+            showCopiedBadge(elCopy);
+          }
+        });
+      })();
+
+
     </script>
 
     <script src="./src/utils.js"></script>
@@ -206,5 +359,6 @@
     <script type="module" src="/src/basic/inbox.js"></script>
     <script type="module" src="/src/authorization/loginRedirect.js"></script>
     <script src="./src/basic/logo-animation.js"></script>
+    <script src="./src/basic/tooltips.js"></script>
   </body>
 </html>
