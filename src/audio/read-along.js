@@ -1,57 +1,122 @@
-// -----read-along.js-----------
-/**
- * Read-along functionality and text positioning (singleton).
- */
+// -----audio/read-along.js-----
 export class ReadAlong {
   static _instance = null;
-
   static get(highlighter) {
-    if (!ReadAlong._instance) {
-      ReadAlong._instance = new ReadAlong(highlighter);
-    } else if (highlighter) {
-      ReadAlong._instance.rebindHighlighter(highlighter);
-    }
+    if (!ReadAlong._instance) ReadAlong._instance = new ReadAlong(highlighter);
+    else if (highlighter) ReadAlong._instance.rebindHighlighter(highlighter);
     return ReadAlong._instance;
   }
 
   constructor(highlighter) {
-    // DO NOT call this directly; use ReadAlong.get()
-    this.highlighter      = highlighter;
+    this.highlighter = highlighter;
 
-    // read-along state
-    this.isActive         = true;
-    this.thresholdPx      = 200;    // ±200px = 400px total band
-    this.isUserScrolling  = false;
-    this.scrollTimeout    = null;
+    // modes & state
+    this.autoEnabled     = true;   // NEW: master auto-follow toggle
+    this.isActive        = true;   // actual following state (on/off)
+    this.activationRadiusPx = 250; // NEW: +/- 100px zone around guide line
 
-    // heightSetter (draggable line) state
-    this.heightSetter     = null;
-    this.isDragging       = false;
-    this.startY           = 0;
-    this.startTop         = 0;
+    this.isUserScrolling = false;
+    this.scrollTimeout   = null;
 
-    // word-change monitor
-    this._rafId           = null;
-    this._lastWordEl      = null;
+    // draggable line state
+    this.heightSetter = null;
+    this.isDragging   = false;
+    this.startY       = 0;
+    this.startTop     = 0;
 
-    // one-time UI bindings
+    // monitoring
+    this._rafId      = null;
+    this._lastWordEl = null;
+
+    // scroll container
+    this.scrollRoot  = null;  // Element or document.scrollingElement
+    this._boundOnScrollWin   = null;
+    this._boundOnScrollRoot  = null;
+
     this._bindUI();
-
-    // start monitoring highlighted word changes
     this._startMonitor();
   }
 
-  // ---------- UI binding (one-time) ----------
+  /* ----------------- core helpers ----------------- */
+  _getWordEl() {
+    if (this._lastWordEl && this._lastWordEl.isConnected) return this._lastWordEl;
+    const h = this.highlighter;
+    if (!h) return null;
+    let el = h.currentHighlightedWord;
+    if (el && el.nodeType === 1) return el;
+    el = h.currentWordEl || h._currentWordEl || h._currentWord || h.lastHighlightedEl;
+    if (!el && typeof h.getCurrentWordEl === 'function') el = h.getCurrentWordEl();
+    return (el && el.nodeType === 1) ? el : null;
+  }
+
+  _getComputedStyle(el) { try { return window.getComputedStyle(el); } catch { return { overflow: '', overflowY: '' }; } }
+
+  _detectScrollRoot(fromEl) {
+    let node = fromEl?.parentElement || null;
+    while (node) {
+      const cs = this._getComputedStyle(node);
+      const oy = cs.overflowY || cs.overflow;
+      if (/(auto|scroll|overlay)/.test(oy) && node.scrollHeight > node.clientHeight + 1) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return document.scrollingElement || document.documentElement || document.body;
+  }
+
+  _isWindowRoot(root) {
+    return (!root ||
+      root === document.scrollingElement ||
+      root === document.documentElement ||
+      root === document.body);
+  }
+
+  _rootRect() {
+    if (this._isWindowRoot(this.scrollRoot)) return { top: 0, height: window.innerHeight };
+    const r = this.scrollRoot.getBoundingClientRect();
+    return { top: r.top, height: this.scrollRoot.clientHeight };
+  }
+
+  _attachScrollListeners() {
+    this._detachScrollListeners();
+    this._boundOnScrollWin  = this.onScroll.bind(this);
+    this._boundOnScrollRoot = this.onScroll.bind(this);
+
+    window.addEventListener('scroll', this._boundOnScrollWin, { passive: true });
+
+    // Rehost guide line if using a container
+    if (!this._isWindowRoot(this.scrollRoot)) {
+      if (this.heightSetter && this.heightSetter.parentElement !== this.scrollRoot) {
+        Object.assign(this.heightSetter.style, { position: 'absolute', right: '0' });
+        this.scrollRoot.appendChild(this.heightSetter);
+      }
+      this.scrollRoot.addEventListener('scroll', this._boundOnScrollRoot, { passive: true });
+    } else {
+      if (this.heightSetter && this.heightSetter.parentElement !== document.body) {
+        document.body.appendChild(this.heightSetter);
+        Object.assign(this.heightSetter.style, { position: 'fixed', right: '0' });
+      }
+    }
+  }
+  _detachScrollListeners() {
+    if (this._boundOnScrollWin) {
+      window.removeEventListener('scroll', this._boundOnScrollWin);
+      this._boundOnScrollWin = null;
+    }
+    if (this._boundOnScrollRoot && this.scrollRoot && !this._isWindowRoot(this.scrollRoot)) {
+      this.scrollRoot.removeEventListener('scroll', this._boundOnScrollRoot);
+      this._boundOnScrollRoot = null;
+    }
+  }
+
+  /* ----------------- UI binding ----------------- */
   _bindUI() {
-    // ensure heightSetter exists
     this.heightSetter = document.getElementById('heightSetter');
     if (!this.heightSetter) {
-      // create a minimal, styled fallback so dragging works even without CSS
       this.heightSetter = document.createElement('div');
       this.heightSetter.id = 'heightSetter';
       Object.assign(this.heightSetter.style, {
         position: 'fixed',
-        left: '0',
         right: '0',
         height: '0',
         top: '50%',
@@ -65,27 +130,26 @@ export class ReadAlong {
     if (!this.heightSetter.style.top) this.heightSetter.style.top = '50%';
     this._setupHeightSetterDragging();
 
-    // read-along toggle control
     let ctrl = document.querySelector('.read-along.control');
     if (!ctrl) {
       ctrl = document.createElement('button');
       ctrl.className = 'read-along control';
       ctrl.type = 'button';
       ctrl.textContent = 'Read-along';
-      Object.assign(ctrl.style, {
-        position: 'fixed',
-        bottom: '16px',
-        right: '16px',
-        zIndex: '10000'
-      });
+      Object.assign(ctrl.style, { position: 'fixed', bottom: '16px', right: '16px', zIndex: '10000' });
       document.body.appendChild(ctrl);
     }
-    this._onCtrlClick = () => this.toggle();
+    this._syncCtrl();
+    this._onCtrlClick = () => this.toggleAuto();
     ctrl.addEventListener('click', this._onCtrlClick);
+  }
 
-    // scroll detection
-    this._boundOnScroll = this.onScroll.bind(this);
-    window.addEventListener('scroll', this._boundOnScroll, { passive: true });
+  _syncCtrl() {
+    const ctrl = document.querySelector('.read-along.control');
+    if (!ctrl) return;
+    ctrl.classList.toggle('active', this.autoEnabled);
+    ctrl.setAttribute('aria-pressed', String(this.autoEnabled));
+    ctrl.title = this.autoEnabled ? 'Auto-follow: ON' : 'Auto-follow: OFF';
   }
 
   _setupHeightSetterDragging() {
@@ -95,68 +159,60 @@ export class ReadAlong {
       this.isDragging = true;
       this.startY     = clientY;
       this.startTop   = this.getCurrentTopPercent();
-      if (e.type.startsWith('mouse')) {
-        this.heightSetter.style.cursor = 'grabbing';
-        e.preventDefault();
-      }
+      if (e.type.startsWith('mouse')) { this.heightSetter.style.cursor = 'grabbing'; e.preventDefault(); }
     };
     const onDrag = (clientY, e) => {
       if (!this.isDragging) return;
-      const deltaY       = clientY - this.startY;
-      const vpHeight     = window.innerHeight;
-      const deltaPercent = (deltaY / vpHeight) * 100;
+      const vpHeight     = this._rootRect().height;
+      const deltaPercent = ((clientY - this.startY) / vpHeight) * 100;
       this.setTopPercent(this.startTop + deltaPercent);
       if (e.type.startsWith('touch')) e.preventDefault();
     };
-    const endDrag = () => {
-      if (!this.isDragging) return;
-      this.isDragging = false;
-      this.heightSetter.style.cursor = 'grab';
-    };
+    const endDrag = () => { if (!this.isDragging) return; this.isDragging = false; this.heightSetter.style.cursor = 'grab'; };
 
-    this._onMouseMove  = e => onDrag(e.clientY, e);
-    this._onMouseUp    = endDrag;
-    this._onTouchMove  = e => onDrag(e.touches[0].clientY, e);
-    this._onTouchEnd   = endDrag;
+    this._onMouseMove = e => onDrag(e.clientY, e);
+    this._onMouseUp   = endDrag;
+    this._onTouchMove = e => onDrag(e.touches[0].clientY, e);
+    this._onTouchEnd  = endDrag;
 
     this.heightSetter.addEventListener('mousedown', e => startDrag(e.clientY, e));
     document.addEventListener('mousemove', this._onMouseMove);
     document.addEventListener('mouseup',   this._onMouseUp);
 
     this.heightSetter.addEventListener('touchstart', e => startDrag(e.touches[0].clientY, e));
-    document.addEventListener('touchmove',  this._onTouchMove, { passive: false });
-    document.addEventListener('touchend',   this._onTouchEnd);
+    document.addEventListener('touchmove', e => onDrag(e.touches[0].clientY, e), { passive: false });
+    document.addEventListener('touchend',  this._onTouchEnd);
   }
 
-  // ---------- word-change monitor (robust, event-agnostic) ----------
+  /* ----------------- monitor highlighted word ----------------- */
   _startMonitor() {
     const tick = () => {
-      const cur = this.highlighter?.currentHighlightedWord || null;
-      if (cur !== this._lastWordEl) {
+      const cur = this._getWordEl();
+
+      // Detect/refresh scroll root as soon as we have a word element.
+      if (cur && !this.scrollRoot) {
+        this.scrollRoot = this._detectScrollRoot(cur);
+        this._attachScrollListeners();
+      }
+
+      if (cur && cur !== this._lastWordEl) {
         this._lastWordEl = cur;
-        this.onWordHighlighted();
+        this.onWordHighlighted(cur);
       }
       this._rafId = window.requestAnimationFrame(tick);
     };
     if (!this._rafId) this._rafId = window.requestAnimationFrame(tick);
   }
-  _stopMonitor() {
-    if (this._rafId) {
-      cancelAnimationFrame(this._rafId);
-      this._rafId = null;
-    }
-  }
+  _stopMonitor() { if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; } }
 
-  // ---------- logic ----------
+  /* ----------------- logic ----------------- */
   onScroll() {
-    if (!this.isUserScrolling) this.isUserScrolling = true;
+    this.isUserScrolling = true;
 
-    const wordEl = this.highlighter?.currentHighlightedWord;
-    if (this.isActive && wordEl) {
-      const rect = wordEl.getBoundingClientRect();
-      if (rect.bottom < 0 || rect.top > window.innerHeight) {
-        this.setReadAlongActive(false);
-      }
+    // While user is scrolling, if we leave the zone, go inactive immediately
+    const el = this._getWordEl();
+    if (this.autoEnabled && el) {
+      if (!this._isInZone(el)) this.setReadAlongActive(false);
     }
 
     clearTimeout(this.scrollTimeout);
@@ -168,79 +224,123 @@ export class ReadAlong {
     this.evaluateReadAlongState();
   }
 
+  _isInZone(el) {
+    const rect            = el.getBoundingClientRect();
+    const { top, height } = this._rootRect();
+    const linePct         = this.getCurrentTopPercent();
+    const lineY           = top + (linePct / 100) * height;
+    const diff            = rect.top - lineY;
+    return Math.abs(diff) <= this.activationRadiusPx;
+  }
+
   evaluateReadAlongState() {
-    const wordEl = this.highlighter?.currentHighlightedWord;
-    if (!this.heightSetter || !wordEl) return;
+    if (!this.autoEnabled) return;
+    const el = this._getWordEl();
+    if (!el) return;
 
-    const rect      = wordEl.getBoundingClientRect();
-    const vpHeight  = window.innerHeight;
-    const linePct   = this.getCurrentTopPercent();
-    const lineY     = (linePct / 100) * vpHeight;
-    const diff      = rect.top - lineY;
-
-    if (Math.abs(diff) <= this.thresholdPx) this.setReadAlongActive(true);
-    else this.setReadAlongActive(false);
+    if (!this.isUserScrolling) {
+      // Auto ON when the highlight is inside the 100px band; otherwise OFF.
+      if (this._isInZone(el)) {
+        this.setReadAlongActive(true);
+        this.updateTextPosition();
+      } else {
+        this.setReadAlongActive(false);
+      }
+    } else {
+      // During user scroll, keep it OFF once we leave the band.
+      if (!this._isInZone(el)) this.setReadAlongActive(false);
+    }
   }
 
   setReadAlongActive(active) {
     if (this.isActive === active) return;
     this.isActive = active;
 
+    // Visual affordance on the control reflects AUTO, not state; but
+    // we can still hint by data-attr if you want to style it.
     const ctrl = document.querySelector('.read-along.control');
-    if (ctrl) ctrl.classList.toggle('active', active);
+    if (ctrl) ctrl.toggleAttribute('data-following', active);
 
-    if (active && this.highlighter?.currentHighlightedWord) {
-      this.updateTextPosition();
-    }
+    if (active) this.updateTextPosition();
   }
 
   getCurrentTopPercent() {
-    if (!this.heightSetter) return 50;
-    return parseFloat((this.heightSetter.style.top || '50%').replace('%',''));
+    return parseFloat((this.heightSetter?.style.top || '50%').replace('%', ''));
   }
 
   setTopPercent(pct) {
     if (!this.heightSetter) return;
     const clamped = Math.max(10, Math.min(90, pct));
     this.heightSetter.style.top = `${clamped}%`;
-    if (this.isActive && this.highlighter?.currentHighlightedWord) {
-      this.updateTextPosition();
+    if (this.autoEnabled && this.isActive) this.updateTextPosition();
+  }
+
+  // NEW: master auto toggle
+  setAutoEnabled(enabled) {
+    enabled = !!enabled;
+    if (this.autoEnabled === enabled) return;
+    this.autoEnabled = enabled;
+    if (!enabled) this.setReadAlongActive(false);
+    this._syncCtrl();
+    // Re-evaluate immediately when turning ON
+    if (enabled) this.evaluateReadAlongState();
+  }
+  toggleAuto() { this.setAutoEnabled(!this.autoEnabled); }
+
+  // (kept for API compatibility; now delegates to auto)
+  toggle() { this.toggleAuto(); }
+
+  updateTextPosition() {
+    if (!this.isActive || this.isUserScrolling) return;
+    const el = this._getWordEl(); if (!el) return;
+
+    const rect            = el.getBoundingClientRect();
+    const { top, height } = this._rootRect();
+    const linePct         = this.getCurrentTopPercent();
+    const targetY         = top + (linePct / 100) * height;
+    const delta           = rect.top - targetY;
+
+    if (this._isWindowRoot(this.scrollRoot)) {
+      window.scrollTo({ top: window.scrollY + delta, behavior: 'smooth' });
+    } else {
+      this.scrollRoot.scrollTo({ top: this.scrollRoot.scrollTop + delta, behavior: 'smooth' });
     }
   }
 
-  toggle() {
-    this.setReadAlongActive(!this.isActive);
-  }
+  onWordHighlighted(el) {
+    if (el && el.nodeType === 1) this._lastWordEl = el;
+    if (!this.autoEnabled) return;
+    if (this.isUserScrolling) return;
 
-  updateTextPosition() {
-    if (!this.isActive || this.isUserScrolling || !this.highlighter?.currentHighlightedWord || !this.heightSetter) return;
-
-    const rect     = this.highlighter.currentHighlightedWord.getBoundingClientRect();
-    const vpHeight = window.innerHeight;
-    const linePct  = this.getCurrentTopPercent();
-    const targetY  = (linePct / 100) * vpHeight;
-    const currentY = rect.top + window.scrollY;
-    const scrollTo = currentY - targetY;
-
-    window.scrollTo({ top: scrollTo, behavior: 'smooth' });
-  }
-
-  onWordHighlighted() {
-    if (!this.isActive) this.evaluateReadAlongState();
-    else this.updateTextPosition();
+    // Only auto-enable inside the band; otherwise keep it off.
+    if (this._isInZone(el)) {
+      this.setReadAlongActive(true);
+      this.updateTextPosition();
+    } else {
+      this.setReadAlongActive(false);
+    }
   }
 
   rebindHighlighter(highlighter) {
     this.highlighter = highlighter;
-    this._lastWordEl = null; // force a refresh on next RAF tick
+    this._lastWordEl = null;
+    this._detachScrollListeners();
+    this.scrollRoot = null;
+  }
+
+  // Optional helper if you want to tweak programmatically
+  setActivationRadius(px) {
+    const v = Math.max(0, Number(px) || 0);
+    this.activationRadiusPx = v;
+    this.evaluateReadAlongState();
   }
 
   destroy() {
     this._stopMonitor();
-    if (this._boundOnScroll) window.removeEventListener('scroll', this._boundOnScroll);
+    this._detachScrollListeners();
     if (this._onMouseMove) document.removeEventListener('mousemove', this._onMouseMove);
-    if (this._onMouseUp)   document.removeEventListener('mouseup', this._onMouseUp);
+    if (this._onMouseUp)   document.removeEventListener('mouseup',   this._onMouseUp);
     if (this._onTouchMove) document.removeEventListener('touchmove', this._onTouchMove);
-    if (this._onTouchEnd)  document.removeEventListener('touchend', this._onTouchEnd);
+    if (this._onTouchEnd)  document.removeEventListener('touchend',  this._onTouchEnd);
   }
 }

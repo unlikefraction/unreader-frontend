@@ -212,21 +212,30 @@ export default class MultiPageReader {
       return false;
     };
 
-    // ---------- Read-Along binding (fix) ----------
+    // Ensure the singleton exists but DO NOT bind here (hydration can be for prefetch pages)
+    ReadAlong.get();
+
+    // Patch highlighter.highlightWord to notify ReadAlong with a concrete element
     try {
-      const ra = ReadAlong.get(sys.highlighter);
-      // if highlighter exposes highlightWord, patch to notify ReadAlong every time
       const hl = sys.highlighter;
       if (hl && typeof hl.highlightWord === 'function' && !hl._raPatched) {
         const _orig = hl.highlightWord.bind(hl);
         hl.highlightWord = (...args) => {
           const r = _orig(...args);
-          try { ReadAlong.get().onWordHighlighted(); } catch {}
+          try {
+            const el =
+              hl.currentWordEl ||
+              hl.currentHighlightedWord ||
+              (typeof hl.getCurrentWordEl === 'function' ? hl.getCurrentWordEl() : null);
+            ReadAlong.get().onWordHighlighted(el || null);
+          } catch {
+            ReadAlong.get().onWordHighlighted(null);
+          }
           return r;
         };
         hl._raPatched = true;
       }
-    } catch (e) { console.warn('ReadAlong bind failed:', e); }
+    } catch (e) { console.warn('ReadAlong notify patch failed:', e); }
 
     this.instances[i] = sys;
     return sys;
@@ -317,6 +326,13 @@ export default class MultiPageReader {
     this.active = i;
     this.#applyPageStateClasses(i);
     this._syncPlayButton(false);
+
+    // 🔁 Bind ReadAlong to the *active* page’s highlighter
+    (async () => {
+      const sys = this.instances[i] || await this.hydratePage(i);
+      try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch (e) { console.warn(e); }
+    })();
+
     if (prev !== i) this._emitActiveChanged(i);
   }
 
@@ -385,6 +401,13 @@ export default class MultiPageReader {
   /* ---------- transport ---------- */
   async play() {
     if (this.active < 0) return;
+
+    // Bind ReadAlong to the currently active page (belt-and-suspenders)
+    try {
+      const sys = this.instances[this.active] || await this.hydratePage(this.active);
+      ReadAlong.get().rebindHighlighter(sys.highlighter);
+    } catch {}
+
     const meta = this.pageMeta[this.active];
     if (!meta?._audioSettled) { this._isLoadingActiveAudio = true; this._autoplayOnReady = true; this._syncPlayButton(true, { loading: true }); }
     const url = await this._awaitReadyAudioAndTranscript(this.active, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
@@ -400,7 +423,6 @@ export default class MultiPageReader {
     this._startProgressTimer();
     this._saveLastPlayedCookie(this.active, this.getCurrentTime());
 
-    // [NEW]
     try { window.app?.holdup?.noteLocalAudioActivity?.(true); } catch {}
   }
 
@@ -411,8 +433,6 @@ export default class MultiPageReader {
     this._syncPlayButton(false);
     this._stopProgressTimer();
     this._saveLastPlayedCookie(this.active, this.getCurrentTime());
-
-    // [NEW]
     try { window.app?.holdup?.noteLocalAudioActivity?.(false); } catch {}
   }
 
@@ -491,6 +511,10 @@ export default class MultiPageReader {
     if (url) this._swapAudioUrl(index, url);
 
     await this.ensureAudioReady(index);
+
+    // Rebind on jump too (consistency)
+    try { ReadAlong.get().rebindHighlighter(this.instances[index].highlighter); } catch {}
+
     if (play) await this.play();
     else { this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false); this._saveLastPlayedCookie(index, this.getCurrentTime()); }
     await this._prefetchAround(index);
@@ -525,6 +549,9 @@ export default class MultiPageReader {
         else { sys.textProcessor.wordTimings = flat; sys.textProcessor._wordTimings = flat; sys.refreshParagraphNavigation?.(); }
       } catch (e) { console.warn('timings ingest failed; will still attempt seek:', e); }
     }
+
+    // Rebind here too to guarantee RA tracks this page for the jump
+    try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch {}
 
     const seekRes = await sys.seekToParagraph(paragraphText, { minProbability });
     if (play) {

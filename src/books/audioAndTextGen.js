@@ -1,5 +1,4 @@
 // -----audioAndTextGen.js------
-
 import { AudioCore } from '../audio/audio-core.js';
 import { TextProcessor } from '../audio/text-processor.js';
 import { WordHighlighter } from '../audio/word-highlighter.js';
@@ -8,16 +7,17 @@ import { ParagraphSeeker } from '../audio/paragraph-seeker.js';
 
 /**
  * Single-page audio/text orchestrator (UI-agnostic).
- * ReadAlong is a singleton shared across pages.
+ * ReadAlong is a singleton shared across pages; MultiPageReader binds it
+ * to the ACTIVE page’s highlighter.
  */
 export class AudioSystem {
   constructor(audioFile, timingFile, textFile, offsetMs = 0) {
-    this.audioCore = new AudioCore(audioFile, offsetMs);
+    this.audioCore     = new AudioCore(audioFile, offsetMs);
     this.textProcessor = new TextProcessor(textFile, timingFile, offsetMs);
-    this.highlighter = new WordHighlighter(this.textProcessor);
+    this.highlighter   = new WordHighlighter(this.textProcessor);
 
-    // 🔸 singleton read-along
-    this.readAlong = ReadAlong.get(this.highlighter);
+    // Create the singleton but DO NOT bind here (binding happens in MultiPageReader).
+    this.readAlong = ReadAlong.get();
 
     this.paragraphSeeker = new ParagraphSeeker(this.textProcessor, this.audioCore);
     this._armed = false;
@@ -26,7 +26,7 @@ export class AudioSystem {
   }
 
   setupConnections() {
-    // Start/stop highlight loop with audio
+    // Start/stop highlighting loop with audio time.
     this.audioCore.onPlay(() => {
       this.highlighter.startHighlighting(
         () => this.audioCore.getCurrentTime(),
@@ -47,38 +47,57 @@ export class AudioSystem {
       this.highlighter.handleSeek(currentTime);
     });
 
-    // 🔸 Notify read-along whenever words are painted
+    // Notify ReadAlong after words are painted; pass the concrete element if available.
     const original = this.highlighter.highlightWordsInRange.bind(this.highlighter);
     this.highlighter.highlightWordsInRange = (startIndex, endIndex, reason = '') => {
       original(startIndex, endIndex, reason);
-      this.readAlong.onWordHighlighted();
+      try {
+        const el =
+          this.highlighter.currentWordEl ||
+          this.highlighter.currentHighlightedWord ||
+          (typeof this.highlighter.getCurrentWordEl === 'function'
+            ? this.highlighter.getCurrentWordEl()
+            : null);
+        this.readAlong.onWordHighlighted(el || null);
+      } catch {
+        this.readAlong.onWordHighlighted(null);
+      }
     };
   }
 
   async init() {
-    printl('🎵 Initializing audio system...');
+    // If you have global log helpers, these will show in console; otherwise no-op.
+    try {
+      if (typeof printl === 'function') printl('🎵 Initializing audio system...');
+    } catch {}
     try {
       await this.textProcessor.init();
-      printl('✅ Text processor initialized');
+      if (typeof printl === 'function') printl('✅ Text processor initialized');
 
       this.audioCore.setupAudio();
-      printl('✅ Audio core initialized');
+      if (typeof printl === 'function') printl('✅ Audio core initialized');
 
       this.paragraphSeeker.enableParagraphNavigation?.();
-      printl('✅ Paragraph navigation enabled');
+      if (typeof printl === 'function') printl('✅ Paragraph navigation enabled');
 
-      printl('🚀 Audio system ready!');
+      if (typeof printl === 'function') printl('🚀 Audio system ready!');
     } catch (error) {
-      printError('❌ Error initializing audio system:', error);
+      try {
+        if (typeof printError === 'function') printError('❌ Error initializing audio system:', error);
+        else console.error('❌ Error initializing audio system:', error);
+      } catch {}
       throw error;
     }
   }
 
   // ---------- arm/disarm ----------
+  // You can call this if you want ReadAlong to explicitly follow this page
+  // (MultiPageReader already rebinds on active page changes).
   arm() {
     this._armed = true;
-    // ensure singleton follows the active page’s highlighter
-    this.readAlong.rebindHighlighter(this.highlighter);
+    try {
+      this.readAlong.rebindHighlighter(this.highlighter);
+    } catch {}
   }
 
   disarm() {
@@ -90,20 +109,30 @@ export class AudioSystem {
   }
 
   // ---------- transport ----------
-  async play() { await this.audioCore.playAudio(); }
-  pause() { this.audioCore.pauseAudio(); }
-  toggle() { this.audioCore.toggleAudio(); }
-  forward() { this.audioCore.forward(); }
-  rewind() { this.audioCore.rewind(); }
+  async play()          { await this.audioCore.playAudio(); }
+  pause()               { this.audioCore.pauseAudio(); }
+  toggle()              { this.audioCore.toggleAudio(); }
+  forward()             { this.audioCore.forward(); }
+  rewind()              { this.audioCore.rewind(); }
 
-  setPlaybackSpeed(speed) { this.audioCore.setPlaybackSpeed(speed); }
-  getCurrentTime() { return this.audioCore.getCurrentTime(); }
-  getDuration() { return this.audioCore.getDuration(); }
+  // For compatibility with MultiPageReader (calls setSpeed)
+  setSpeed(speed)       { this.audioCore.setPlaybackSpeed(speed); }
+  // Also expose a verbose alias if you use it elsewhere
+  setPlaybackSpeed(s)   { this.audioCore.setPlaybackSpeed(s); }
+
+  getCurrentTime()      { return this.audioCore.getCurrentTime(); }
+  getDuration()         { return this.audioCore.getDuration(); }
 
   // ---------- highlighting / read-along ----------
-  clearHighlights() { this.highlighter.clearAllHighlights(); }
-  toggleReadAlong() { this.readAlong.toggle(); }
-  isReadAlongActive() { return this.readAlong.isActive; }
+  clearHighlights()     { this.highlighter.clearAllHighlights(); }
+
+  /**
+   * Toggle the ReadAlong AUTO mode (not the active-follow state directly).
+   * When auto is OFF, ReadAlong won’t auto-engage even if the word is near the guide.
+   * When auto is ON, it auto-engages only if the current word is within the configured band.
+   */
+  toggleReadAlong()     { this.readAlong.toggleAuto(); }
+  isReadAlongActive()   { return this.readAlong.isActive; }
 
   // ---------- paragraph seeking ----------
   async seekToParagraph(paragraphText, options = {}) {
@@ -112,16 +141,16 @@ export class AudioSystem {
   async seekToParagraphs(paragraphTexts, options = {}) {
     return await this.paragraphSeeker.seekToParagraphs(paragraphTexts, options);
   }
-  extractParagraphs() { return this.paragraphSeeker.extractParagraphs(); }
+  extractParagraphs()   { return this.paragraphSeeker.extractParagraphs(); }
   setParagraphSeekingThreshold(threshold) { this.paragraphSeeker.setMinProbabilityThreshold(threshold); }
-  setParagraphContextWindow(windowSize) { this.paragraphSeeker.setContextWindow(windowSize); }
+  setParagraphContextWindow(windowSize)   { this.paragraphSeeker.setContextWindow(windowSize); }
 
   async seekToText(text) {
-    printl(`🔍 Seeking to text: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+    try { if (typeof printl === 'function') printl(`🔍 Seeking to text: "${text.slice(0, 50)}${text.length > 50 ? '…' : ''}"`); } catch {}
     return await this.seekToParagraph(text);
   }
   async seekToSentence(sentence) {
-    printl(`🔍 Seeking to sentence: "${sentence}"`);
+    try { if (typeof printl === 'function') printl(`🔍 Seeking to sentence: "${sentence}"`); } catch {}
     return await this.seekToParagraph(sentence);
   }
 
@@ -134,6 +163,6 @@ export class AudioSystem {
       this.highlighter.stopHighlighting();
       if (this.audioCore?.sound) this.audioCore.sound.unload();
     } catch {}
-    printl('🧹 Audio system destroyed');
+    try { if (typeof printl === 'function') printl('🧹 Audio system destroyed'); } catch {}
   }
 }

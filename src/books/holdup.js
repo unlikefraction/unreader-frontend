@@ -146,7 +146,7 @@ function getCookie(name) {
       await this._ensureLiveKit();
       const roomName = this._roomNameFor(pageNumber);
   
-      await this.disconnect(); // fresh room every page, per your request
+      await this.disconnect(); // fresh room every page
   
       this._connecting = true;
       this._setStatus(`Connecting… (${roomName})`);
