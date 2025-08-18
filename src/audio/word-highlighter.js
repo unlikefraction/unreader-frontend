@@ -2,6 +2,9 @@
 
 /**
  * Word highlighting and synchronization with audio
+ *
+ * Behavior: same as your original implementation, **plus** a probability gate:
+ * we do not paint any match whose bestMatch.probability < 0.7.
  */
 export class WordHighlighter {
   constructor(textProcessor) {
@@ -15,6 +18,9 @@ export class WordHighlighter {
     this.lookaheadMs = 100;
     this.processedTimingIndices = new Set();
     this.currentHighlightedWord = null;
+
+    // NEW: probability threshold for painting
+    this.minProbability = 0.7;
 
     // timers & perf
     this.highlightInterval = null;
@@ -118,15 +124,16 @@ export class WordHighlighter {
         this.lastHighlightedIndex
       );
 
-      if (bestMatch.index !== -1) {
+      const p = bestMatch?.probability ?? 0;
+      if (bestMatch.index !== -1 && p >= this.minProbability) {
         this.fillGapsToTarget(bestMatch.index, `before "${wordData.word}"`);
 
         this.highlightWordsInRange(
           bestMatch.index,
           bestMatch.index,
-          `(p=${bestMatch.probability.toFixed(3)}, w=${bestMatch.wordScore.toFixed(
+          `(p=${(bestMatch.probability ?? 0).toFixed(3)}, w=${(bestMatch.wordScore ?? 0).toFixed(
             3
-          )}, c=${bestMatch.contextScore.toFixed(3)})`
+          )}, c=${(bestMatch.contextScore ?? 0).toFixed(3)})`
         );
 
         if (index < this.textProcessor.wordTimings.length - 1) {
@@ -138,7 +145,12 @@ export class WordHighlighter {
             this.lastHighlightedIndex
           );
 
-          if (nextMatch.index !== -1 && nextMatch.index > bestMatch.index + 1) {
+          const nextP = nextMatch?.probability ?? 0;
+          if (
+            nextMatch.index !== -1 &&
+            nextMatch.index > bestMatch.index + 1 &&
+            nextP >= this.minProbability
+          ) {
             const timeGap = nextWordData.time_start - wordData.time_end;
 
             if (timeGap > 0.1) {
@@ -163,14 +175,9 @@ export class WordHighlighter {
           }
         }
       } else {
-        const fallbackEnd = Math.min(
-          this.lastHighlightedIndex + 2,
-          this.textProcessor.wordSpans.length - 1
-        );
-        this.highlightWordsInRange(
-          this.lastHighlightedIndex,
-          fallbackEnd,
-          `(fallback for "${wordData.word}")`
+        // Gate: do not paint when p < threshold. No fallback painting.
+        printl?.(
+          `⏭️ Skipping low-confidence match for "${wordData.word}" (p=${p.toFixed(3)})`
         );
       }
     }
@@ -214,7 +221,12 @@ export class WordHighlighter {
         this.lastHighlightedIndex
       );
 
-      if (expectedMatch.index !== -1 && expectedMatch.index >= this.lastHighlightedIndex) {
+      const p = expectedMatch?.probability ?? 0;
+      if (
+        expectedMatch.index !== -1 &&
+        expectedMatch.index >= this.lastHighlightedIndex &&
+        p >= this.minProbability
+      ) {
         this.fillGapsToTarget(expectedMatch.index + 1, 'catching up to current time');
       }
     }
@@ -239,17 +251,19 @@ export class WordHighlighter {
           this.lastHighlightedIndex
         );
 
-        if (bestMatch.index !== -1) {
+        const p = bestMatch?.probability ?? 0;
+        if (bestMatch.index !== -1 && p >= this.minProbability) {
           this.clearAllHighlights();
           this.highlightWordsInRange(
             0,
             bestMatch.index,
-            `(seek target p=${bestMatch.probability.toFixed(3)})`
+            `(seek target p=${p.toFixed(3)})`
           );
 
           return { wordData, textIndex: bestMatch.index };
         }
 
+        // Gate: no highlight if below threshold
         return { wordData, textIndex: -1 };
       }
     }
@@ -278,19 +292,20 @@ export class WordHighlighter {
         this.lastHighlightedIndex
       );
 
-      if (bestMatch.index !== -1) {
+      const p = bestMatch?.probability ?? 0;
+      if (bestMatch.index !== -1 && p >= this.minProbability) {
         this.clearAllHighlights();
         this.highlightWordsInRange(
           0,
           bestMatch.index,
-          `(seek closest p=${bestMatch.probability.toFixed(3)})`
+          `(seek closest p=${p.toFixed(3)})`
         );
 
         return { wordData: closestWord, textIndex: bestMatch.index };
       }
     }
 
-    printl?.(`⚠️ No suitable word for t=${currentTime.toFixed(3)}s`);
+    printl?.(`⚠️ No suitable high-confidence word for t=${currentTime.toFixed(3)}s`);
     return null;
   }
 
@@ -325,7 +340,8 @@ export class WordHighlighter {
         null,
         this.lastHighlightedIndex
       );
-      if (bestMatch.index !== -1) lastTextIndex = bestMatch.index;
+      const p = bestMatch?.probability ?? 0;
+      if (bestMatch.index !== -1 && p >= this.minProbability) lastTextIndex = bestMatch.index;
     }
 
     if (lastTextIndex >= 0) {
@@ -359,7 +375,7 @@ export class WordHighlighter {
     const currentWord = this.findCurrentWordAndHighlight(currentTime);
 
     if (currentWord) {
-      printl?.(`✅ Highlighted after seek: "${currentWord.wordData.word}"`);
+      printl?.(`✅ Highlighted after seek: "${currentWord.wordData?.word ?? ''}"`);
     } else {
       this.estimatePositionFromTime(currentTime);
     }
