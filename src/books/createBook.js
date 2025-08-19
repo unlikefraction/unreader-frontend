@@ -82,14 +82,31 @@ const dzHint       = document.getElementById("dzHint");
 });
 dropZone.addEventListener("click", () => fileInput.click());
 dropZone.addEventListener("drop", e => {
+  e.preventDefault();
   const f = [...e.dataTransfer.files].find(f => /\.epub$/i.test(f.name));
   if (!f) return alert("Drop a .epub file");
+
+  const maxSize = 30 * 1024 * 1024; // 30 MB
+  if (f.size > maxSize) {
+    return alert("File is too large! Maximum allowed size is 30 MB.");
+  }
+
   handleUpload(f);
 });
+
 fileInput.addEventListener("change", () => {
   const f = fileInput.files[0];
   if (!f) return;
+
   if (!/\.epub$/i.test(f.name)) return alert("Please choose a .epub");
+
+  const maxSize = 30 * 1024 * 1024; // 30 MB
+  if (f.size > maxSize) {
+    alert("File is too large! Maximum allowed size is 30 MB.");
+    fileInput.value = ""; // clear the input
+    return;
+  }
+
   handleUpload(f);
 });
 
