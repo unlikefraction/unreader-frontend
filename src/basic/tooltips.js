@@ -12,6 +12,7 @@ const tools = {
     ".rectangle": ["Rectangle", "R", "right"],
     ".circle": ["Circle", "O", "right"],
     ".inbox": ["Inbox", null, "right"],
+    ".bookDetails": ["Book Details", null, "right"],
   
     ".settings": ["Settings", null, "top"],
     ".rewind": ["Rewind", "←", "top"],
@@ -32,6 +33,7 @@ const tools = {
   
     function createTooltip() {
       const el = document.createElement("div");
+      el.classList.add("tooltip");
       el.setAttribute("role", "tooltip");
       el.style.position = "fixed";
       el.style.left = "0";
