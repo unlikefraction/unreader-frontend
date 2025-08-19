@@ -296,6 +296,18 @@
     align-items: center;
 }
 
+.topSectionLeftThoughts{
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+}
+
+.wordsThoughts{
+    font-size: 14px;
+    font-weight: 400;
+    color: #7D7D7D;
+}
+
 .topSectionThoughts .headingThoughts{
     font-size: 21px;
     font-weight: 500;

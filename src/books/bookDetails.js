@@ -419,6 +419,26 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
         initialServerText: book.thoughts || ''
       });
       window.__thoughtsAutosaver = autosaver; // optional: for debugging
+      // === Live word count for Thoughts ===
+      const wordAmountEl = document.querySelector('.wordAmountThought');
+
+      function countThoughtWords(text) {
+        // treat words as tokens separated by a single space (normalize all whitespace -> one space)
+        const normalized = String(text || "").replace(/\s+/g, " ").trim();
+        return normalized ? normalized.split(" ").length : 0;
+      }
+
+      function updateThoughtWordCount() {
+        if (!wordAmountEl || !thoughtsInput) return;
+        wordAmountEl.textContent = String(countThoughtWords(thoughtsInput.value));
+      }
+
+      // initial render (after you've set thoughtsInput.value)
+      updateThoughtWordCount();
+
+      // keep it live
+      thoughtsInput.addEventListener('input', updateThoughtWordCount);
+
     }
 
     // === Edit Cover (pencil) → file select → upload → POST update → update UI ===
