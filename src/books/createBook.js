@@ -110,6 +110,60 @@ fileInput.addEventListener("change", () => {
   handleUpload(f);
 });
 
+/* ================================
+   NEW — EPUB metadata fetch + search text derivation
+===================================*/
+async function fetchEpubMetadata(epubUrl, token) {
+  try {
+    showOverlay("Reading EPUB metadata…");
+    const res = await fetch(`${API_URLS.BOOK}epub-metadata/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ epub_url: epubUrl })
+    });
+    const data = await res.json().catch(() => ({}));
+    hideOverlay();
+
+    if (!res.ok) {
+      // Friendly status-based messaging; still fall back safely
+      let msg = "Couldn't read EPUB metadata.";
+      if (res.status === 400) msg = "EPUB URL invalid or private; using file name.";
+      if (res.status === 401) msg = "Auth failed while reading metadata; using file name.";
+      if (res.status === 413) msg = "EPUB is too large for metadata parse; using file name.";
+      if (res.status === 502) msg = "Server couldn't fetch the EPUB; using file name.";
+      console.warn("EPUB metadata error:", data || res.statusText);
+      searchStatus.textContent = msg;
+      return null;
+    }
+
+    return data; // { source_url, metadata: {...} }
+  } catch (err) {
+    hideOverlay();
+    console.error("EPUB metadata network error:", err);
+    searchStatus.textContent = "Network error while extracting metadata; using file name.";
+    return null;
+  }
+}
+
+function deriveSearchTextFromMetadata(meta, fallbackNameNoExt) {
+  if (!meta || !meta.metadata) return fallbackNameNoExt;
+
+  const m = meta.metadata;
+  const title = (m.title || "").trim();
+  const authors = Array.isArray(m.authors) ? m.authors.filter(Boolean).map(a => a.trim()).filter(Boolean) : [];
+
+  if (title && authors.length) {
+    return `${title} by ${authors.join(", ")}`;        // case 1: title + authors
+  }
+  if (title && !authors.length) {
+    return title;                                      // case 2: title only
+  }
+  return fallbackNameNoExt;                             // case 3: neither available
+}
+
 async function handleUpload(file) {
   const token = getCookie("authToken");
   if (!token) {
@@ -142,8 +196,26 @@ async function handleUpload(file) {
 
     uploadedFileUrl = data.files?.[file.name];
     uploadStatus.textContent = "✅ Uploaded.";
+
+    // === NEW: fetch EPUB metadata using the uploaded URL ===
+    const meta = await fetchEpubMetadata(uploadedFileUrl, token);
+
+    // derive what we put in Step 2’s search box
+    const derivedText = deriveSearchTextFromMetadata(meta, uploadedFilename);
+
+    // If metadata gave us just a title (no authors), we’ll search by title next.
+    // If it gave us title+authors, we’ll show "Title by A, B" in the box.
+    // If neither, we fall back to the filename (existing behavior).
+    uploadedFilename = derivedText;  // Step 2 uses this to pre-fill the search box
+
+    // proceed to Step 2
     initStep2();
     setStep(2);
+
+    // If Step 2 text is present, trigger a search now.
+    if (searchInput.value.trim()) {
+      doSearch(searchInput.value.trim());
+    }
 
   } catch (err) {
     hideOverlay();
@@ -369,7 +441,6 @@ function renderOathCopy() {
 
   oathCopy.innerHTML = `I, <strong>${username}</strong>, hereby take the <strong>${labelHTML}</strong> to read “<u>${title}</u>”, and <strong>wager $${price}</strong>, which I shall receive if, and only if, I complete the book.`;
 }
-
 
 takeOathBtn.addEventListener("click", createBookOnBackend);
 
