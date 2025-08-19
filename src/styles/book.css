@@ -317,3 +317,25 @@
     font-size: 16px;
     color: #373737;
 }
+
+/* base */
+.editableTitle {
+    font: inherit;
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: text;
+    width: 100%;
+  }
+  
+  /* non-active (readonly) */
+  .editableTitle[readonly] {
+    border-bottom: 1px solid transparent;
+  }
+  
+  /* active (editing) */
+  .editableTitle.isEditing,
+  .editableTitle:not([readonly]) {
+    border-bottom: 1px solid #373737;
+  }
+  
