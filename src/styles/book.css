@@ -351,3 +351,36 @@
     border-bottom: 1px solid #373737;
   }
   
+
+  .completedLabel{
+    font-weight: 400 !important;
+    display: flex;
+    align-items: center;
+    margin-left: 0.4rem;
+  }
+
+
+.endDate{
+    position: relative;
+    bottom: -0.8rem;
+    right: -1rem;
+    display: flex;
+    justify-content: end;
+}
+
+.bookCompleted{
+    border: none;
+    font-size: 1.4rem;
+    margin-top: -0.4rem;
+}
+
+.endDayArrow{
+    margin-top: -0.5rem;
+}
+
+.endDayText{
+    font-size: 16px;
+    font-family: 'excalifont', sans-serif;
+    color: #000;
+    margin-left: 6px;
+}

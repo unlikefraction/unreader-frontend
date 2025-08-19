@@ -27,6 +27,12 @@ function escapeHtmlAttr(str) {
     .replace(/>/g, "&gt;");
 }
 
+// Count words by normalizing whitespace to single spaces, then splitting by " "
+function countWords(text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  return normalized ? normalized.split(" ").length : 0;
+}
+
 // === Timezone Setup ===
 const userTimezoneOffset = new Date().getTimezoneOffset() * 60000; // in ms
 
@@ -316,7 +322,11 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       pages.forEach(p => { if (p > lastPageRead) lastPageRead = p; });
     });
 
-    const percentageRead = Math.min(Math.round((lastPageRead / totalPages) * 100), 100);
+    // If already completed, show 100%, else compute normally
+    const percentageRead = book.marked_as_complete
+      ? 100
+      : Math.min(Math.round((lastPageRead / totalPages) * 100), 100);
+
     const filledBar = document.querySelector('.progressFilledBook');
     const percentText = document.querySelector('.percentRead');
     if (filledBar) filledBar.style.width = `${percentageRead}%`;
@@ -332,13 +342,27 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       });
     }
 
-    // === Dot logic ===
+    // === Dot logic (uses existing .endDate in HTML) ===
     const progressContainer = document.querySelector('.progressMarkings');
+    const endDateContainer = document.querySelector('.endDate');
+    const endDayTextEl = endDateContainer?.querySelector('.endDayText');
+
     if (progressContainer) {
       progressContainer.innerHTML = '';
-      const today = new Date(Date.now() - userTimezoneOffset);
-      const dayMap = {};
+      const todayLocal = new Date(Date.now() - userTimezoneOffset);
 
+      let endBoundaryLocal = todayLocal;
+      let endKey = todayLocal.toISOString().split("T")[0];
+
+      // If completed, cap boundary at completion date
+      if (book.marked_as_complete && book.book_completed_at) {
+        const completedDate = new Date(book.book_completed_at);
+        endBoundaryLocal = new Date(completedDate.getTime() - userTimezoneOffset);
+        endKey = endBoundaryLocal.toISOString().split("T")[0];
+      }
+
+      // map of days user read
+      const dayMap = {};
       Object.keys(analytics).forEach(utcDate => {
         const d = new Date(utcDate + "T00:00:00Z");
         const localDate = new Date(d.getTime() - userTimezoneOffset);
@@ -349,26 +373,45 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       const start = new Date(userStartDate);
       let isFirst = true;
 
-      while (start <= today) {
+      while (start <= endBoundaryLocal) {
         const dot = document.createElement("div");
         dot.classList.add("progressDot");
 
         const dateKey = start.toISOString().split("T")[0];
-        const isToday = dateKey === today.toISOString().split("T")[0];
-        const wasRead = dayMap[dateKey];
+        const isToday = dateKey === todayLocal.toISOString().split("T")[0];
+        const wasRead = !!dayMap[dateKey];
 
         if (isFirst) {
           if (wasRead) dot.classList.add("startCompleted");
           else dot.classList.add("start");
           isFirst = false;
+        } else if (book.marked_as_complete && dateKey === endKey) {
+          // Final "completed" dot with 🔥
+          dot.classList.add("bookCompleted");
+          dot.textContent = "🔥";
         } else {
-          if (isToday && wasRead) dot.classList.add("todayCompleted");
-          else if (isToday) dot.classList.add("today");
+          if (!book.marked_as_complete && isToday && wasRead) dot.classList.add("todayCompleted");
+          else if (!book.marked_as_complete && isToday) dot.classList.add("today");
           else if (wasRead) dot.classList.add("completed");
         }
 
         progressContainer.appendChild(dot);
         start.setDate(start.getDate() + 1);
+      }
+
+      // Toggle + fill pre-existing endDate block in HTML
+      if (book.marked_as_complete && book.book_completed_at) {
+        if (endDateContainer) {
+          endDateContainer.style.display = "";
+          const endDateLocal = endBoundaryLocal;
+          if (endDayTextEl) {
+            endDayTextEl.textContent = endDateLocal.toLocaleDateString(undefined, {
+              day: 'numeric', month: 'short', year: 'numeric'
+            });
+          }
+        }
+      } else {
+        if (endDateContainer) endDateContainer.style.display = "none";
       }
     }
 
@@ -409,7 +452,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       });
     }
 
-    // === Thoughts (cookie 2s, backend 10s, and on click) ===
+    // === Thoughts (cookie 2s, backend 10s, and on click) + live word count ===
     const thoughtsInput = document.querySelector('.thoughtsInput');
     if (thoughtsInput) {
       const autosaver = wireThoughtsAutosave({
@@ -419,26 +462,15 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
         initialServerText: book.thoughts || ''
       });
       window.__thoughtsAutosaver = autosaver; // optional: for debugging
-      // === Live word count for Thoughts ===
+
+      // Live word count
       const wordAmountEl = document.querySelector('.wordAmountThought');
-
-      function countThoughtWords(text) {
-        // treat words as tokens separated by a single space (normalize all whitespace -> one space)
-        const normalized = String(text || "").replace(/\s+/g, " ").trim();
-        return normalized ? normalized.split(" ").length : 0;
-      }
-
-      function updateThoughtWordCount() {
-        if (!wordAmountEl || !thoughtsInput) return;
-        wordAmountEl.textContent = String(countThoughtWords(thoughtsInput.value));
-      }
-
-      // initial render (after you've set thoughtsInput.value)
+      const updateThoughtWordCount = () => {
+        if (!wordAmountEl) return;
+        wordAmountEl.textContent = String(countWords(thoughtsInput.value));
+      };
       updateThoughtWordCount();
-
-      // keep it live
       thoughtsInput.addEventListener('input', updateThoughtWordCount);
-
     }
 
     // === Edit Cover (pencil) → file select → upload → POST update → update UI ===
@@ -476,6 +508,92 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
           alert(err.message || "Failed to update cover.");
         }
       });
+    }
+
+    // === Mark as Complete ===
+    const markBtn = document.querySelector('.markComplete');
+    const actionButtons = document.querySelector('.bookActionButtons');
+
+    if (book.marked_as_complete) {
+      // Replace button with green "Completed 🎉" label
+      if (markBtn && actionButtons) {
+        const done = document.createElement('span');
+        done.className = 'completedLabel';
+        done.textContent = 'Completed 🎉';
+        done.style.color = '#289156';
+        done.style.fontWeight = '600';
+        markBtn.replaceWith(done);
+      }
+    } else {
+      // Attach click handler only if not yet complete
+      if (markBtn) {
+        markBtn.addEventListener('click', async () => {
+          try {
+            const thoughtsInput = document.querySelector('.thoughtsInput');
+            const text = thoughtsInput ? thoughtsInput.value : (book.thoughts || "");
+            const words = countWords(text);
+
+            if (words < 200) {
+              alert(`You need at least 200 words in Thoughts to complete. Current: ${words}`);
+              return;
+            }
+
+            // try to force-sync current thoughts before marking complete
+            if (window.__thoughtsAutosaver && typeof window.__thoughtsAutosaver.forceSync === 'function') {
+              await window.__thoughtsAutosaver.forceSync();
+            }
+
+            markBtn.disabled = true;
+            markBtn.textContent = "Marking…";
+            showOverlay("Marking as complete…");
+
+            const res = await fetch(`${window.API_URLS.BOOK}mark-complete/${userBookId}/`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              },
+              body: '{}' // empty body per spec
+            });
+
+            hideOverlay();
+
+            if (!res.ok) {
+              let msg = `Failed (${res.status}).`;
+              try {
+                const data = await res.json();
+                if (data?.message) msg = data.message;
+                if (data?.detail) msg = data.detail;
+              } catch {}
+              if (res.status === 400) {
+                // could be already complete or <200 words (server-side check)
+                alert(msg || "Cannot mark as complete: requirements not met.");
+              } else if (res.status === 401) {
+                alert("Unauthorized. Please log in again.");
+              } else if (res.status === 404) {
+                alert("Book not found.");
+              } else {
+                alert(msg);
+              }
+              markBtn.disabled = false;
+              markBtn.textContent = "Mark as Complete  🎉";
+              return;
+            }
+
+            // success → reload
+            window.location.reload();
+
+          } catch (err) {
+            hideOverlay();
+            console.error(err);
+            alert(err.message || "Unexpected error while marking as complete.");
+            if (markBtn) {
+              markBtn.disabled = false;
+              markBtn.textContent = "Mark as Complete  🎉";
+            }
+          }
+        });
+      }
     }
 
   } catch (err) {
