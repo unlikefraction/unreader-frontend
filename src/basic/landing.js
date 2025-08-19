@@ -185,7 +185,7 @@ if (linkEl) linkEl.href = chosenHref;
     { sel: '.bookDetails', pos: 'right' },
   ];
 
-  const LOGIN_MESSAGE = "Please login to use this feature";
+  const LOGIN_MESSAGE = "Login to use this feature";
   const GAP = 6, PAD = 6, RADIUS = 4;
   const SHOW_POSITION_IN_TEXT = false; // append (top/right/left/bottom) to the text
 
