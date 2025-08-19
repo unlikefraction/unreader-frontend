@@ -46,6 +46,41 @@ function computeAnchorIndex(pages = []) {
   return Math.min(lastReadIdx + 1, pages.length - 1);
 }
 
+/** ------- UI helpers for "Page X of Y" ------- **/
+function ensurePageDetailsElement() {
+  let container = document.querySelector('.pageDetails');
+  if (!container) {
+    container = document.createElement('p');
+    container.className = 'pageDetails';
+    container.style.position = 'fixed';
+    container.style.right = '16px';
+    container.style.bottom = '16px';
+    container.style.margin = '0';
+    container.style.padding = '6px 10px';
+    container.style.borderRadius = '8px';
+    container.style.background = 'rgba(0,0,0,0.6)';
+    container.style.color = '#fff';
+    container.style.font = '500 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+    container.style.zIndex = '2147483647';
+    document.body.appendChild(container);
+  }
+  let current = container.querySelector('.currentPage');
+  let total = container.querySelector('.totalPage');
+  if (!current || !total) {
+    container.innerHTML = `Page <span class="currentPage">1</span> of <span class="totalPage">1</span>`;
+    current = container.querySelector('.currentPage');
+    total = container.querySelector('.totalPage');
+  }
+  return { container, current, total };
+}
+function updatePageDetails(currentPage, totalPages) {
+  const { current, total } = ensurePageDetailsElement();
+  // avoid layout thrash if unchanged
+  if (current.textContent !== String(currentPage)) current.textContent = String(currentPage);
+  if (total.textContent !== String(totalPages)) total.textContent = String(totalPages);
+}
+/** ------------------------------------------- **/
+
 export default class AppController {
   constructor() {
     this.reader = null;
@@ -124,7 +159,10 @@ export default class AppController {
         callbacks: {
           onActivePageChanged: async (index) => {
             try {
-              const pageNo = this.pageDescriptors[index]?.page_number;
+              const pageNo = this.pageDescriptors[index]?.page_number ?? (index + 1);
+              // Update Page X of Y UI on scroll / page change
+              updatePageDetails(pageNo, this.pageDescriptors.length);
+
               const ctx = { pageNumber: pageNo, metadata: this._metadataForIndex(index) };
               // Switch LiveKit room on page change, show loading in holdup status
               await this.holdup.switchToPage(ctx);
@@ -138,7 +176,11 @@ export default class AppController {
 
       // Initial per-page connect
       const startIndex = this.reader.getActive();
-      const startPageNo = this.pageDescriptors[startIndex]?.page_number;
+      const startPageNo = this.pageDescriptors[startIndex]?.page_number ?? (startIndex + 1);
+
+      // Seed the Page X of Y UI immediately on load
+      updatePageDetails(startPageNo, this.pageDescriptors.length);
+
       await this.holdup.connectForPage({
         pageNumber: startPageNo,
         metadata: this._metadataForIndex(startIndex)

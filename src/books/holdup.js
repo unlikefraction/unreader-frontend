@@ -58,16 +58,9 @@ function getCookie(name) {
     /* -------------------- UI helpers -------------------- */
     _ensureStatusOutlet() {
       const host = document.querySelector('.holdup') || document.body;
-      let banner = host.querySelector('.holdup-status');
-      if (!banner) {
-        banner = document.createElement('div');
-        banner.className = 'holdup-status';
-        banner.style.cssText = 'position:relative;font:600 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;opacity:.8;margin:.25rem 0;';
-        host.appendChild(banner);
-      }
     }
     _setStatus(text) {
-      const el = (document.querySelector('.holdup') || document).querySelector('.holdup-status');
+      const el = (document.querySelector('.holdup'));
       if (el) el.textContent = text;
     }
     _bindHoldUpButton() {
