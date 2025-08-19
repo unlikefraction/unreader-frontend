@@ -58,6 +58,13 @@ let pickedDetails     = null;
 let selectedOath      = "fire_oath";
 let lastClickedItemEl = null;
 
+/* NEW: Step 2 overrides */
+let customCoverUrl = "";   // uploaded cover image URL (if any)
+let titleOverride  = "";   // edited title (if any)
+
+/* Track outside-click handler for inline title editing */
+let titleDocHandler = null;
+
 /* ================================
    STEP 1 — Upload
 ===================================*/
@@ -128,7 +135,6 @@ async function fetchEpubMetadata(epubUrl, token) {
     hideOverlay();
 
     if (!res.ok) {
-      // Friendly status-based messaging; still fall back safely
       let msg = "Couldn't read EPUB metadata.";
       if (res.status === 400) msg = "EPUB URL invalid or private; using file name.";
       if (res.status === 401) msg = "Auth failed while reading metadata; using file name.";
@@ -156,12 +162,12 @@ function deriveSearchTextFromMetadata(meta, fallbackNameNoExt) {
   const authors = Array.isArray(m.authors) ? m.authors.filter(Boolean).map(a => a.trim()).filter(Boolean) : [];
 
   if (title && authors.length) {
-    return `${title} by ${authors.join(", ")}`;        // case 1: title + authors
+    return `${title} by ${authors.join(", ")}`;
   }
   if (title && !authors.length) {
-    return title;                                      // case 2: title only
+    return title;
   }
-  return fallbackNameNoExt;                             // case 3: neither available
+  return fallbackNameNoExt;
 }
 
 async function handleUpload(file) {
@@ -197,22 +203,17 @@ async function handleUpload(file) {
     uploadedFileUrl = data.files?.[file.name];
     uploadStatus.textContent = "✅ Uploaded.";
 
-    // === NEW: fetch EPUB metadata using the uploaded URL ===
+    // fetch EPUB metadata using the uploaded URL
     const meta = await fetchEpubMetadata(uploadedFileUrl, token);
 
     // derive what we put in Step 2’s search box
     const derivedText = deriveSearchTextFromMetadata(meta, uploadedFilename);
-
-    // If metadata gave us just a title (no authors), we’ll search by title next.
-    // If it gave us title+authors, we’ll show "Title by A, B" in the box.
-    // If neither, we fall back to the filename (existing behavior).
-    uploadedFilename = derivedText;  // Step 2 uses this to pre-fill the search box
+    uploadedFilename = derivedText;
 
     // proceed to Step 2
     initStep2();
     setStep(2);
 
-    // If Step 2 text is present, trigger a search now.
     if (searchInput.value.trim()) {
       doSearch(searchInput.value.trim());
     }
@@ -225,12 +226,62 @@ async function handleUpload(file) {
 }
 
 /* ================================
-   STEP 2 — Choose book
+   STEP 2 — Choose book (+ edit cover/title)
 ===================================*/
 const searchInput  = document.getElementById("searchInput");
 const bookList     = document.getElementById("bookList");
 const pickedBox    = document.getElementById("pickedBox");
 const searchStatus = document.getElementById("searchStatus");
+
+/* cover upload (image) — shared helpers */
+const ACCEPTED_IMAGE_TYPES = [
+  "image/png", "image/webp", "image/jpeg", "image/jpg"
+];
+const MAX_COVER_BYTES = 10 * 1024 * 1024; // 10MB
+
+async function uploadCoverImage(file) {
+  const token = getCookie("authToken");
+  if (!token) {
+    alert("You're not logged in. Please log in first.");
+    return null;
+  }
+  if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+    alert("Please select a PNG, WEBP, or JPEG image.");
+    return null;
+  }
+  if (file.size > MAX_COVER_BYTES) {
+    alert("Cover image too large. Max 10 MB.");
+    return null;
+  }
+
+  try {
+    showOverlay("Uploading cover image…");
+    const form = new FormData();
+    form.append("book_file", file);
+
+    const res = await fetch(`${API_URLS.BOOK}assets/upload/`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}` },
+      body: form
+    });
+    const data = await res.json().catch(() => ({}));
+    hideOverlay();
+
+    if (!res.ok) {
+      console.error("Cover upload error:", data);
+      alert(`Cover upload failed (${res.status}).`);
+      return null;
+    }
+
+    const url = data.files?.[file.name] || "";
+    return url || null;
+  } catch (err) {
+    hideOverlay();
+    console.error("Cover upload network error:", err);
+    alert("Network error while uploading cover.");
+    return null;
+  }
+}
 
 function initStep2() {
   searchInput.value = uploadedFilename || "";
@@ -302,6 +353,16 @@ function selectBook(book, el) {
   el.classList.add("active");
   lastClickedItemEl = el;
 
+  // Reset overrides when selecting a new book
+  customCoverUrl = "";
+  titleOverride  = "";
+
+  // Clean up prior outside-click handler, if any
+  if (titleDocHandler) {
+    document.removeEventListener("mousedown", titleDocHandler, true);
+    titleDocHandler = null;
+  }
+
   const info = book.volumeInfo || {};
   const year = getYear(info.publishedDate || "");
   pickedDetails = {
@@ -317,23 +378,172 @@ function selectBook(book, el) {
 
   pickedBox.className = "pickedBox bookSelected";
   pickedBox.innerHTML = `
-    <div class="book-cover">
-      <div class="book-inside"></div>
-      <div class="book-image">
-        <img src="${pickedDetails.imageUrl}"
-              alt="Cover of ${pickedDetails.title}">
-        <div class="effect"></div>
-        <div class="light"></div>
+    <div class="book-cover-main-div">
+      <button id="editCoverBtn" class="editCoverBtn" title="Change cover">
+        <i class="ph ph-pencil-simple"></i>
+      </button>
+      <div class="book-cover editable-cover">
+        <div class="book-inside"></div>
+        <div class="book-image">
+          <img id="pickedCoverImg" src="${pickedDetails.imageUrl}" alt="Cover of ${pickedDetails.title}">
+          <div class="effect"></div>
+          <div class="light"></div>
+          <input type="file" id="coverFileInput" accept="image/png, image/webp, image/jpeg, image/jpg" style="display:none" />
+        </div>
       </div>
     </div>
+
     <div class="pickedMeta">
       <div class="mataDeta">
-        <h4>${pickedDetails.title}</h4>
+        <h4 class="titleRow">
+          <input
+            id="pickedTitleInput"
+            class="editableTitle"
+            type="text"
+            value="${escapeHtmlAttr(pickedDetails.title)}"
+            placeholder="Enter title"
+            readonly
+          />
+          <button id="editTitleBtn" class="editTitleBtn" title="Edit title" style="margin-left:8px">
+            <i class="ph ph-pencil-simple"></i>
+          </button>
+        </h4>
         <p>${pickedDetails.authors ? pickedDetails.authors.replace(/\|/g, ", ") : "Unknown author"}${year ? ` • ${year}` : ""}</p>
       </div>
       <button id="confirmBookBtn" class="btn">yes, continue   →</button>
     </div>
   `;
+
+  // Wire up cover edit
+  const editCoverBtn = document.getElementById("editCoverBtn");
+  const coverInput   = document.getElementById("coverFileInput");
+  const coverImgEl   = document.getElementById("pickedCoverImg");
+
+  editCoverBtn?.addEventListener("click", () => coverInput?.click());
+  coverInput?.addEventListener("change", async () => {
+    const f = coverInput.files?.[0];
+    if (!f) return;
+    const url = await uploadCoverImage(f);
+    if (url) {
+      customCoverUrl = url;
+      coverImgEl.src = url;
+      pickedDetails.imageUrl = url;
+    }
+    coverInput.value = "";
+  });
+
+  // Wire up inline title editing
+  const titleInput = document.getElementById("pickedTitleInput");
+  const titleBtn   = document.getElementById("editTitleBtn");
+  let preEditTitle = pickedDetails.title;
+
+  const enableTitleEdit = () => {
+    if (!titleInput) return;
+    preEditTitle = titleOverride || pickedDetails.title || "";
+    titleInput.readOnly = false;
+    titleInput.classList.add("isEditing");
+    titleInput.focus();
+    titleInput.setSelectionRange(0, titleInput.value.length);
+  };
+
+  const commitTitleEdit = () => {
+    if (!titleInput) return;
+    const newTitle = titleInput.value.trim();
+    if (newTitle) {
+      titleOverride = newTitle;
+      pickedDetails.title = newTitle;
+    } else {
+      titleInput.value = preEditTitle;
+    }
+    titleInput.readOnly = true;
+    titleInput.classList.remove("isEditing");
+  };
+
+  const revertTitleEdit = () => {
+    if (!titleInput) return;
+    titleInput.value = preEditTitle;
+    titleInput.readOnly = true;
+    titleInput.classList.remove("isEditing");
+  };
+
+  titleInput?.addEventListener("click", () => {
+    if (titleInput.readOnly) enableTitleEdit();
+  });
+  titleBtn?.addEventListener("click", enableTitleEdit);
+
+  titleInput?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitTitleEdit();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      revertTitleEdit();
+    }
+  });
+
+  // Outside click closes editing
+  titleDocHandler = (e) => {
+    if (!titleInput) return;
+    if (titleInput.readOnly) return;
+    const isInside = titleInput.contains(e.target) || titleBtn.contains(e.target);
+    if (!isInside) {
+      commitTitleEdit();
+    }
+  };
+  document.addEventListener("mousedown", titleDocHandler, true);
+
+  // === NEW: check if this book already exists on backend; if yes, use that title/cover ===
+  checkAndApplyExistingBook(pickedDetails.google_books_id);
+}
+
+/* Check if the selected Google Books ID already exists; if so, use its title & cover */
+async function checkAndApplyExistingBook(googleBooksId) {
+  try {
+    const token = getCookie("authToken");
+    const headers = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+
+    const url = `${API_URLS.BOOK}check/${encodeURIComponent(googleBooksId)}/`;
+    const res = await fetch(url, { headers });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.warn("Book check failed:", res.status, data);
+      return;
+    }
+
+    if (data && data.exists) {
+      const newTitle = (data.title || "").trim() || pickedDetails.title;
+      const newCover = (data.cover_image_url || "").trim() || pickedDetails.imageUrl;
+
+      // Update model
+      pickedDetails.title = newTitle;
+      pickedDetails.imageUrl = newCover;
+
+      // If user hasn't uploaded a custom cover, reflect backend cover
+      if (!customCoverUrl && newCover) {
+        const coverImgEl = document.getElementById("pickedCoverImg");
+        if (coverImgEl) coverImgEl.src = newCover;
+      }
+
+      // Only update title input if not actively editing
+      const titleInput = document.getElementById("pickedTitleInput");
+      if (titleInput && titleInput.readOnly) {
+        titleInput.value = newTitle;
+      }
+    }
+  } catch (err) {
+    console.error("Error checking existing book:", err);
+  }
+}
+
+// Simple HTML attribute escaper to keep input value safe
+function escapeHtmlAttr(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 document.addEventListener("click", e => {
@@ -342,13 +552,18 @@ document.addEventListener("click", e => {
       alert("Pick a book and upload an EPUB first.");
       return;
     }
+    // Clean outside-click handler for title before moving on
+    if (titleDocHandler) {
+      document.removeEventListener("mousedown", titleDocHandler, true);
+      titleDocHandler = null;
+    }
     initStep3();
     setStep(3);
   }
 });
 
 /* ================================
-   STEP 3 — Oath + Create  (UPDATED)
+   STEP 3 — Oath + Create
 ===================================*/
 const oathTabs     = document.getElementById("oathTabs");
 const oathBadge    = document.getElementById("oathBadge");
@@ -430,7 +645,6 @@ function renderOathCopy() {
   const firstTwo = gradient.match(/#[0-9A-Fa-f]{3,6}/g)?.slice(0, 2) || ["#000", "#000"];
   const twoColorGradient = `linear-gradient(90deg, ${firstTwo[0]} 0%, ${firstTwo[1]} 50%)`;
 
-  // gradient label style
   const labelHTML = `<span style="
       background: ${twoColorGradient};
       -webkit-background-clip: text;
@@ -457,13 +671,13 @@ async function createBookOnBackend() {
   showOverlay("Creating your book…");
 
   const payload = {
-    title: pickedDetails.title,
+    title: titleOverride || pickedDetails.title,
     authors: pickedDetails.authors,
     google_books_id: pickedDetails.google_books_id,
     book_file_url: uploadedFileUrl,
     oath: selectedOath,
     subtitle: pickedDetails.subtitle,
-    cover_image_url: pickedDetails.imageUrl,
+    cover_image_url: customCoverUrl || pickedDetails.imageUrl, // prefer uploaded/checked cover
     publisher: pickedDetails.publisher,
     published_date: pickedDetails.published_date,
     isbns: "",

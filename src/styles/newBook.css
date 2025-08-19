@@ -466,3 +466,74 @@
     color: #373737;
   }
   
+
+  .book-cover-main-div{
+    display: flex;
+    margin-left: -3rem;
+    gap: 8px;
+  }
+
+  .editCoverBtn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 35px;
+    height: 35px;
+    padding: 0.5rem;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 18px;
+    border-radius: 50px;
+    cursor: pointer;
+  }
+
+  .editCoverBtn:hover{
+    border: 1px solid #000;
+  }
+
+  .mataDeta h4{
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .editTitleBtn{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 35px;
+    height: 35px;
+    padding: 0.5rem;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-size: 18px;
+    border-radius: 50px;
+    cursor: pointer;
+  }
+
+  .editTitleBtn:hover{
+    border: 1px solid #000;
+  }
+
+
+  /* base */
+.editableTitle {
+  font: inherit;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: text;
+  width: 100%;
+}
+
+/* non-active (readonly) */
+.editableTitle[readonly] {
+  border-bottom: 1px solid transparent;
+}
+
+/* active (editing) */
+.editableTitle.isEditing,
+.editableTitle:not([readonly]) {
+  border-bottom: 1px solid #373737;
+}
