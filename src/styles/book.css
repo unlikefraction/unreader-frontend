@@ -2,6 +2,7 @@
     position: absolute;
     right: 40px;
     top: 100px;
+    width: 140px;
 }
 
 .mainBookDetails{
@@ -134,6 +135,31 @@
 }
 
 .progressDot.start{
+    position: relative;
+    width: 22px;
+    height: 22px;
+    margin-top: -2px;
+    display: inline-block;
+    background: #B7B7B7; /* border color layer */
+    clip-path: polygon(
+      50% 0%,
+      100% 38%,
+      82% 100%,
+      18% 100%,
+      0% 38%
+    );
+    border-radius: 0 !important;
+}
+  
+.progressDot.start::after{
+    content: "";
+    position: absolute;
+    inset: 0px;             /* “1px stroke” */
+    background: #FFF;       /* fill */
+    clip-path: inherit;     /* same polygon */
+}  
+
+.progressDot.startCompleted{
     width: 22px;
     height: 22px;
     margin-top: -2px;
