@@ -1,41 +1,29 @@
-// -------text-processor.js-------
+// -------text-processor.js (preserving full HTML + per-word spans)-------
 
-/**
- * Text processing and word timing management
- */
 export class TextProcessor {
-  /**
-   * @param {string} textFile - URL/path to HTML containing <p> paragraphs
-   * @param {string} timingFile - URL/path to JSON [{word,time_start,time_end}, ...]
-   * @param {number} offsetMs - shift timings by ms
-   * @param {string|null} pageKey - OPTIONAL unique key so multiple pages can share the same files without colliding
-   */
   constructor(textFile, timingFile, offsetMs = 0, pageKey = null) {
     this.textFile = textFile;
     this.timingFile = timingFile;
     this.offsetMs = offsetMs;
     this.wordTimings = null;
     this.wordSpans = [];
-    this.referenceWords = 10; // Number of reference words for context matching
+    this.referenceWords = 10;
 
-    // Stable, page-specific identifier (unique across pages even if files are identical)
     const key = pageKey ?? `${textFile}|${timingFile}|${offsetMs}`;
     this.pageId = this.#slugify(key);
 
-    // will be the <p class="mainContent" ...>
     this.container = null;
   }
 
   #slugify(s) {
     return String(s)
       .toLowerCase()
-      .replace(/^[a-z]+:\/\/+/i, "")  // strip protocol if any
+      .replace(/^[a-z]+:\/\/+/i, "")
       .replace(/[^a-z0-9]+/gi, "-")
       .replace(/^-+|-+$/g, "");
   }
 
   #ensureMainContent() {
-    // Ensure there is a mainContainer
     let containerDiv = document.querySelector(".mainContainer");
     if (!containerDiv) {
       containerDiv = document.createElement("div");
@@ -44,79 +32,117 @@ export class TextProcessor {
       printl?.(`🔧 Created <div.mainContainer>`);
     }
 
-    // Check if our page's <p> already exists
-    let el = containerDiv.querySelector(
-      `p.mainContent[data-page-id="${this.pageId}"]`
-    );
-
+    // accept any tag; upgrade legacy <p> to <div>
+    let el = containerDiv.querySelector(`[data-page-id="${this.pageId}"]`);
     if (!el) {
-      el = document.createElement("p");
+      el = document.createElement("div");
       el.className = "mainContent";
       el.dataset.pageId = this.pageId;
       el.id = `mainContent-${this.pageId}`;
-      // Anchor paragraph overlays (hover areas/buttons) relative to this page only
       el.style.position = el.style.position || "relative";
       containerDiv.appendChild(el);
-      printl?.(`🔧 Created <p.mainContent> for pageId=${this.pageId} inside mainContainer`);
+      printl?.(`🔧 Created <div.mainContent> for pageId=${this.pageId} inside mainContainer`);
+    } else if (el.tagName.toLowerCase() === "p") {
+      const replacement = document.createElement("div");
+      for (const { name, value } of [...el.attributes]) replacement.setAttribute(name, value);
+      replacement.classList.add("mainContent");
+      el.replaceWith(replacement);
+      el = replacement;
+      printl?.("♻️ Replaced legacy <p.mainContent> with <div.mainContent> for valid HTML.");
     }
 
     this.container = el;
   }
 
-  async separateText() {
+  async separateTextPreservingMarkup() {
     this.#ensureMainContent();
 
     const response = await fetch(this.textFile);
-    const htmlContent = await response.text();
+    const rawHtml = await response.text();
 
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = htmlContent;
+    const htmlContent = (window.DOMPurify ? DOMPurify.sanitize(rawHtml, { RETURN_TRUSTED_TYPE: false }) : rawHtml);
 
-    // Clear only within this instance's container
+    const tempRoot = document.createElement("div");
+    tempRoot.innerHTML = htmlContent;
+
     this.container.innerHTML = "";
     this.wordSpans = [];
 
-    const paragraphs = tempDiv.querySelectorAll("p");
+    // strip dangerous/irrelevant nodes
+    ["script","style","noscript","template"].forEach(sel => tempRoot.querySelectorAll(sel).forEach(n => n.remove()));
 
-    paragraphs.forEach((paragraph, paragraphIndex) => {
-      const paragraphText = paragraph.textContent.trim();
-
-      if (paragraphText) {
-        const words = paragraphText.split(/\s+/);
-
-        words.forEach((word) => {
-          if (word.trim()) {
-            const span = document.createElement("span");
-            span.className = "word";
-            span.textContent = word;
-            span.dataset.originalWord = word.toLowerCase().replace(/[^\w]/g, "");
-            span.dataset.index = this.wordSpans.length;
-
-            // Keep everything scoped to this container
-            this.container.appendChild(span);
-            this.container.appendChild(document.createTextNode(" "));
-            this.wordSpans.push(span);
-          }
-        });
+    // walk text nodes and wrap words
+    const BLOCKED = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
+    const walker = document.createTreeWalker(
+      tempRoot,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          const parent = node.parentNode;
+          if (!parent) return NodeFilter.FILTER_REJECT;
+          if (BLOCKED.has(parent.nodeName)) return NodeFilter.FILTER_REJECT;
+          if (!/\S/.test(node.nodeValue)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
       }
+    );
 
-      if (paragraphIndex < paragraphs.length - 1) {
-        this.container.appendChild(document.createElement("br"));
-        this.container.appendChild(document.createElement("br"));
-      }
+    const WORD_RE = /[\p{L}\p{N}’']+/u;
+    const TOKENIZE_RE = /[\p{L}\p{N}’']+|[^\p{L}\p{N}’']+/gu;
+
+    let globalIndex = 0;
+    const nodesToProcess = [];
+    while (walker.nextNode()) nodesToProcess.push(walker.currentNode);
+
+    nodesToProcess.forEach((textNode) => {
+      const parts = textNode.nodeValue.match(TOKENIZE_RE);
+      if (!parts) return;
+
+      const frag = document.createDocumentFragment();
+
+      parts.forEach((part) => {
+        if (WORD_RE.test(part)) {
+          const span = document.createElement("span");
+          span.className = "word";
+          span.textContent = part;
+
+          const normalized = part.toLocaleLowerCase().normalize("NFKC")
+            .replace(/[^\p{L}\p{N}’']+/gu, "");
+          span.dataset.originalWord = normalized;
+          span.dataset.index = String(globalIndex++);
+
+          this.wordSpans.push(span);
+          frag.appendChild(span);
+        } else {
+          frag.appendChild(document.createTextNode(part));
+        }
+      });
+
+      textNode.parentNode.replaceChild(frag, textNode);
     });
 
-    printl?.(`📝 Total words in document: ${this.wordSpans.length}`);
-    printl?.(`📄 Total paragraphs processed: ${paragraphs.length}`);
-    printl?.(`⏱️ Offset applied: ${this.offsetMs}ms`);
+    while (tempRoot.firstChild) this.container.appendChild(tempRoot.firstChild);
+
+    printl?.(`📝 Total words wrapped: ${this.wordSpans.length}`);
+    printl?.(`✅ Preserved full HTML structure (links, images, headings, lists).`);
+    printl?.(`⏱️ Offset applied: ${this.offsetMs}ms (affects timings, not DOM).`);
   }
+
+  // Back-compat alias (old callers still invoke separateText)
+  async separateText() {
+    return this.separateTextPreservingMarkup();
+  }
+
+  // Optional ingest APIs used by MultiPageReader fallbacks
+  setWordTimings(words) { this.wordTimings = Array.isArray(words) ? words : []; }
+  async ingestWordTimings(words) { this.setWordTimings(words); }
+  async ingestWordTimingsFromBackend(words) { this.setWordTimings(words); }
 
   async loadWordTimings() {
     const response = await fetch(this.timingFile);
     this.wordTimings = await response.json();
     printl?.(`🎵 Loaded ${this.wordTimings.length} word timings`);
 
-    // Apply offset to all timings
     const offsetSeconds = this.offsetMs / 1000;
     this.wordTimings = this.wordTimings.map((timing) => ({
       ...timing,
@@ -133,10 +159,9 @@ export class TextProcessor {
     const context = [];
     const startIndex = Math.max(0, timingIndex - contextSize);
     const endIndex = Math.min(this.wordTimings.length - 1, timingIndex + contextSize);
-
     for (let i = startIndex; i <= endIndex; i++) {
       if (i !== timingIndex && this.wordTimings[i]) {
-        context.push(this.wordTimings[i].word.toLowerCase().replace(/[^\w]/g, ""));
+        context.push(this.wordTimings[i].word.toLowerCase().replace(/[^\p{L}\p{N}’']+/gu, ""));
       }
     }
     return context;
@@ -146,13 +171,8 @@ export class TextProcessor {
     const context = [];
     const startIndex = Math.max(0, spanIndex - contextSize);
     const endIndex = Math.min(this.wordSpans.length - 1, spanIndex + contextSize);
-
     for (let i = startIndex; i <= endIndex; i++) {
-      if (
-        i !== spanIndex &&
-        this.wordSpans[i] &&
-        this.wordSpans[i].dataset.originalWord
-      ) {
+      if (i !== spanIndex && this.wordSpans[i]?.dataset.originalWord) {
         context.push(this.wordSpans[i].dataset.originalWord);
       }
     }
@@ -167,31 +187,24 @@ export class TextProcessor {
     const totalWords = Math.max(audioContext.length, textContext.length);
 
     audioContext.forEach((audioWord) => {
-      if (textContext.includes(audioWord)) {
-        matchCount++;
-      }
+      if (textContext.includes(audioWord)) matchCount++;
     });
 
     const positionalMatches = Math.min(audioContext.length, textContext.length);
     let positionalMatchCount = 0;
-
     for (let i = 0; i < positionalMatches; i++) {
-      if (audioContext[i] === textContext[i]) {
-        positionalMatchCount++;
-      }
+      if (audioContext[i] === textContext[i]) positionalMatchCount++;
     }
 
     const generalScore = matchCount / totalWords;
     const positionalScore = positionalMatchCount / positionalMatches;
-
     return generalScore * 0.6 + positionalScore * 0.4;
   }
 
   findBestWordMatch(targetWord, timingIndex, searchCenter = null, lastHighlightedIndex = 0) {
-    const cleanTarget = targetWord.toLowerCase().replace(/[^\w]/g, "");
+    const cleanTarget = targetWord.toLocaleLowerCase().normalize("NFKC").replace(/[^\p{L}\p{N}’']+/gu, "");
 
-    const centerIndex = searchCenter !== null ? searchCenter : lastHighlightedIndex;
-
+    const centerIndex = searchCenter ?? lastHighlightedIndex;
     const searchStart = Math.max(0, centerIndex - this.referenceWords);
     const searchEnd = Math.min(this.wordSpans.length, centerIndex + this.referenceWords + 1);
 
@@ -201,21 +214,14 @@ export class TextProcessor {
 
     for (let i = searchStart; i < searchEnd; i++) {
       const span = this.wordSpans[i];
-      if (span && span.dataset.originalWord) {
+      if (span?.dataset.originalWord) {
         const wordScore = cleanTarget === span.dataset.originalWord ? 1.0 : 0.0;
-
         const textContext = this.getTextContext(i);
         const contextScore = this.calculateContextSimilarity(audioContext, textContext);
-
         const totalProbability = wordScore * 0.4 + contextScore * 0.6;
 
         if (totalProbability > bestMatch.probability) {
-          bestMatch = {
-            index: i,
-            probability: totalProbability,
-            wordScore,
-            contextScore,
-          };
+          bestMatch = { index: i, probability: totalProbability, wordScore, contextScore };
         }
       }
     }
@@ -225,7 +231,7 @@ export class TextProcessor {
   }
 
   async init() {
-    await this.separateText();
+    await this.separateTextPreservingMarkup();
     await this.loadWordTimings();
   }
 }

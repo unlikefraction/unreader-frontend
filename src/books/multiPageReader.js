@@ -169,7 +169,8 @@ export default class MultiPageReader {
       const meta = this.pageMeta[i];
       const pageId = slugify(meta.pageKey || `page-${meta.page_number}-${i}`);
 
-      const p = document.createElement('p');
+      // CHANGED: use a DIV to host real HTML (keeps incoming headings/images/lists valid)
+      const p = document.createElement('div');
       p.className = 'mainContent pageRemaining';
       p.dataset.pageId = pageId;
       p.id = `mainContent-${pageId}`;
@@ -192,6 +193,7 @@ export default class MultiPageReader {
     const sys = new AudioSystem(meta.audioFile, meta.timingFile, meta.textBlobUrl, meta.offsetMs ?? 0);
     sys.textProcessor.pageId = slugify(meta.pageKey || `page-${meta.page_number}-${i}`);
 
+    // keep the call name the same; TextProcessor.separateText() now preserves markup internally
     await sys.textProcessor.separateText();
     sys.paragraphSeeker.enableParagraphNavigation();
 
@@ -269,13 +271,15 @@ export default class MultiPageReader {
       for (const e of entries) {
         if (e.isIntersecting) {
           const el = e.target;
-          const all = [...this._container.querySelectorAll('p.mainContent')];
+          // CHANGED: match any .mainContent (works for <div> or <p>)
+          const all = [...this._container.querySelectorAll('.mainContent')];
           const i = all.indexOf(el);
           if (i >= 0 && !this.instances[i]) await this.hydratePage(i);
         }
       }
     }, { root: null, rootMargin, threshold: 0.01 });
-    this._container.querySelectorAll('p.mainContent').forEach(p => this._io.observe(p));
+    // CHANGED: observe .mainContent
+    this._container.querySelectorAll('.mainContent').forEach(p => this._io.observe(p));
   }
 
   async init() {
@@ -303,7 +307,8 @@ export default class MultiPageReader {
     this._setupIntersectionHydrator();
   }
 
-  #pageEl(i) { return this._container?.querySelectorAll('p.mainContent')[i] || null; }
+  // CHANGED: accept either <div.mainContent> or <p.mainContent>
+  #pageEl(i) { return this._container?.querySelectorAll('.mainContent')[i] || null; }
   #applyPageStateClasses(activeIndex) {
     const N = this.pageMeta.length;
     for (let i = 0; i < N; i++) {
@@ -578,7 +583,8 @@ export default class MultiPageReader {
       const paraText = chip.dataset?.paragraphText;
       if (!pageId || !paraText) return;
 
-      const all = [...this._container.querySelectorAll('p.mainContent')];
+      // CHANGED: match any .mainContent
+      const all = [...this._container.querySelectorAll('.mainContent')];
       const pageIndex = all.findIndex(p => p.id === `mainContent-${pageId}`);
       if (pageIndex === -1) return;
 
