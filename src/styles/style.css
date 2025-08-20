@@ -294,10 +294,11 @@ nav a{
 
 .leftControls{
   position: fixed;
-  justify-content: space-between;
-  height: 100%;
   left: 0rem;
-  top: 0rem;
+  top: -3rem;
+  align-content: center;
+  justify-content: center;
+  height: 100%;
   display: flex;
   flex-direction: column;
   padding: 2rem;
@@ -371,7 +372,7 @@ nav a{
   position: absolute;
   margin-top: -3rem;
   margin-left: 3rem;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   background: #9C0000;
@@ -692,11 +693,15 @@ nav a{
   font-family: "Space Mono", monospace;
 }
 
+.newMessage{
+  margin-top: -2rem;
+}
+
 .newMessage::before{
   content: '*';
-  position: absolute;
+  position: relative;
   margin-left: -1rem;
-  margin-top: 0.25rem;
+  top: 2.1rem;
   font-size: 18px;
 }
 
@@ -838,6 +843,7 @@ mark{
   color: #ABABAB !important;
 }
 
+
 /* Default: animation on */
 [data-page-id="transcript-landing-html-order-word-timings-ordered-json-100"] 
 [data-paragraph-index="0"] {
@@ -846,16 +852,12 @@ mark{
   left: -10px !important;
 }
 
-@keyframes pulseAnimation {
-  0%{
-    transform: scale(1);
-  }
+.inbox{
+  position: fixed;
+  bottom: 31px;
+  left: 31px;
+}
 
-  50%{
-    transform: scale(1.2);
-  }
-
-  100%{
-    transform: scale(1);
-  }
+.inbox i{
+  font-size: 1.4rem;
 }
