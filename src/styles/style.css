@@ -283,7 +283,7 @@ nav a{
   opacity: 1;
 }
 
-.pageDetails{
+.pageDetailsBottomRight{
   position: fixed;
   right: 1.5rem;
   bottom: 1.5rem;
@@ -860,4 +860,122 @@ mark{
 
 .inbox i{
   font-size: 1.4rem;
+}
+
+.pageHeader{
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  font-family: 'Space Mono', monospace;
+  color: #808080;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.regenerateAudio{
+  cursor: pointer;
+  transition: 0.1s all;
+}
+
+.regenerateAudio:hover{
+  color: #000;
+}
+
+
+/* paragraph spacing */
+.mainContent p {
+  margin: 16px 0;
+}
+
+/* if the source uses <br> for paragraphs, give them vertical gap */
+.mainContent br {
+  display: block;
+  margin-bottom: 16px;
+}
+
+/* headings rhythm */
+.mainContent h1 {
+  font-size: 1.75rem;
+  line-height: 1.25;
+  margin: 24px 0 12px;
+}
+.mainContent h2 {
+  font-size: 1.5rem;
+  line-height: 1.3;
+  margin: 22px 0 10px;
+}
+.mainContent h3 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  margin: 20px 0 8px;
+}
+
+/* lists */
+.mainContent ul,
+.mainContent ol {
+  margin: 16px 0 16px 20px;
+}
+.mainContent li {
+  margin: 6px 0;
+}
+
+/* make images responsive & full width */
+.mainContent img {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  margin: 12px 0;
+  border-radius: 6px;
+}
+
+/* make iframes/media scale to container width */
+.mainContent iframe,
+.mainContent video {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+}
+
+/* links: keep them readable against various backgrounds */
+.mainContent a .word {
+  cursor: pointer;
+  color: #0099FF !important;
+  text-decoration: none;
+}
+
+.mainContent a{
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* keep the chip below text/links */
+.paragraph-hover-nav {
+  z-index: 10;            /* lower than links */
+}
+
+/* raise links above the chip so they’re always clickable */
+.mainContent a {
+  position: relative;     /* creates a stacking context */
+  z-index: 20;            /* higher than the chip */
+}
+
+/* if links wrap other inline elements, keep them above too */
+.mainContent a * {
+  position: relative;
+  z-index: 20;
+}
+
+
+.scrollToPlayhead{
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7) !important;
+  backdrop-filter: blur(10px);
+  transition: 0.2s all;
+}
+
+.scrollToPlayhead:hover{
+  background: #000 !important;
 }

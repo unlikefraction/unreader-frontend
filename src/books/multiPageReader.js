@@ -81,6 +81,10 @@ export default class MultiPageReader {
     this._isLoadingActiveAudio = false;
     this._autoplayOnReady = false;
 
+    // NEW: scroll-to-playhead UI state
+    this._scrollToPlayheadBtn = null;
+    this._scrollWatchBound = false;
+
     this.userBookId = userBookId ?? qs('id');
     this.audioApiBase = window.API_URLS?.AUDIO || '';
 
@@ -123,27 +127,28 @@ export default class MultiPageReader {
   _updateTransportMeta({ playing = false, loading = false, pageIndex = this.active, paragraphText = null } = {}) {
     const root = this._transportRoot();
     if (root) {
-      // do NOT reflect "loading" on the transport; paragraph chip shows spinner instead
-      root.classList.remove('is-loading');               // remove if your CSS uses this
+      // Do NOT reflect "loading" on the transport anymore. Chips handle spinner.
+      root.classList.remove('is-loading');
       root.classList.toggle('is-playing', !!playing);
       root.classList.toggle('is-paused', !playing);
-      // ...
+      const pageNo = this.pageMeta[pageIndex]?.page_number;
+      root.setAttribute('data-active-page', pageNo ?? '');
+      if (paragraphText) root.setAttribute('data-active-paragraph', paragraphText);
+      const pageEl = root.querySelector('[data-transport="page"]'); if (pageEl && pageNo) pageEl.textContent = `Page ${pageNo}`;
+      const paraEl = root.querySelector('[data-transport="paragraph"]'); if (paraEl) paraEl.textContent = paragraphText || '';
     }
     const playButton = document.querySelector('.playButton');
     const icon = playButton?.querySelector('i');
     if (playButton) {
-      // stop toggling the loading class on the bottom player icon
+      // Stop toggling loading on the bottom player.
       playButton.classList.remove('loading');
       playButton.classList.toggle('playing', !!playing);
       playButton.classList.toggle('paused', !playing);
     }
     if (icon) icon.className = playing ? 'ph ph-pause' : 'ph ph-play';
-
   }
   _syncPlayButton(forcePlaying, { loading = false, paragraphText = null } = {}) {
-    const playing = loading
-      ? true
-      : (typeof forcePlaying === 'boolean'
+    const playing = (typeof forcePlaying === 'boolean'
           ? forcePlaying
           : (this.active >= 0 && !!this.instances[this.active]?.audioCore?.isPlaying));
     this._updateTransportMeta({ playing, loading, pageIndex: this.active, paragraphText });
@@ -159,16 +164,161 @@ export default class MultiPageReader {
     }
   }
 
+  /* ---------- header helpers ---------- */
+  _ensureGlobalOverlayPageDetails() {
+    if (document.querySelector('.pageDetails[data-overlay="1"]')) return;
+    const container = document.createElement('p');
+    container.className = 'pageDetails';
+    container.setAttribute('data-overlay', '1');
+    container.classList.add("pageDetailsBottomRight")
+    container.innerHTML = `Page <span class="currentPage">1</span> of <span class="totalPage">1</span>`;
+    document.body.appendChild(container);
+  }
+
+  _buildPerPageHeader(meta, pageIndex, pageId) {
+    const header = document.createElement('div');
+    header.className = 'pageDetails pageHeader';
+    header.id = `pageHeader-${pageId}`;
+    header.innerHTML = `
+      <p class="regenerateAudio" role="button" tabindex="0" title="Queue a high-priority audio regeneration">regenerate page’s audio</p>
+      <p class="pageNumber">Page ${meta.page_number}</p>
+    `;
+    Object.assign(header.style, {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: '12px',
+      margin: '8px 0'
+    });
+    const regen = header.querySelector('.regenerateAudio');
+    Object.assign(regen.style, { cursor: 'pointer', textDecoration: 'underline' });
+
+    const onTrigger = (e) => {
+      e.preventDefault();
+      this._regeneratePageAudio(pageIndex).catch(err => console.warn('regenerate error', err));
+    };
+    regen.addEventListener('click', onTrigger);
+    regen.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') onTrigger(e); });
+
+    return header;
+  }
+
+  async _regeneratePageAudio(pageIndex) {
+    const meta = this.pageMeta[pageIndex]; if (!meta) return;
+    const token = getCookie('authToken');
+    const pageId = slugify(meta.pageKey || `page-${meta.page_number}-${pageIndex}`);
+    const header = document.getElementById(`pageHeader-${pageId}`);
+    const regenEl = header?.querySelector?.('.regenerateAudio');
+
+    const url = `${this.audioApiBase}regenerate/book/${encodeURIComponent(this.userBookId)}/page/${encodeURIComponent(meta.page_number)}/`;
+
+    // optimistic UI
+    if (regenEl) {
+      regenEl.textContent = 'Regenerating audio';
+      regenEl.classList.add('regenerating');
+      regenEl.style.pointerEvents = 'none';
+      regenEl.style.opacity = '0.7';
+    }
+
+    let res, json = null;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      json = await res.json().catch(() => ({}));
+    } catch (e) {
+      if (regenEl) {
+        regenEl.textContent = 'Another Regeneration in Progress (Try Again)';
+        regenEl.classList.remove('regenerating');
+        regenEl.style.pointerEvents = 'auto';
+        regenEl.style.opacity = '1';
+      }
+      return;
+    }
+
+    // Start one immediate fetch, then poll every 5s until audio_url changes
+    const getPageUrl = `${this.audioApiBase}book/${encodeURIComponent(this.userBookId)}/page/${encodeURIComponent(meta.page_number)}/`;
+    const fetchStatus = async () => {
+      const r = await fetch(getPageUrl, { headers: { Authorization: `Bearer ${token}` } });
+      if (!r.ok) throw new Error(`Audio API ${r.status}`);
+      return r.json();
+    };
+
+    let firstAudioUrl = null;
+    try {
+      const first = await fetchStatus();
+      firstAudioUrl = first?.audio_url || null;
+    } catch {}
+
+    const checkChanged = async () => {
+      try {
+        const data = await fetchStatus();
+        const currUrl = data?.audio_url || null;
+        if (firstAudioUrl && currUrl && currUrl !== firstAudioUrl) {
+          // Done: swap audio, clear regenerating state, and play from start
+          meta._audioSettled = true;
+          meta._readyAudioUrl = currUrl;
+          const transcript = data?.time_aligned_transcript ?? null;
+          meta._readyTranscript = transcript;
+          meta._readyTranscriptFlat = normalizeWordTimings(transcript || []);
+          this._swapAudioUrl(pageIndex, currUrl);
+
+          if (regenEl) {
+            regenEl.textContent = 'regenerate page’s audio';
+            regenEl.classList.remove('regenerating');
+            regenEl.style.pointerEvents = 'auto';
+            regenEl.style.opacity = '1';
+          }
+
+          // If this is the active page, start from the beginning
+          if (pageIndex === this.active) {
+            try {
+              this.seek(0);
+              await this.play();
+            } catch {}
+          }
+          return true;
+        }
+      } catch (e) {
+        // ignore and keep polling
+      }
+      return false;
+    };
+
+    // Poll every 5 seconds until changed
+    const poll = setInterval(async () => {
+      const changed = await checkChanged();
+      if (changed) clearInterval(poll);
+    }, 5000);
+  }
+
+  /* ---------- scaffolding ---------- */
   async _buildScaffolding() {
+    this._ensureGlobalOverlayPageDetails();
+
     let main = document.querySelector('.mainContainer');
     if (!main) { main = document.createElement('div'); main.className = 'mainContainer'; document.body.appendChild(main); }
     this._container = main;
+
+    // Ensure "scroll to playhead" button exists
+    this._ensureScrollToPlayhead();
 
     for (let i = 0; i < this.pageMeta.length; i++) {
       const meta = this.pageMeta[i];
       const pageId = slugify(meta.pageKey || `page-${meta.page_number}-${i}`);
 
-      // CHANGED: use a DIV to host real HTML (keeps incoming headings/images/lists valid)
+      // page wrapper
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pageWrapper';
+      wrapper.id = `pageWrapper-${pageId}`;
+
+      // per-page header
+      const header = this._buildPerPageHeader(meta, i, pageId);
+      wrapper.appendChild(header);
+
+      // main content host
       const p = document.createElement('div');
       p.className = 'mainContent pageRemaining';
       p.dataset.pageId = pageId;
@@ -179,8 +329,10 @@ export default class MultiPageReader {
       meta._html = html;
       p.innerHTML = html;
 
+      wrapper.appendChild(p);
+
       if (i > 0) this._container.appendChild(document.createElement('hr'));
-      this._container.appendChild(p);
+      this._container.appendChild(wrapper);
     }
   }
 
@@ -270,14 +422,12 @@ export default class MultiPageReader {
       for (const e of entries) {
         if (e.isIntersecting) {
           const el = e.target;
-          // CHANGED: match any .mainContent (works for <div> or <p>)
           const all = [...this._container.querySelectorAll('.mainContent')];
           const i = all.indexOf(el);
           if (i >= 0 && !this.instances[i]) await this.hydratePage(i);
         }
       }
     }, { root: null, rootMargin, threshold: 0.01 });
-    // CHANGED: observe .mainContent
     this._container.querySelectorAll('.mainContent').forEach(p => this._io.observe(p));
   }
 
@@ -304,15 +454,13 @@ export default class MultiPageReader {
     this._setupGlobalControls();
     this._setupGlobalParagraphClickDelegation();
     this._setupIntersectionHydrator();
+
+    // NEW: watch scroll to toggle the "scroll to playhead" button
+    this._bindScrollWatcher();
+    this._updateScrollToPlayheadVisibility();
   }
 
-  // CHANGED: accept either <div.mainContent> or <p.mainContent>
   #pageEl(i) { return this._container?.querySelectorAll('.mainContent')[i] || null; }
-  #pageIdFor(i) {
-    const meta = this.pageMeta[i];
-    return slugify(meta.pageKey || `page-${meta.page_number}-${i}`);
-  }
-
   #applyPageStateClasses(activeIndex) {
     const N = this.pageMeta.length;
     for (let i = 0; i < N; i++) {
@@ -336,23 +484,40 @@ export default class MultiPageReader {
     this.#applyPageStateClasses(i);
     this._syncPlayButton(false);
 
-    // 🔁 Bind ReadAlong to the *active* page’s highlighter
+    // Bind ReadAlong to the active page’s highlighter
     (async () => {
       const sys = this.instances[i] || await this.hydratePage(i);
       try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch (e) { console.warn(e); }
     })();
+
+    // Refresh scroll-to-playhead visibility on active change
+    this._updateScrollToPlayheadVisibility();
 
     if (prev !== i) this._emitActiveChanged(i);
   }
 
   getActive() { return this.active; }
 
+  /* ---------- helper: toggle spinner on paragraph chips ---------- */
+  _setParagraphChipLoading(pageIndex, paragraphText, isLoading) {
+    const meta = this.pageMeta[pageIndex]; if (!meta) return;
+    const pageId = slugify(meta.pageKey || `page-${meta.page_number}-${pageIndex}`);
+    const pageEl = document.getElementById(`mainContent-${pageId}`);
+    if (!pageEl) return;
+    const chips = pageEl.querySelectorAll('.paragraph-hover-nav');
+    chips.forEach(chip => {
+      if (paragraphText && chip.dataset.paragraphText !== paragraphText) return;
+      chip.classList.toggle('loading', !!isLoading);
+      const icon = chip.querySelector('i');
+      if (icon) icon.className = isLoading ? 'ph ph-spinner' : 'ph ph-play';
+    });
+  }
+
   /* ---------- AUDIO API polling / swap ---------- */
   async _awaitReadyAudioAndTranscript(i, { pollGeneratingMs = 5000, pollQueuedMs = 5000 } = {}) {
     const meta = this.pageMeta[i];
     if (!meta) return null;
-    if (!this.audioApiBase || !this.userBookId) { console.warn('⚠️ Missing audio API base or userBookId.'); return null;
-    }
+    if (!this.audioApiBase || !this.userBookId) { console.warn('⚠️ Missing audio API base or userBookId.'); return null; }
     if (meta._audioSettled && meta._readyAudioUrl) return meta._readyAudioUrl;
     if (meta._polling) return null;
     meta._polling = true;
@@ -408,38 +573,10 @@ export default class MultiPageReader {
     } catch (e) { console.error('audio swap error:', e); }
   }
 
-  /* ---------- chip loading helpers ---------- */
-  _setParagraphChipLoading(pageIndex, paragraphText, loading, chipEl = null) {
-    try {
-      let targetChip = chipEl;
-      if (!targetChip) {
-        // find by page id + paragraph text
-        const pageId = this.#pageIdFor(pageIndex);
-        const container = this._container?.querySelector(`#mainContent-${pageId}`);
-        if (container) {
-          const candidates = container.querySelectorAll('.paragraph-hover-nav');
-          for (const c of candidates) {
-            if ((c.dataset?.paragraphText || '') === (paragraphText || '')) { targetChip = c; break; }
-          }
-        }
-      }
-      if (!targetChip) return;
-
-      if (loading) {
-        targetChip.classList.add('loading');
-        targetChip.innerHTML = '<i class="ph ph-spinner"></i>';
-      } else {
-        targetChip.classList.remove('loading');
-        targetChip.innerHTML = '<i class="ph ph-play"></i>';
-      }
-    } catch {}
-  }
-
   /* ---------- transport ---------- */
   async play() {
     if (this.active < 0) return;
 
-    // Bind ReadAlong to the currently active page (belt-and-suspenders)
     try {
       const sys = this.instances[this.active] || await this.hydratePage(this.active);
       ReadAlong.get().rebindHighlighter(sys.highlighter);
@@ -549,7 +686,6 @@ export default class MultiPageReader {
 
     await this.ensureAudioReady(index);
 
-    // Rebind on jump too (consistency)
     try { ReadAlong.get().rebindHighlighter(this.instances[index].highlighter); } catch {}
 
     if (play) await this.play();
@@ -557,11 +693,13 @@ export default class MultiPageReader {
     await this._prefetchAround(index);
   }
 
-  async jumpToParagraph(pageIndex, paragraphText, { minProbability = 0.35, play = true, chipEl = null } = {}) {
+  async jumpToParagraph(pageIndex, paragraphText, { minProbability = 0.35, play = true } = {}) {
     if (pageIndex < 0 || pageIndex >= this.pageMeta.length) return;
     this.setActive(pageIndex);
     this._stopProgressTimer();
 
+    // Chip spinner ON for this paragraph
+    this._setParagraphChipLoading(pageIndex, paragraphText, true);
     if (play) { this._isLoadingActiveAudio = true; this._autoplayOnReady = true; this._syncPlayButton(true, { loading: true, paragraphText }); }
 
     const meta = this.pageMeta[pageIndex];
@@ -569,48 +707,42 @@ export default class MultiPageReader {
       !!this.instances[pageIndex]?.audioCore &&
       this.instances[pageIndex].audioCore.audioFile === meta._readyAudioUrl;
 
-    // 🔄 show spinner on the specific paragraph chip only when we actually need to fetch
-    if (!alreadySettled) this._setParagraphChipLoading(pageIndex, paragraphText, true, chipEl);
-
-    try {
-      if (!alreadySettled) {
-        const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
-        if (url) this._swapAudioUrl(pageIndex, url);
-      }
-
-      await this.ensureAudioReady(pageIndex);
-      const sys = this.instances[pageIndex];
-
-      const flat = this.pageMeta[pageIndex]?._readyTranscriptFlat;
-      if (Array.isArray(flat) && flat.length) {
-        try {
-          if (typeof sys.textProcessor.ingestWordTimingsFromBackend === 'function')      await sys.textProcessor.ingestWordTimingsFromBackend(flat);
-          else if (typeof sys.textProcessor.ingestWordTimings === 'function')            await sys.textProcessor.ingestWordTimings(flat);
-          else if (typeof sys.textProcessor.setWordTimings === 'function')               sys.textProcessor.setWordTimings(flat);
-          else { sys.textProcessor.wordTimings = flat; sys.textProcessor._wordTimings = flat; sys.refreshParagraphNavigation?.(); }
-        } catch (e) { console.warn('timings ingest failed; will still attempt seek:', e); }
-      }
-
-      // Rebind here too to guarantee RA tracks this page for the jump
-      try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch {}
-
-      const seekRes = await sys.seekToParagraph(paragraphText, { minProbability });
-      if (play) {
-        for (let k = 0; k < this.instances.length; k++) { if (k !== pageIndex) this.instances[k]?.audioCore?.pauseAudio?.(); }
-        await sys.play();
-        this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(true, { paragraphText });
-        this._startProgressTimer();
-      } else {
-        this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false, { paragraphText });
-      }
-
-      this._saveLastPlayedCookie(pageIndex, this.getCurrentTime());
-      await this._prefetchAround(pageIndex);
-      return seekRes;
-    } finally {
-      // ✅ always clear spinner after polling completes (success or failure)
-      if (!alreadySettled) this._setParagraphChipLoading(pageIndex, paragraphText, false, chipEl);
+    if (!alreadySettled) {
+      const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+      if (url) this._swapAudioUrl(pageIndex, url);
     }
+
+    await this.ensureAudioReady(pageIndex);
+    const sys = this.instances[pageIndex];
+
+    const flat = this.pageMeta[pageIndex]?._readyTranscriptFlat;
+    if (Array.isArray(flat) && flat.length) {
+      try {
+        if (typeof sys.textProcessor.ingestWordTimingsFromBackend === 'function')      await sys.textProcessor.ingestWordTimingsFromBackend(flat);
+        else if (typeof sys.textProcessor.ingestWordTimings === 'function')            await sys.textProcessor.ingestWordTimings(flat);
+        else if (typeof sys.textProcessor.setWordTimings === 'function')               sys.textProcessor.setWordTimings(flat);
+        else { sys.textProcessor.wordTimings = flat; sys.textProcessor._wordTimings = flat; sys.refreshParagraphNavigation?.(); }
+      } catch (e) { console.warn('timings ingest failed; will still attempt seek:', e); }
+    }
+
+    try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch {}
+
+    const seekRes = await sys.seekToParagraph(paragraphText, { minProbability });
+    if (play) {
+      for (let k = 0; k < this.instances.length; k++) { if (k !== pageIndex) this.instances[k]?.audioCore?.pauseAudio?.(); }
+      await sys.play();
+      this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(true, { paragraphText });
+      this._startProgressTimer();
+    } else {
+      this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false, { paragraphText });
+    }
+
+    // Chip spinner OFF
+    this._setParagraphChipLoading(pageIndex, paragraphText, false);
+
+    this._saveLastPlayedCookie(pageIndex, this.getCurrentTime());
+    await this._prefetchAround(pageIndex);
+    return seekRes;
   }
 
   _setupGlobalParagraphClickDelegation() {
@@ -623,26 +755,16 @@ export default class MultiPageReader {
       const paraText = chip.dataset?.paragraphText;
       if (!pageId || !paraText) return;
 
-      // CHANGED: match any .mainContent
       const all = [...this._container.querySelectorAll('.mainContent')];
       const pageIndex = all.findIndex(p => p.id === `mainContent-${pageId}`);
       if (pageIndex === -1) return;
 
       e.preventDefault(); e.stopPropagation();
-
-      // show spinner immediately on the clicked chip (and transport shows "loading" too)
-      this._setParagraphChipLoading(pageIndex, paraText, true, chip);
-
+      // show spinner on the clicked chip immediately
+      this._setParagraphChipLoading(pageIndex, paraText, true);
       this._isLoadingActiveAudio = true; this._autoplayOnReady = true; this._syncPlayButton(true, { loading: true, paragraphText: paraText });
-
-      try {
-        await this.jumpToParagraph(pageIndex, paraText, { minProbability: 0.35, play: true, chipEl: chip });
-      } catch (err) {
-        console.error('jumpToParagraph error:', err);
-      } finally {
-        // jumpToParagraph has a finally that also clears, but keep this as belt-and-suspenders
-        this._setParagraphChipLoading(pageIndex, paraText, false, chip);
-      }
+      await this.jumpToParagraph(pageIndex, paraText, { minProbability: 0.35, play: true });
+      // jumpToParagraph turns the spinner off when ready
     }, { capture: true });
     this._paragraphClicksBound = true;
   }
@@ -699,9 +821,82 @@ export default class MultiPageReader {
     this._controlsBound = true;
   }
 
+  /* ---------- Scroll to playhead button ---------- */
+  _ensureScrollToPlayhead() {
+    if (this._scrollToPlayheadBtn) return;
+    const btn = document.createElement('button');
+    btn.className = 'scrollToPlayhead';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'Scroll to current page');
+    btn.textContent = 'Scroll to playhead';
+
+    // Minimal inline styling (you can theme in CSS later)
+    Object.assign(btn.style, {
+      position: 'fixed',
+      left: '50%',
+      bottom: '100px',
+      zIndex: '9999',
+      padding: '10px 12px',
+      borderRadius: '9999px',
+      border: '0',
+      background: '#111',
+      color: '#fff',
+      font: '500 13px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+      cursor: 'pointer',
+      display: 'none'
+    });
+
+    btn.addEventListener('click', () => {
+      this._scrollActivePageIntoView(true);
+    });
+
+    document.body.appendChild(btn);
+    this._scrollToPlayheadBtn = btn;
+  }
+
+  _bindScrollWatcher() {
+    if (this._scrollWatchBound) return;
+    this._onScrollWatch = () => this._updateScrollToPlayheadVisibility();
+    this._onResizeWatch = () => this._updateScrollToPlayheadVisibility();
+    window.addEventListener('scroll', this._onScrollWatch, { passive: true });
+    window.addEventListener('resize', this._onResizeWatch);
+    this._scrollWatchBound = true;
+  }
+
+  _updateScrollToPlayheadVisibility() {
+    if (!this._scrollToPlayheadBtn || !this._container) return;
+    const pages = [...this._container.querySelectorAll('.mainContent')];
+    if (!pages.length || this.active < 0) {
+      this._scrollToPlayheadBtn.style.display = 'none';
+      return;
+    }
+
+    // Find the page nearest the viewport center
+    const viewportCenter = window.innerHeight / 2;
+    let bestIdx = 0;
+    let bestDist = Infinity;
+
+    for (let i = 0; i < pages.length; i++) {
+      const r = pages[i].getBoundingClientRect();
+      const pageCenter = r.top + r.height / 2;
+      const dist = Math.abs(pageCenter - viewportCenter);
+      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    }
+
+    // Show button if user is >= 2 pages away from the active page
+    const far = Math.abs(bestIdx - this.active) >= 1;
+    this._scrollToPlayheadBtn.style.display = far ? 'inline-flex' : 'none';
+  }
+
   destroy() {
     if (this._io) { try { this._io.disconnect(); } catch {} }
     this._stopProgressTimer();
+    if (this._scrollWatchBound) {
+      window.removeEventListener('scroll', this._onScrollWatch);
+      window.removeEventListener('resize', this._onResizeWatch);
+      this._scrollWatchBound = false;
+    }
     for (const sys of this.instances) { try { sys?.destroy?.(); } catch (e) { console.error('Destroy error:', e); } }
     this.instances = [];
     this.active = -1;
