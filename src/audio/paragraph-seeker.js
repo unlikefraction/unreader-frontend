@@ -1,3 +1,5 @@
+// ----paragraph-seeker.js-----
+
 import { commonVars } from '../common-vars.js';
 
 export class ParagraphSeeker {
@@ -9,7 +11,7 @@ export class ParagraphSeeker {
     {
       minProbabilityThreshold = 0.4,
       contextWindow = 15,
-      cleanPattern = /[^\p{L}\p{N}’']/gu   // Unicode-aware punctuation stripper
+      cleanPattern = /[^\w\s]/g
     } = {}
   ) {
     this.textProcessor = textProcessor;
@@ -18,11 +20,13 @@ export class ParagraphSeeker {
     this.contextWindow = contextWindow;
     this.cleanPattern = cleanPattern;
 
+    // respect edit mode for selection
     document.body.style.userSelect = commonVars.beingEdited ? 'none' : '';
 
     this._lastToolActive = commonVars.toolActive;
     this._lastBeingEdited = commonVars.beingEdited;
 
+    // watch global tool/edit switches and refresh paragraph hover UI when needed
     this._stateInterval = setInterval(() => {
       const { toolActive, beingEdited } = commonVars;
 
@@ -37,12 +41,15 @@ export class ParagraphSeeker {
       }
     }, 100);
 
+    // Re-enable hover areas after selection attempts
     if (!ParagraphSeeker._mouseListenersAdded) {
-      document.addEventListener('mouseup', () => {
+      const reenable = () => {
         document.querySelectorAll('.paragraph-hover-area').forEach(area => {
-          area.style.pointerEvents = 'auto';
+          area.style.pointerEvents = commonVars.beingEdited ? 'none' : 'auto';
         });
-      });
+      };
+      document.addEventListener('mouseup', reenable);
+      document.addEventListener('touchend', reenable, { passive: true });
       ParagraphSeeker._mouseListenersAdded = true;
     }
   }
@@ -51,9 +58,8 @@ export class ParagraphSeeker {
 
   preprocessText(inputText) {
     return inputText
-      .toLocaleLowerCase()
-      .normalize('NFKC')
-      .replace(this.cleanPattern, ' ')
+      .toLowerCase()
+      .replace(this.cleanPattern, '')
       .split(/\s+/)
       .filter(Boolean);
   }
@@ -116,7 +122,7 @@ export class ParagraphSeeker {
   getAudioContext(idx) {
     const timings = this.textProcessor.wordTimings;
     const from = Math.max(0, idx - this.contextWindow);
-    const to = Math.min(timings.length, idx + this.contextWindow);
+       const to = Math.min(timings.length, idx + this.contextWindow);
     const ctx = [];
     for (let i = from; i < to; i++) {
       const w = timings[i].word.toLowerCase().replace(this.cleanPattern, '');
@@ -166,7 +172,7 @@ export class ParagraphSeeker {
     }
 
     this.audioCore.sound?.seek(timing.time_start);
-    if (log) printl(`Seeked to ${timing.time_start}s`);
+    if (log) printl?.(`Seeked to ${timing.time_start}s`);
     return { success: true, timestamp: timing.time_start, match, timing };
   }
 
@@ -180,60 +186,91 @@ export class ParagraphSeeker {
     return results;
   }
 
-  // ---------- paragraph detection on real HTML ----------
+  // ---------- paragraph detection (HTML-preserving) ----------
 
+  /** block-ish displays we treat as paragraph hosts */
+  _isBlockish(el) {
+    try {
+      const display = getComputedStyle(el).display;
+      if (display === 'block' || display === 'list-item' || display === 'table' ||
+          display === 'table-row' || display === 'table-cell' ||
+          display === 'grid' || display === 'flex') return true;
+    } catch {}
+    // fallback by tag (covers <p>, headings, li, blockquote, pre, div, section, article, aside)
+    const tag = el.tagName;
+    return /^(P|H[1-6]|LI|BLOCKQUOTE|PRE|DIV|SECTION|ARTICLE|ASIDE|HEADER|FOOTER|MAIN|NAV|DD|DT|FIGCAPTION|ADDRESS)$/.test(tag);
+  }
+
+  _closestParagraphHost(spanEl, stopAt) {
+    let n = spanEl?.parentElement || null;
+    while (n && n !== stopAt) {
+      if (this._isBlockish(n)) return n;
+      n = n.parentElement;
+    }
+    return stopAt || null;
+  }
+
+  /**
+   * Build paragraph boundaries by grouping contiguous word spans under the same
+   * block-level ancestor. This works for real HTML (<p>, <li>, headings, etc.).
+   */
   findParagraphBoundaries() {
     const main = this.textProcessor?.container;
     if (!main) return [];
+    const spans = this.textProcessor.wordSpans || [];
     const paras = [];
 
-    const BLOCK_QUERY = [
-      'p','li','blockquote','pre','figcaption','dt','dd',
-      'h1','h2','h3','h4','h5','h6','article','section'
-    ].join(',');
+    let curHost = null;
+    let para = { start: 0, end: 0, text: '', elements: [] };
+    let idx = 0;
 
-    const blocks = main.querySelectorAll(BLOCK_QUERY);
+    for (let i = 0; i < spans.length; i++) {
+      const w = spans[i];
+      if (!w?.isConnected) continue;
+      const host = this._closestParagraphHost(w, main) || main;
 
-    blocks.forEach((blk) => {
-      const words = blk.querySelectorAll('span.word');
-      if (!words.length) return;
+      // start a new paragraph when host changes
+      if (host !== curHost && para.elements.length) {
+        para.end = idx - 1;
+        paras.push({ ...para });
+        para = { start: idx, end: idx, text: '', elements: [] };
+      }
 
-      const first = words[0];
-      const last  = words[words.length - 1];
-
-      const start = Number(first.dataset.index);
-      const end   = Number(last.dataset.index);
-      const text  = [...words].map(w => w.textContent).join(' ').trim();
-
-      paras.push({ start, end, text, elements: [...words] });
-    });
-
-    if (!paras.length && this.textProcessor?.wordSpans?.length) {
-      const ws = this.textProcessor.wordSpans;
-      paras.push({
-        start: 0, end: ws.length - 1,
-        text: ws.map(w => w.textContent).join(' ').trim(),
-        elements: [...ws]
-      });
+      curHost = host;
+      para.text += w.textContent + ' ';
+      para.elements.push(w);
+      idx++;
     }
 
+    if (para.elements.length) {
+      para.end = idx - 1;
+      paras.push(para);
+    }
+
+    if (!paras.length) {
+      printl?.('⚠️ ParagraphSeeker: no paragraph boundaries found');
+    } else {
+      printl?.(`🧭 ParagraphSeeker: found ${paras.length} paragraph(s)`);
+    }
     return paras;
   }
 
   extractParagraphs() {
-    return this.findParagraphBoundaries().map(p => p.text);
+    return this.findParagraphBoundaries().map(p => p.text.trim()).filter(Boolean);
   }
 
-  // ---------- paragraph hover UI (unchanged, uses boundaries) ----------
+  // ---------- paragraph hover UI (container-scoped, multi-page safe) ----------
 
   setupParagraphHoverNavigation() {
     const main = this.textProcessor?.container;
     if (!main) return;
 
+    // ensure relative positioning so our absolute children are local to this page only
     if (getComputedStyle(main).position === 'static') {
       main.style.position = 'relative';
     }
 
+    // remove only *this page's* hover UI
     main.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
 
     this.findParagraphBoundaries().forEach((p, i) => this.setupParagraphHover(p, i));
@@ -247,26 +284,29 @@ export class ParagraphSeeker {
 
     const first = paragraph.elements[0];
 
+    // Invisible hit area spanning the paragraph block (within this page only)
     const hoverArea = document.createElement('div');
     Object.assign(hoverArea.style, {
       position: 'absolute',
       zIndex: 1,
       background: 'transparent',
-      pointerEvents: commonVars.toolActive && !commonVars.beingEdited ? 'auto' : 'none',
+      // make it hoverable immediately unless actively editing
+      pointerEvents: commonVars.beingEdited ? 'none' : 'auto',
       cursor: commonVars.toolActive ? 'crossbow' : 'text'
     });
     hoverArea.className = 'paragraph-hover-area';
-    hoverArea.dataset.pageId = this.textProcessor.pageId;
+    hoverArea.dataset.pageId = this.textProcessor.pageId; // scope tagging
 
     main.appendChild(hoverArea);
     this.updateHoverAreaPosition(hoverArea, paragraph);
 
-    hoverArea.addEventListener('mousedown', () => {
-      if (!commonVars.toolActive || commonVars.beingEdited) {
-        hoverArea.style.pointerEvents = 'none';
-      }
-    });
+    // When user presses to select text, let the real content take the events.
+    // We flip pointer events OFF on down; global mouseup/touchend flips it back ON.
+    const dropThrough = () => { hoverArea.style.pointerEvents = 'none'; };
+    hoverArea.addEventListener('mousedown', dropThrough);
+    hoverArea.addEventListener('touchstart', dropThrough, { passive: true });
 
+    // Visible “play” chip
     const hoverDiv = document.createElement('div');
     hoverDiv.className = 'paragraph-hover-nav';
     Object.assign(hoverDiv.style, {
@@ -280,9 +320,12 @@ export class ParagraphSeeker {
 
     hoverDiv.innerHTML = '<i class="ph ph-play"></i>';
     hoverDiv.dataset.paragraphIndex = index;
+
+    // 🔑 carry page + full paragraph text for the orchestrator
     hoverDiv.dataset.pageId = this.textProcessor.pageId;
     hoverDiv.dataset.paragraphText = paragraph.text.trim();
 
+    // hover show/hide
     hoverArea.addEventListener('mouseenter', () => this.showHoverDiv(hoverDiv, first, paragraph));
     hoverArea.addEventListener('mouseleave', e => {
       if (!hoverDiv.contains(e.relatedTarget)) this.hideHoverDiv(hoverDiv);
@@ -292,6 +335,7 @@ export class ParagraphSeeker {
       if (!hoverArea.contains(e.relatedTarget)) this.hideHoverDiv(hoverDiv);
     });
 
+    // local click (still works single-page); reader will also intercept globally
     hoverDiv.addEventListener('click', async e => {
       e.preventDefault();
       if (commonVars.beingEdited) return;
@@ -312,6 +356,7 @@ export class ParagraphSeeker {
     const lastRect = paragraph.elements[paragraph.elements.length - 1].getBoundingClientRect();
     const containerRect = main.getBoundingClientRect();
 
+    // position relative to the page container
     const left = Math.min(firstRect.left, lastRect.left) - containerRect.left - 25;
     const top = Math.min(firstRect.top, lastRect.top) - containerRect.top;
     const height = Math.max(firstRect.bottom, lastRect.bottom) - firstRect.top;
@@ -382,6 +427,8 @@ export class ParagraphSeeker {
     this.enableParagraphNavigation();
   }
 
+  // ---------- tuning ----------
+
   setMinProbabilityThreshold(threshold) {
     this.minProbabilityThreshold = Math.min(1, Math.max(0, threshold));
     printl?.(`📊 Min probability threshold set to: ${this.minProbabilityThreshold}`);
@@ -392,6 +439,7 @@ export class ParagraphSeeker {
     printl?.(`🔍 Context window set to: ${this.contextWindow} words`);
   }
 
+  // ---------- cleanup ----------
   destroy() {
     clearInterval(this._stateInterval);
     this.disableParagraphNavigation();

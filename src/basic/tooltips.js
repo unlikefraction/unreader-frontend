@@ -12,7 +12,6 @@ const tools = {
     ".rectangle": ["Rectangle", "R", "right"],
     ".circle": ["Circle", "O", "right"],
     ".inbox": ["Inbox", null, "right"],
-    ".bookDetails": ["Book Details", null, "right"],
   
     ".settings": ["Settings", null, "top"],
     ".rewind": ["Rewind", "←", "top"],

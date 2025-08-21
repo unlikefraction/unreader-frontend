@@ -175,17 +175,14 @@ if (linkEl) linkEl.href = chosenHref;
     }
   });
 
-  /* === LOGIN-GATE: disable .hold-up, .inbox, .bookDetails with tooltip + redirect === */
+  /* === LOGIN-GATE: disable .hold-up, .inbox with tooltip + redirect (per-element messages) === */
 
-  // You can set per-selector tooltip placements here (top/right/left/bottom)
-  // This affects both **position** and appends the direction to the **text**.
+  // Per-selector config: selector, tooltip position, and custom message
   const GATED_CONFIG = [
-    { sel: '.hold-up',     pos: 'top' },
-    { sel: '.inbox',       pos: 'right' },
-    { sel: '.bookDetails', pos: 'right' },
+    { sel: '.hold-up', pos: 'top',   message: 'Holdup can be accessed with books. Login to experience.' },
+    { sel: '.inbox',   pos: 'right', message: 'Login to use your inbox.' },
   ];
 
-  const LOGIN_MESSAGE = "Login to use this feature";
   const GAP = 6, PAD = 6, RADIUS = 4;
   const SHOW_POSITION_IN_TEXT = false; // append (top/right/left/bottom) to the text
 
@@ -209,17 +206,17 @@ if (linkEl) linkEl.href = chosenHref;
     return el;
   }
 
-  // Hide any existing .tooltip when hovering gated features (your request)
+  // Hide any existing .tooltip when hovering gated features
   function hideNativeTooltips() {
     document.querySelectorAll('.tooltip').forEach(t => {
       t.style.visibility = 'hidden';
     });
   }
 
-  function setLoginTooltipText(position) {
+  function setLoginTooltipText(message, position) {
     if (!loginTooltipEl) return;
     const label = (SHOW_POSITION_IN_TEXT && position) ? ` (${position})` : "";
-    loginTooltipEl.textContent = LOGIN_MESSAGE + label;
+    loginTooltipEl.textContent = message + label;
   }
 
   function positionLoginTooltip(target, position = "top") {
@@ -260,10 +257,10 @@ if (linkEl) linkEl.href = chosenHref;
     loginTooltipEl.style.top = `${Math.round(top)}px`;
   }
 
-  function showLoginTooltip(target, position = "top") {
+  function showLoginTooltip(target, message, position = "top") {
     if (!loginTooltipEl) loginTooltipEl = createLoginTooltip();
-    hideNativeTooltips(); // hide .tooltip on hover as requested
-    setLoginTooltipText(position);
+    hideNativeTooltips(); // hide .tooltip on hover
+    setLoginTooltipText(message, position);
 
     // measurable
     loginTooltipEl.style.visibility = "hidden";
@@ -281,12 +278,12 @@ if (linkEl) linkEl.href = chosenHref;
     el.setAttribute("aria-disabled", "true");
     el.style.cursor = "pointer";
     if (!el.dataset._dimApplied) {
-      el.style.opacity = (parseFloat(getComputedStyle(el).opacity) || 1) * 0.7;
+      // el.style.opacity = (parseFloat(getComputedStyle(el).opacity) || 1) * 0.7;
       el.dataset._dimApplied = "1";
     }
   }
 
-  function gateElement(el, pos) {
+  function gateElement(el, pos, message) {
     if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "0");
     makeElementLookDisabled(el);
 
@@ -301,9 +298,9 @@ if (linkEl) linkEl.href = chosenHref;
       if (e.key === "Enter" || e.key === " ") go(e);
     });
 
-    el.addEventListener("mouseenter", () => showLoginTooltip(el, pos));
+    el.addEventListener("mouseenter", () => showLoginTooltip(el, message, pos));
     el.addEventListener("mouseleave", hideLoginTooltip);
-    el.addEventListener("focus", () => showLoginTooltip(el, pos));
+    el.addEventListener("focus", () => showLoginTooltip(el, message, pos));
     el.addEventListener("blur", hideLoginTooltip);
 
     window.addEventListener("scroll", hideLoginTooltip, { passive: true });
@@ -311,8 +308,8 @@ if (linkEl) linkEl.href = chosenHref;
   }
 
   function initLoginGate() {
-    GATED_CONFIG.forEach(({ sel, pos }) => {
-      document.querySelectorAll(sel).forEach((el) => gateElement(el, pos || "top"));
+    GATED_CONFIG.forEach(({ sel, pos, message }) => {
+      document.querySelectorAll(sel).forEach((el) => gateElement(el, pos || "top", message));
     });
   }
 
