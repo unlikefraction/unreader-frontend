@@ -1,11 +1,28 @@
 // --------selection.js--------
 
-
 import { getZeroXPoint, getShapeBounds } from './utils.js';
 import { commonVars } from '../common-vars.js';
 
 export function initSelectionHandler(drawingTools) {
   let dragInfo = null;
+
+  // helpers for multi-canvas bands
+  function pickManagerByY(dt, y) {
+    const list = dt.canvasManagers && dt.canvasManagers.length ? dt.canvasManagers : (dt.canvasManager ? [dt.canvasManager] : []);
+    if (!list.length) return null;
+    let chosen = list[0];
+    for (const m of list) {
+      const top = m.topOffset;
+      const bottom = top + (m.height || m.drawCanvas?.height || 0);
+      if (y >= top && y <= bottom) return m;
+      if (y > bottom) chosen = m;
+    }
+    return chosen;
+  }
+  function clearAllPreviews(dt) {
+    const list = dt.canvasManagers && dt.canvasManagers.length ? dt.canvasManagers : (dt.canvasManager ? [dt.canvasManager] : []);
+    list.forEach(m => m?.clearPreview());
+  }
 
   // Preload SVG handle
   const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><polyline points="80 104 32 152 80 200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M224,56a96,96,0,0,1-96,96H32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>`;
@@ -14,7 +31,7 @@ export function initSelectionHandler(drawingTools) {
   const HANDLE_SIZE = 24; // adjust size as needed
   const OFFSETX = 5;     // handle offset in px
   const OFFSETY = 7;     // handle offset in px
-  const EXTRA_ROT = -25 * Math.PI / 180; // extra 30deg
+  const EXTRA_ROT = -25 * Math.PI / 180; // extra rotation
 
   function drawPersistentHighlight() {
     const sel = drawingTools.selectedShape;
@@ -27,7 +44,8 @@ export function initSelectionHandler(drawingTools) {
     // Compute rotation pivot & local center
     let centerXLocal, centerYLocal;
     if (type === 'pencil' || type === 'highlighter') {
-      const pts = shape.points;
+      const pts = shape.points || [];
+      if (!pts.length) return;
       const sum = pts.reduce((acc, p) => {
         acc.x += p.xRel;
         acc.y += p.y;
@@ -39,8 +57,8 @@ export function initSelectionHandler(drawingTools) {
       centerXLocal = (bounds.minX + bounds.maxX) / 2;
       centerYLocal = (bounds.minY + bounds.maxY) / 2;
     }
-    const cx = zeroX + centerXLocal;
-    const cy = centerYLocal;
+    const cx = zeroX + centerXLocal; // page-space
+    const cy = centerYLocal;         // page-space
     const rot = ((shape.rotation || 0) * Math.PI) / 180;
 
     const width = bounds.maxX - bounds.minX;
@@ -48,7 +66,11 @@ export function initSelectionHandler(drawingTools) {
     const halfW = width / 2;
     const halfH = height / 2;
 
-    const ctx = drawingTools.canvasManager.previewCtx;
+    // choose the correct preview ctx by Y band
+    const mgr = pickManagerByY(drawingTools, cy) || drawingTools.canvasManager;
+    if (!mgr) return;
+    const ctx = mgr.previewCtx;
+
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(rot);
@@ -69,7 +91,7 @@ export function initSelectionHandler(drawingTools) {
       ctx.restore();
     } else {
       svgImg.onload = () => {
-        drawingTools.canvasManager.clearPreview();
+        clearAllPreviews(drawingTools);
         drawingTools.redrawAll();
         drawPersistentHighlight();
       };
@@ -77,7 +99,7 @@ export function initSelectionHandler(drawingTools) {
 
     ctx.restore();
 
-    // Store handle region for hit-testing
+    // Store handle region for hit-testing (page-space center + local rect)
     drawingTools.selectedShape.handle = {
       cx,
       cy,
@@ -88,15 +110,18 @@ export function initSelectionHandler(drawingTools) {
     };
   }
 
-  function getLocalCoords(e) {
-    const canvas = drawingTools.canvasManager.previewCtx.canvas;
-    const rect = canvas.getBoundingClientRect();
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  // Use page-space coords since our canvases translate to page space
+  function getPageCoords(e) {
+    return { x: e.pageX, y: e.pageY };
   }
 
   document.addEventListener('mousedown', e => {
     if (commonVars.toolActive !== false) return;
-    const { x, y } = getLocalCoords(e);
+
+    // bind the appropriate canvas manager for this event
+    drawingTools._bindManagerForEvent?.(e);
+
+    const { x, y } = getPageCoords(e);
     let hit = null;
     dragInfo = null;
 
@@ -131,8 +156,8 @@ export function initSelectionHandler(drawingTools) {
           const shape = list[i];
           const bounds = getShapeBounds(typeKey, shape);
           const zeroXInner = getZeroXPoint();
-          const cxShape = zeroXInner + (bounds.minX + bounds.maxX) / 2;
-          const cyShape = (bounds.minY + bounds.maxY) / 2;
+          const cxShape = zeroXInner + (bounds.minX + bounds.maxX) / 2; // page-space
+          const cyShape = (bounds.minY + bounds.maxY) / 2;              // page-space
           const rotInv = -((shape.rotation || 0) * Math.PI / 180);
           const dx = x - cxShape;
           const dy = y - cyShape;
@@ -167,14 +192,18 @@ export function initSelectionHandler(drawingTools) {
       commonVars.beingEdited = false;
     }
 
-    drawingTools.canvasManager.clearPreview();
+    clearAllPreviews(drawingTools);
     drawingTools.redrawAll();
     drawPersistentHighlight();
   });
 
   document.addEventListener('mousemove', e => {
     if (!dragInfo) return;
-    const { x, y } = getLocalCoords(e);
+
+    // keep manager selection in sync while dragging
+    drawingTools._bindManagerForEvent?.(e);
+
+    const { x, y } = getPageCoords(e);
     const { mode, type: moveType, index } = dragInfo;
     const shape = drawingTools.shapesData[moveType][index];
 
@@ -200,7 +229,7 @@ export function initSelectionHandler(drawingTools) {
       shape.rotation = dragInfo.origRot + (ang - dragInfo.startAng) * 180 / Math.PI;
     }
 
-    drawingTools.canvasManager.clearPreview();
+    clearAllPreviews(drawingTools);
     drawingTools.redrawAll();
     drawPersistentHighlight();
   });
@@ -209,7 +238,7 @@ export function initSelectionHandler(drawingTools) {
     if (!dragInfo) return;
     drawingTools.save();
     dragInfo = null;
-    drawingTools.canvasManager.clearPreview();
+    clearAllPreviews(drawingTools);
     drawingTools.redrawAll();
     drawPersistentHighlight();
   });
@@ -221,7 +250,7 @@ export function initSelectionHandler(drawingTools) {
       drawingTools.shapesData[delType].splice(delIdx, 1);
       drawingTools.selectedShape = null;
       commonVars.beingEdited = false;
-      drawingTools.canvasManager.clearPreview();
+      clearAllPreviews(drawingTools);
       drawingTools.redrawAll();
       drawingTools.save();
       e.preventDefault();
