@@ -1,5 +1,3 @@
-// --------selection.js--------
-
 import { getZeroXPoint, getShapeBounds } from './utils.js';
 import { commonVars } from '../common-vars.js';
 
@@ -8,11 +6,15 @@ export function initSelectionHandler(drawingTools) {
 
   // helpers for multi-canvas bands
   function pickManagerByY(dt, y) {
-    const list = dt.canvasManagers && dt.canvasManagers.length ? dt.canvasManagers : (dt.canvasManager ? [dt.canvasManager] : []);
+    const list = dt.canvasManagers && dt.canvasManagers.length
+      ? dt.canvasManagers
+      : (dt.canvasManager ? [dt.canvasManager] : []);
     if (!list.length) return null;
+
     let chosen = list[0];
     for (const m of list) {
-      const top = m.topOffset;
+      // USE ABSOLUTE TOP; fallback to topOffset if needed
+      const top = (typeof m._absTop === 'number') ? m._absTop : (m.topOffset || 0);
       const bottom = top + (m.height || m.drawCanvas?.height || 0);
       if (y >= top && y <= bottom) return m;
       if (y > bottom) chosen = m;
@@ -20,7 +22,9 @@ export function initSelectionHandler(drawingTools) {
     return chosen;
   }
   function clearAllPreviews(dt) {
-    const list = dt.canvasManagers && dt.canvasManagers.length ? dt.canvasManagers : (dt.canvasManager ? [dt.canvasManager] : []);
+    const list = dt.canvasManagers && dt.canvasManagers.length
+      ? dt.canvasManagers
+      : (dt.canvasManager ? [dt.canvasManager] : []);
     list.forEach(m => m?.clearPreview());
   }
 
@@ -66,12 +70,13 @@ export function initSelectionHandler(drawingTools) {
     const halfW = width / 2;
     const halfH = height / 2;
 
-    // choose the correct preview ctx by Y band
+    // choose the correct preview ctx by Y band (ABSOLUTE)
     const mgr = pickManagerByY(drawingTools, cy) || drawingTools.canvasManager;
     if (!mgr) return;
     const ctx = mgr.previewCtx;
 
     ctx.save();
+    // IMPORTANT: contexts are already translated by -mgr._absTop in CanvasManager
     ctx.translate(cx, cy);
     ctx.rotate(rot);
     ctx.lineWidth = 1;
@@ -134,7 +139,7 @@ export function initSelectionHandler(drawingTools) {
       const invCos = Math.cos(-rot);
       const invSin = Math.sin(-rot);
       const lx = dx * invCos - dy * invSin;
-      const ly = dx * invSin + dy * Math.cos(-rot);
+      const ly = dx * invSin + dy * invCos;
       if (lx >= localX && lx <= localX + size && ly >= localY && ly <= localY + size) {
         dragInfo = {
           mode: 'rotate',

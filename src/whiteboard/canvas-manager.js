@@ -7,11 +7,12 @@ import rough from 'roughjs';
  */
 export class CanvasManager {
   constructor({ topOffset = 0, height = 0, bg = '' } = {}) {
-    this.topOffset = Math.max(0, topOffset | 0); // kept for compatibility (normalized if you want)
+    this.topOffset = Math.max(0, topOffset | 0); // kept for compatibility
     this.height = Math.max(0, height | 0);
     this.bg = bg;
 
-    this._absTop = this.topOffset; // absolute page Y used for CSS top
+    // absolute page Y used for CSS top and transform mapping
+    this._absTop = this.topOffset;
 
     this.drawCanvas = null;
     this.previewCanvas = null;
@@ -32,17 +33,26 @@ export class CanvasManager {
     this.drawCanvas = document.createElement('canvas');
     this.previewCanvas = document.createElement('canvas');
 
-    [this.drawCanvas, this.previewCanvas].forEach(c => {
-      Object.assign(c.style, {
-        position: 'absolute',
-        left: '0',
-        top: `${this._absTop}px`,
-        pointerEvents: 'none',
-        zIndex: '-1', // behind selectable DOM
-        background: this.bg || 'transparent'
-      });
-      document.body.appendChild(c);
+    // Draw layer below, preview layer above (both ABOVE the document)
+    Object.assign(this.drawCanvas.style, {
+      position: 'absolute',
+      left: '0',
+      top: `${this._absTop}px`,
+      pointerEvents: 'none',
+      zIndex: '1000',
+      background: this.bg || 'transparent'
     });
+    Object.assign(this.previewCanvas.style, {
+      position: 'absolute',
+      left: '0',
+      top: `${this._absTop}px`,
+      pointerEvents: 'none',
+      zIndex: '1001',
+      background: 'transparent'
+    });
+
+    document.body.appendChild(this.drawCanvas);
+    document.body.appendChild(this.previewCanvas);
 
     this.drawCtx = this.drawCanvas.getContext('2d');
     this.previewCtx = this.previewCanvas.getContext('2d');
@@ -50,6 +60,20 @@ export class CanvasManager {
     this.previewRough = rough.canvas(this.previewCanvas);
 
     this.sizeCanvases();
+  }
+
+  /** Map page-space (x, y_page) -> canvas-local by translating -_absTop on Y */
+  _applyPageSpaceTransform() {
+    if (!this.drawCtx || !this.previewCtx) return;
+
+    // reset to identity, then translate Y by -_absTop so page Y works directly
+    const apply = (ctx) => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.translate(0, -this._absTop);
+    };
+
+    apply(this.drawCtx);
+    apply(this.previewCtx);
   }
 
   /** Resize canvases to full document width and fixed band height */
@@ -65,6 +89,9 @@ export class CanvasManager {
       c.style.width = `${width}px`;
       c.style.height = `${this.height}px`;
     });
+
+    // after resizing, contexts reset; reapply mapping
+    this._applyPageSpaceTransform();
   }
 
   /** Legacy: update with normalized offset (kept for compatibility) */
@@ -88,12 +115,19 @@ export class CanvasManager {
 
   clearPreview() {
     if (!this.previewCtx) return;
+    // clear must ignore current transform, so temporarily reset to identity
+    this.previewCtx.save();
+    this.previewCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.previewCtx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+    this.previewCtx.restore();
   }
 
   clearDraw() {
     if (!this.drawCtx) return;
+    this.drawCtx.save();
+    this.drawCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.drawCtx.clearRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
+    this.drawCtx.restore();
   }
 
   destroy() {

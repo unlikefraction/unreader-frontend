@@ -5,6 +5,7 @@ import { getStroke } from 'perfect-freehand';
 /**
  * Renderer for drawing all shapes across multiple bands.
  * We always compare against ABSOLUTE top via mgr._absTop.
+ * Contexts are pre-translated in CanvasManager so we can draw in page-space.
  */
 export function redrawAll(drawingTools) {
   // Remove completed text editors
@@ -13,13 +14,8 @@ export function redrawAll(drawingTools) {
   // Resize & clear all draw canvases
   drawingTools.canvasManagers.forEach(mgr => {
     mgr.sizeCanvases();
-    // clear the whole canvas in canvas-local coords
-    if (mgr.drawCtx && mgr.drawCanvas) {
-      mgr.drawCtx.clearRect(0, 0, mgr.drawCanvas.width, mgr.drawCanvas.height);
-    }
-    if (mgr.previewCtx && mgr.previewCanvas) {
-      mgr.previewCtx.clearRect(0, 0, mgr.previewCanvas.width, mgr.previewCanvas.height);
-    }
+    if (mgr.drawCtx && mgr.drawCanvas) mgr.clearDraw();
+    if (mgr.previewCtx && mgr.previewCanvas) mgr.clearPreview();
   });
 
   const zeroX = getZeroXPoint();
@@ -59,7 +55,7 @@ export function redrawAll(drawingTools) {
 
     runDraw(id, mgr, (ctx) => {
       ctx.save();
-      ctx.translate(cx, cy);
+      ctx.translate(cx, cy); // page-space; CanvasManager maps Y to local
       ctx.rotate(rotRad);
       mgr.drawRough.rectangle(
         -w / 2, -h / 2,
@@ -193,7 +189,7 @@ export function redrawAll(drawingTools) {
 
     const xs = raw.map(r => r[0]);
     const cxRel = xs.reduce((a,b)=>a+b)/xs.length;
-    const cx = zeroX + cxRel;
+    const cx = getZeroXPoint() + cxRel;
     const rotRad = ((h.rotation || 0) * Math.PI) / 180;
     const stroke = getStroke(raw, h.options);
 
@@ -214,7 +210,7 @@ export function redrawAll(drawingTools) {
     });
   });
 
-  // TEXT overlay divs are page-absolute already; leave as-is
+  // TEXT overlay divs are page-absolute already; leave as-is (but keep on top)
   drawingTools.shapesData.text.forEach((t, i) => {
     const id = `text-${i}`;
     const bounds = getShapeBounds('text', t);
@@ -248,7 +244,7 @@ export function redrawAll(drawingTools) {
       whiteSpace: 'pre-wrap',
       background: 'transparent',
       color: t.color,
-      zIndex: '-1',
+      zIndex: '1002', // above both draw and preview
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
     });
     document.body.appendChild(div);
