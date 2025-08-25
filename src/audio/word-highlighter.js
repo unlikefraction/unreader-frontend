@@ -20,7 +20,7 @@ export class WordHighlighter {
     this.currentHighlightedWord = null;
 
     // NEW: probability threshold for painting
-    this.minProbability = 0.7;
+    this.minProbability = 0.8;
 
     // timers & perf
     this.highlightInterval = null;

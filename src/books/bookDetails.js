@@ -310,7 +310,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     if (oathImg && book.oath) {
       const oath = book.oath.toLowerCase();
       if (["fire_oath", "whisper_oath", "blood_oath"].includes(oath)) {
-        oathImg.src = `/assets/${oath.replace("_", "")}.png`;
+        oathImg.src = `/assets/${oath.replace("_", "")}.webp`;
       }
     }
 

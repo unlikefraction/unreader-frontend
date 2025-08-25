@@ -632,7 +632,7 @@ function renderOathCopy() {
   // oath image
   const oathKey = selectedOath.toLowerCase();
   if (["fire_oath", "whisper_oath", "blood_oath"].includes(oathKey)) {
-    oathImg.src = `/assets/${oathKey.replace("_", "")}.png`;
+    oathImg.src = `/assets/${oathKey.replace("_", "")}.webp`;
   }
 
   // username (capitalize first letter)
