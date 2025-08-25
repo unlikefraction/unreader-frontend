@@ -927,6 +927,12 @@ mark{
   height: auto !important;
   margin: 12px 0;
   border-radius: 6px;
+  -webkit-user-drag: none;
+  user-select: none;
+  -moz-user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  cursor: default;
 }
 
 /* make iframes/media scale to container width */

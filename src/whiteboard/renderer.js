@@ -215,8 +215,10 @@ export function redrawAll(drawingTools) {
     const id = `text-${i}`;
     const bounds = getShapeBounds('text', t);
     const rotDeg = t.rotation || 0;
-    const cx = (bounds.minX + bounds.maxX) / 2 + 0;
-    const cy = (bounds.minY + bounds.maxY) / 2 + 0;
+
+    // 🔧 FIX: text div must use page-space X, i.e., add zeroX here
+    const cx = getZeroXPoint() + (bounds.minX + bounds.maxX) / 2;
+    const cy = (bounds.minY + bounds.maxY) / 2;
 
     const width = bounds.maxX - bounds.minX;
     const height = bounds.maxY - bounds.minY;
@@ -231,6 +233,7 @@ export function redrawAll(drawingTools) {
       top: `${cy}px`,
       width: `${width}px`,
       height: `${height}px`,
+      // translate to center first, then rotate around center (keeps bbox aligned)
       transform: `translate(-50%, -50%) rotate(${rotDeg}deg)`,
       transformOrigin: 'center center',
       display: 'flex',
@@ -244,7 +247,7 @@ export function redrawAll(drawingTools) {
       whiteSpace: 'pre-wrap',
       background: 'transparent',
       color: t.color,
-      zIndex: '1002', // above both draw and preview
+      zIndex: '1002',
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
     });
     document.body.appendChild(div);
