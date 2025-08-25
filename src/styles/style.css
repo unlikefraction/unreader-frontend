@@ -985,3 +985,7 @@ mark{
 .scrollToPlayhead:hover{
   background: #000 !important;
 }
+
+canvas{
+  z-index: -1 !important;
+}
