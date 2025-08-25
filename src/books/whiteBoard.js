@@ -4,7 +4,7 @@
 // Each band gets PADDING_REM above AND below (total = 2 * PADDING_REM).
 const PADDING_REM = 5;
 // How many canvases to keep alive at once (ring buffer)
-const BAND_COUNT = 5;
+const BAND_COUNT = 3;
 // How many pages each band spans
 const PAGES_PER_BAND = 2;
 
@@ -73,13 +73,9 @@ export class DrawingTools {
 
     // single-shot height poll state
     this._heightPollTimer = null;
-    this._lastFirstPageOffsetHeight = -1;
 
     // base absolute top for band 0 (used when some APIs expect normalized offsets)
     this._bandsBaseTop = 0;
-
-    // last time we re-planned (to avoid overwork)
-    this._lastPlanScrollY = -1;
 
     initSelectionHandler(this);
 
@@ -185,22 +181,13 @@ export class DrawingTools {
       this.canvasManagers = [];
     }
 
-    // create fixed number of managers
-    const colors = [
-      'rgba(255, 247, 230, 0.22)',
-      'rgba(230, 247, 255, 0.22)',
-      'rgba(246, 255, 237, 0.22)',
-      'rgba(255, 240, 245, 0.22)',
-      'rgba(235, 255, 240, 0.22)'
-    ];
+    // create fixed number of managers (no background tint)
     for (let i = 0; i < BAND_COUNT; i++) {
       const mgr = new CanvasManager({
-        topOffset: 0,           // we’ll keep this normalized to base
-        height: 1,
-        bg: colors[i % colors.length]
+        topOffset: 0, // we’ll position absolutely via updateAbsoluteTopAndHeight
+        height: 1
+        // bg intentionally omitted → transparent
       });
-      // internal marker for absolute top (for hit-testing fallback)
-      mgr._absTop = 0;
       this.canvasManagers.push(mgr);
     }
 
@@ -213,20 +200,26 @@ export class DrawingTools {
 
     this._bandsBaseTop = plan.baseTop || 0;
 
-    // assign managers to plans in order; this is the ring buffer "window"
+    // Update only when something actually changes; skip redraw if stable.
+    let anyChanged = false;
     plan.plans.forEach((p, i) => {
       const mgr = this.canvasManagers[i];
-      // keep manager's "topOffset" normalized relative to base for any internal logic
-      const normalizedTop = p.top - this._bandsBaseTop;
-      mgr.updateTopAndHeight(normalizedTop, p.height);
-      mgr._absTop = p.top;       // stash absolute top for fallback hit-testing
-      mgr.height = p.height;     // ensure height is accurate for both hit-test paths
+      const prevTop = typeof mgr._absTop === 'number' ? mgr._absTop : 0;
+      const prevH = mgr.height || 0;
+      if (prevTop !== p.top || prevH !== p.height) {
+        // Use absolute updater so contexts remap page-space correctly
+        mgr.updateAbsoluteTopAndHeight(p.top, p.height);
+        anyChanged = true;
+      }
     });
 
-    this.canvasManagers.forEach(m => m.sizeCanvases());
-    if (initial) this.canvasManager = this.canvasManagers[0] || null;
+    if (initial) {
+      // pick the first band by default; selection logic will switch as needed
+      this.canvasManager = this.canvasManagers[0] || null;
+      anyChanged = true; // ensure initial paint
+    }
 
-    this.redrawAll();
+    if (anyChanged) this.redrawAll();
   }
 
   // ========== events & boot ==========

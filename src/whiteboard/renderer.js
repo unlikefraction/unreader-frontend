@@ -247,7 +247,7 @@ export function redrawAll(drawingTools) {
       whiteSpace: 'pre-wrap',
       background: 'transparent',
       color: t.color,
-      zIndex: '1002',
+      zIndex: '1',
       opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
     });
     document.body.appendChild(div);
