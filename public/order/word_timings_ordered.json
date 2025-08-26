@@ -1430,6 +1430,11 @@
     "time_end": 104.644671202
   },
   {
+    "word": ">",
+    "time_start": 104.644671202,
+    "time_end": 104.934013605
+  },
+  {
     "word": "BILLING",
     "time_start": 104.934013605,
     "time_end": 105.382993197
@@ -1445,14 +1450,9 @@
     "time_end": 107.498185941
   },
   {
-    "word": "I",
+    "word": "I-UNREAD-IT-ALL",
     "time_start": 107.498185941,
-    "time_end": 107.568027211
-  },
-  {
-    "word": "ALL",
-    "time_start": 107.568027211,
-    "time_end": 107.84739229
+    "time_end": 108.515873016
   },
   {
     "word": "CHEERS",

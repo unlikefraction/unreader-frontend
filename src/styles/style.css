@@ -122,16 +122,21 @@ nav a{
   align-items: center;
   justify-content: center;
   gap: 4rem;
-  margin: 4rem 0 12rem 0;
+  margin: -6rem 0 8rem 0;
 }
 
 .mainContent{
   position: relative;
-  font-size: 30px;
+  font-size: 31px;
   font-weight: 500;
   color: #ABABAB;
   min-width: 650px;
   width: 650px;
+  line-height: 42px;
+}
+
+.mainContent .calibre1{
+  margin-top: 2rem;
 }
 
 .mainContent .word{
@@ -791,7 +796,7 @@ mark{
   left: 50%;
   transform: translateX(-50%);
   font-size: 12px;
-  padding: 7px 15px;
+  padding: 0px 15px;
   background: linear-gradient(
     90deg,
     #fd9a2e 0%,
@@ -848,7 +853,7 @@ mark{
 [data-page-id="transcript-landing-html-order-word-timings-ordered-json-100"] 
 [data-paragraph-index="0"] {
   display: block !important;
-  top: 15px !important;
+  top: 33px !important;
   left: -10px !important;
 }
 

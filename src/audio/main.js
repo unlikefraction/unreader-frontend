@@ -1,8 +1,8 @@
 // -----main.js-----
 
 import { AudioCore } from './audio-core.js';
-import { TextProcessor } from './text-processor.js';
-import { WordHighlighter } from './word-highlighter.js';
+import { TextProcessor } from './landing-audio/text-processor.js';
+import { WordHighlighter } from './landing-audio/word-highlighter.js';
 import { ReadAlong } from './read-along.js';
 import { PlaybackControls } from './playback-controls.js';
 import { ParagraphSeeker } from './paragraph-seeker.js';
