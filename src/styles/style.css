@@ -248,24 +248,24 @@ nav a{
 }
 
 /* Add animation to your existing SVG rules */
-.hold-up.loading svg{
+.hold-up.active svg{
   transform: scale(2);
   filter: blur(4px);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
-.hold-up.loading .blue{
+.hold-up.active .blue{
   margin-top: 1.2rem;
   animation-delay: 0s;
 }
 
-.hold-up.loading .lightYellow{
+.hold-up.active .lightYellow{
   margin-top: 2.4rem;
   margin-left: -1rem;
   animation-delay: 0.5s;
 }
 
-.hold-up.loading .yellow{
+.hold-up.active .yellow{
   margin-top: 1.1rem;
   animation-delay: 1s;
 }
