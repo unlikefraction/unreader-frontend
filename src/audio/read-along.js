@@ -1,3 +1,4 @@
+// -----read-along.js-----
 export class ReadAlong {
   static _instance = null;
   static get(highlighter) {
@@ -311,6 +312,28 @@ export class ReadAlong {
     const v = Math.max(0, Number(px) || 0);
     this.activationRadiusPx = v;
     this.evaluateReadAlongState();
+  }
+
+  // NEW: imperative snap used by the "Scroll to playhead" button
+  snapToCurrentWord({ smooth = true } = {}) {
+    const el = this._getWordEl();
+    if (!el) return false;
+
+    const rect            = el.getBoundingClientRect();
+    const { top, height } = this._rootRect();
+    const linePct         = this.getCurrentTopPercent();
+    const targetY         = top + (linePct / 100) * height;
+    const delta           = rect.top - targetY;
+    const behavior        = smooth ? 'smooth' : 'auto';
+
+    if (this._isWindowRoot(this.scrollRoot)) {
+      window.scrollTo({ top: window.scrollY + delta, behavior });
+    } else {
+      this.scrollRoot.scrollTo({ top: this.scrollRoot.scrollTop + delta, behavior });
+    }
+
+    this.setReadAlongActive(true);
+    return true;
   }
 
   destroy() {

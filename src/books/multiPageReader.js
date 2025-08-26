@@ -847,8 +847,24 @@ export default class MultiPageReader {
       display: 'none'
     });
 
-    btn.addEventListener('click', () => {
-      this._scrollActivePageIntoView(true);
+    // UPDATED: snap the *current highlighted word* to the read-along line
+    btn.addEventListener('click', async () => {
+      // Ensure active page is hydrated so ReadAlong knows the highlighter
+      if (this.active >= 0 && !this.instances[this.active]) {
+        await this.hydratePage(this.active);
+      }
+      try {
+        const ra = ReadAlong.get();
+        // try a precise snap to the read-along height
+        const snapped = ra && typeof ra.snapToCurrentWord === 'function'
+          ? ra.snapToCurrentWord({ smooth: true })
+          : false;
+
+        // Fallback: center the active page if no word is highlighted yet
+        if (!snapped) this._scrollActivePageIntoView(true);
+      } catch {
+        this._scrollActivePageIntoView(true);
+      }
     });
 
     document.body.appendChild(btn);
@@ -884,7 +900,7 @@ export default class MultiPageReader {
       if (dist < bestDist) { bestDist = dist; bestIdx = i; }
     }
 
-    // Show button if user is >= 2 pages away from the active page
+    // Show button if user is >= 1 page away from the active page
     const far = Math.abs(bestIdx - this.active) >= 1;
     this._scrollToPlayheadBtn.style.display = far ? 'inline-flex' : 'none';
   }
