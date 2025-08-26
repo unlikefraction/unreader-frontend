@@ -2,9 +2,9 @@
 
 
 import { commonVars } from '../common-vars.js';
-import { CanvasManager } from './canvas-manager.js';
-import { saveShapesData, loadShapesData, clearAllShapesData } from './storage.js';
-import { redrawAll } from './renderer.js';
+import { CanvasManager } from './landingFiles/canvas-manager.js';
+import { saveShapesData, loadShapesData, clearAllShapesData } from './landingFiles/storage.js';
+import { redrawAll } from './landingFiles/renderer.js';
 import { handleRectangle } from './tools/rectangle-tools.js';
 import { handleEllipse } from './tools/elipse-tool.js';
 import { handleLine } from './tools/line-tool.js';
@@ -14,7 +14,7 @@ import { handleHighlight } from './tools/highlighter-tool.js';
 import { handleText, createTextEditor } from './tools/text-tool.js';
 import { handleEraser } from './tools/eraser-tool.js';
 import { isClickOnTool, hexToRgba } from './utils.js';
-import { initSelectionHandler } from './selection.js';
+import { initSelectionHandler } from './landingFiles/selection.js';
 import { initVersioning } from './version.js';
 
 /**
