@@ -386,10 +386,18 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
           else dot.classList.add("start");
           isFirst = false;
         } else if (book.marked_as_complete && dateKey === endKey) {
-          // Final "completed" dot with 🔥
+          // Final "completed" dot with oath symbol
           dot.classList.add("bookCompleted");
-          dot.textContent = "🔥";
-        } else {
+        
+          let symbol = "🔥"; // default
+          if (book.oath) {
+            const oath = book.oath.toLowerCase();
+            if (oath === "whisper_oath") symbol = "💨";
+            else if (oath === "blood_oath") symbol = "🩸";
+          }
+          dot.textContent = symbol;
+        }
+         else {
           if (!book.marked_as_complete && isToday && wasRead) dot.classList.add("todayCompleted");
           else if (!book.marked_as_complete && isToday) dot.classList.add("today");
           else if (wasRead) dot.classList.add("completed");
