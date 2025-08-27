@@ -161,6 +161,34 @@
         </div>
       </div>
 
+    <script>
+        (function attachAutoGrow(){
+        const grow = (el) => {
+            el.style.height = 'auto';                   // shrink first
+            el.style.height = el.scrollHeight + 'px';   // then grow to content
+        };
+
+        const wire = (el) => {
+            if (!el) return;
+            const onInput = () => grow(el);
+            el.addEventListener('input', onInput);
+            // first paint / prefilled values
+            requestAnimationFrame(() => grow(el));
+
+            // if fonts or layout change width, recalc height
+            if ('ResizeObserver' in window) {
+            const ro = new ResizeObserver(() => grow(el));
+            ro.observe(el);
+            } else {
+            window.addEventListener('resize', () => grow(el));
+            }
+        };
+
+        // one or many
+        document.querySelectorAll('.thoughtsInput').forEach(wire);
+        })();
+    </script>
+
     <script src="./src/utils.js"></script>
     <script type="module" src="./src/analytics.js"></script>
     <script type="module" src="./src/user/userDetails.js"></script>

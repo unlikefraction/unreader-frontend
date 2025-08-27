@@ -320,16 +320,30 @@
     font-family: "Space Mono", monospace;
 }
 
+/* thoughtsInput.css */
 .thoughtsInput{
-    height: 200px;
-    margin-top: 0.5rem;
-    outline: none;
-    border: none;
+    width: 100%;
+    /* start small; we'll grow it with JS */
+    min-height: 26px;            /* matches your line-height */
+    height: auto;
     line-height: 26px;
     font-size: 16px;
     color: #373737;
+  
+    /* keep your original vibes */
+    margin-top: 0.5rem;
+    outline: none;
+    border: none;
+  
+    /* critical for autosize UX */
+    overflow: hidden;            /* no scrollbars, ever */
+    resize: none;                /* user can’t manually drag */
+    box-sizing: border-box;      /* so padding doesn't mess sizing */
+    padding: 0;                  /* add if you need */
+    margin-bottom: 6rem;
 }
 
+  
 /* base */
 .editableTitle {
     font: inherit;
