@@ -161,33 +161,147 @@
         </div>
       </div>
 
-    <script>
+      <script>
         (function attachAutoGrow(){
-        const grow = (el) => {
-            el.style.height = 'auto';                   // shrink first
-            el.style.height = el.scrollHeight + 'px';   // then grow to content
-        };
-
-        const wire = (el) => {
+          // ---- config --------------------------------------------------------------
+          const SELECTOR = '.thoughtsInput';   // target textareas/inputs you want to autogrow
+        
+          // ---- internal state ------------------------------------------------------
+          const wired = new WeakSet();
+          let roMap = new WeakMap();           // element -> ResizeObserver
+          let pending = new Set();             // for raf-batched grows
+        
+          // ---- utils ---------------------------------------------------------------
+          function grow(el){
             if (!el) return;
-            const onInput = () => grow(el);
-            el.addEventListener('input', onInput);
-            // first paint / prefilled values
-            requestAnimationFrame(() => grow(el));
-
-            // if fonts or layout change width, recalc height
-            if ('ResizeObserver' in window) {
-            const ro = new ResizeObserver(() => grow(el));
-            ro.observe(el);
-            } else {
-            window.addEventListener('resize', () => grow(el));
+            // Only handle <textarea>. If you also want contenteditable, extend here.
+            if (el.tagName !== 'TEXTAREA') return;
+        
+            // Temporarily reset height so scrollHeight is the content's natural height
+            el.style.height = 'auto';
+        
+            // In some layouts, scrollHeight can be 0 if element is display:none
+            // Skip if not measurable; we'll retry via observers later.
+            const sh = el.scrollHeight;
+            if (sh > 0) {
+              el.style.height = sh + 'px';
             }
-        };
-
-        // one or many
-        document.querySelectorAll('.thoughtsInput').forEach(wire);
+          }
+        
+          // batch grow calls into a single rAF tick to avoid layout thrash on cascaded events
+          function scheduleGrow(el){
+            pending.add(el);
+            if (scheduleGrow._scheduled) return;
+            scheduleGrow._scheduled = true;
+            requestAnimationFrame(() => {
+              pending.forEach(grow);
+              pending.clear();
+              scheduleGrow._scheduled = false;
+            });
+          }
+        
+          function wire(el){
+            if (!el || wired.has(el)) return;
+            wired.add(el);
+        
+            // Ensure basic CSS for smoothness (only sets overflow if unset)
+            if (getComputedStyle(el).overflowY === 'visible') {
+              el.style.overflowY = 'hidden';
+            }
+        
+            const onInput = () => scheduleGrow(el);
+            el.addEventListener('input', onInput, { passive: true });
+        
+            // Initial sizing: do it twice — once now, once on next frame — to catch late value assignment/styles
+            grow(el);
+            requestAnimationFrame(() => grow(el));
+        
+            // If fonts or container size changes, recalc height.
+            // Use ResizeObserver where available (observes box size changes).
+            if ('ResizeObserver' in window) {
+              const ro = new ResizeObserver(() => scheduleGrow(el));
+              ro.observe(el);
+              roMap.set(el, ro);
+            } else {
+              // Fallback: window resize
+              const onResize = () => scheduleGrow(el);
+              window.addEventListener('resize', onResize);
+              // Keep a tiny cleanup handle on the element so we can unhook later if needed
+              el._autoGrowCleanup = () => window.removeEventListener('resize', onResize);
+            }
+          }
+        
+          function unwire(el){
+            if (!el || !wired.has(el)) return;
+            wired.delete(el);
+            const ro = roMap.get(el);
+            if (ro) {
+              try { ro.disconnect(); } catch {}
+              roMap.delete(el);
+            }
+            if (el._autoGrowCleanup) {
+              try { el._autoGrowCleanup(); } catch {}
+              delete el._autoGrowCleanup;
+            }
+          }
+        
+          // Public API so you can wire newly created inputs manually if you prefer.
+          window.attachAutoGrow = function(elOrList){
+            if (!elOrList) return;
+            if (NodeList.prototype.isPrototypeOf(elOrList) || Array.isArray(elOrList)) {
+              elOrList.forEach(wire);
+            } else if (elOrList instanceof Element) {
+              wire(elOrList);
+            }
+          };
+        
+          // ---- automatic bootstrapping --------------------------------------------
+          function initExisting(){
+            document.querySelectorAll(SELECTOR).forEach(wire);
+          }
+        
+          // If script ran before the DOM exists, wait for it.
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initExisting, { once: true });
+          } else {
+            initExisting();
+          }
+        
+          // Also recalc once the whole page finishes loading (images/layout shifts)
+          window.addEventListener('load', () => {
+            document.querySelectorAll(SELECTOR).forEach(scheduleGrow);
+          }, { once: true });
+        
+          // If fonts API exists, resize after fonts are ready (prevents clipping from font metrics change)
+          if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+              document.querySelectorAll(SELECTOR).forEach(scheduleGrow);
+            }).catch(()=>{ /* ignore */ });
+          }
+        
+          // Observe the DOM for new matching nodes and removed ones
+          if ('MutationObserver' in window) {
+            const mo = new MutationObserver((mutations) => {
+              for (const m of mutations) {
+                // Wire any newly added elements
+                m.addedNodes && m.addedNodes.forEach(node => {
+                  if (!(node instanceof Element)) return;
+                  if (node.matches && node.matches(SELECTOR)) wire(node);
+                  node.querySelectorAll && node.querySelectorAll(SELECTOR).forEach(wire);
+                });
+                // Cleanup removed elements
+                m.removedNodes && m.removedNodes.forEach(node => {
+                  if (!(node instanceof Element)) return;
+                  if (node.matches && node.matches(SELECTOR)) unwire(node);
+                  node.querySelectorAll && node.querySelectorAll(SELECTOR).forEach(unwire);
+                });
+              }
+            });
+            mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
+          }
+        
         })();
-    </script>
+    </script>        
 
     <script src="./src/utils.js"></script>
     <script type="module" src="./src/analytics.js"></script>
