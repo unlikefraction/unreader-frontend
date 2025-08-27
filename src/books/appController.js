@@ -186,6 +186,11 @@ export default class AppController {
         metadata: this._metadataForIndex(startIndex)
       });
 
+      // 🔌 Expose to window so keyboard.js can discover them
+      window.app    = this;
+      window.reader = this.reader;
+      window.holdup = this.holdup;
+
       // Feed holdup with local audio activity (inactivity auto-disconnect)
       this._localAudioWatch = setInterval(() => {
         try {

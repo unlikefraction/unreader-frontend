@@ -1,11 +1,13 @@
+// keyboard.js
+
 /**
- * Keyboard shortcuts for drawing tools and audio controls
+ * Keyboard shortcuts for drawing tools, audio controls, and holdup toggle
  */
 
 // Drawing Tool Shortcuts Configuration
 const DRAWING_SHORTCUTS = {
   'KeyV': 'cursor',
-  'KeyR': 'rectangle', 
+  'KeyR': 'rectangle',
   'KeyA': 'arrow',
   'KeyL': 'line',
   'KeyE': 'eraser',
@@ -19,6 +21,12 @@ const AUDIO_SHORTCUTS = {
   'Space': 'playPause',
   'ArrowRight': 'forward',
   'ArrowLeft': 'rewind'
+};
+
+// Holdup shortcuts ("/" key). Note: Shift+"/" is "?" but still comes through as 'Slash'.
+const HOLDUP_SHORTCUTS = {
+  'Slash': 'toggle',
+  'Backslash': 'toggle'
 };
 
 const SETTINGS = {
@@ -50,6 +58,13 @@ function getAudioSystem() {
 // Get the drawing system
 function getDrawingSystem() {
   return window.drawer || null;
+}
+
+// Get the holdup system
+function getHoldupSystem() {
+  if (window.app?.holdup) return window.app.holdup;
+  if (window.holdup) return window.holdup;
+  return null;
 }
 
 // Handle drawing tool shortcuts
@@ -123,6 +138,25 @@ function handleAudioShortcut(audioAction) {
   }
 }
 
+// Handle holdup shortcut
+function handleHoldupShortcut(action) {
+  const h = getHoldupSystem();
+  if (!h) {
+    printError?.('Holdup system not available');
+    return false;
+  }
+  switch (action) {
+    case 'toggle': {
+      h.toggleMute?.();
+      printl?.('🗣️ Toggled holdup (agent + mic)');
+      return true;
+    }
+    default:
+      printError?.(`Unknown holdup action: ${action}`);
+      return false;
+  }
+}
+
 // Wait for systems to be ready
 function waitForSystems(callback, maxAttempts = 50) {
   let attempts = 0;
@@ -132,9 +166,12 @@ function waitForSystems(callback, maxAttempts = 50) {
 
     const audioReady = getAudioSystem() !== null;
     const drawingReady = getDrawingSystem() !== null;
+    const holdupReady = getHoldupSystem() !== null;
 
     if (audioReady && drawingReady) {
       printl?.('✅ All systems ready for shortcuts');
+      // also log holdup status, but don’t block
+      printl?.(`Holdup system: ${holdupReady ? 'Ready' : 'Not ready'}`);
       callback();
       return;
     }
@@ -143,6 +180,7 @@ function waitForSystems(callback, maxAttempts = 50) {
       printError?.('⚠️ Timeout waiting for systems to be ready');
       printl?.(`Audio system: ${audioReady ? 'Ready' : 'Not ready'}`);
       printl?.(`Drawing system: ${drawingReady ? 'Ready' : 'Not ready'}`);
+      printl?.(`Holdup system: ${holdupReady ? 'Ready' : 'Not ready'}`);
       callback(); // Proceed anyway
       return;
     }
@@ -171,6 +209,14 @@ function initializeShortcuts() {
       return;
     }
 
+    // Holdup shortcuts (handle first so "/" never triggers browser quick-find)
+    const holdupAction = HOLDUP_SHORTCUTS[e.code];
+    if (holdupAction) {
+      e.preventDefault();
+      handleHoldupShortcut(holdupAction);
+      return;
+    }
+
     // Drawing tool shortcuts
     const toolClass = DRAWING_SHORTCUTS[e.code];
     if (toolClass) {
@@ -193,6 +239,7 @@ function initializeShortcuts() {
   printl?.('📋 Available shortcuts:');
   printl?.('Drawing tools:', Object.entries(DRAWING_SHORTCUTS).map(([key, tool]) => `${key} → ${tool}`));
   printl?.('Audio controls:', Object.entries(AUDIO_SHORTCUTS).map(([key, action]) => `${key} → ${action}`));
+  printl?.('Holdup:', Object.entries(HOLDUP_SHORTCUTS).map(([key, action]) => `${key} → ${action}`));
   printl?.('Other: Ctrl+R → reload');
 }
 
@@ -225,7 +272,8 @@ export const ShortcutManager = {
   getShortcuts() {
     return {
       drawing: { ...DRAWING_SHORTCUTS },
-      audio: { ...AUDIO_SHORTCUTS }
+      audio: { ...AUDIO_SHORTCUTS },
+      holdup: { ...HOLDUP_SHORTCUTS }
     };
   }
 };
