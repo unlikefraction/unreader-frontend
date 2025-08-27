@@ -11,6 +11,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const POLL_MS = 5 * 60 * 1000;
   let pollTimer = null;
 
+  // For optimistic messages we create and later resolve/remove
+  const tempMessageAttr = 'data-temp-id';
+  let sending = false;
+
   // ---- helpers -------------------------------------------------------------
   function getCookie(name) {
     const value = `; ${document.cookie}`;
@@ -75,41 +79,92 @@ document.addEventListener('DOMContentLoaded', () => {
     const frag = document.createDocumentFragment();
 
     messages.forEach(msg => {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'message';
-
-      const isUnreadForUser = (msg.direction === 'team' && msg.read_by_user === false);
-      const isUnreadForTeam = (msg.direction === 'user' && msg.read_by_team === false);
-      if (isUnreadForUser || isUnreadForTeam) wrapper.classList.add('newMessage');
-
-      const details = document.createElement('p');
-      details.className = 'messageDetails';
-
-      const date = formatDate(msg.created_at);
-
-      if (msg.direction === 'user') {
-        details.innerHTML = `<span class="name">You</span> • <span class="date">${date}</span>`;
-      } else {
-        const name = escapeHtml(msg.sender || 'Team');
-        const role = msg.role ? ` • <span class="designation">${escapeHtml(msg.role)}</span>` : '';
-        details.innerHTML = `<span class="name">${name}</span>${role} • <span class="date">${date}</span>`;
-      }
-
-      const content = document.createElement('p');
-      content.className = 'messageContent';
-      content.innerHTML = escapeHtml(msg.text || '').replace(/\n/g, '<br>');
-
-      wrapper.appendChild(details);
-      wrapper.appendChild(content);
-      frag.appendChild(wrapper);
+      frag.appendChild(buildMessageNode(msg));
     });
 
     messagesEl.innerHTML = '';
     messagesEl.appendChild(frag);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollMessagesToBottom();
 
     const unreadTeamForUser = messages.filter(m => m.direction === 'team' && m.read_by_user === false).length;
     updateUnreadBadge(unreadTeamForUser);
+  }
+
+  function scrollMessagesToBottom() {
+    if (!messagesEl) return;
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function buildMessageNode(msg, opts = {}) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message';
+
+    // temp/optimistic flags
+    if (opts.tempId) wrapper.setAttribute(tempMessageAttr, opts.tempId);
+    if (opts.pending) wrapper.classList.add('pending'); // style in CSS to dim/spinner
+
+    const details = document.createElement('p');
+    details.className = 'messageDetails';
+
+    // When we create an optimistic message, we may not have server time; show "Just now"
+    const dateStr = msg.created_at
+      ? formatDate(msg.created_at)
+      : 'Just now';
+
+    if (msg.direction === 'user') {
+      details.innerHTML = `<span class="name">You</span> • <span class="date">${dateStr}</span>`;
+    } else {
+      const name = escapeHtml(msg.sender || 'Team');
+      const role = msg.role ? ` • <span class="designation">${escapeHtml(msg.role)}</span>` : '';
+      details.innerHTML = `<span class="name">${name}</span>${role} • <span class="date">${dateStr}</span>`;
+    }
+
+    const content = document.createElement('p');
+    content.className = 'messageContent';
+    content.innerHTML = escapeHtml(msg.text || '').replace(/\n/g, '<br>');
+
+    // Only show the "unread indicator" styling for confirmed messages:
+    // - for team->user unread_for_user
+    // - for user->team unread_for_team
+    // We don't set it during optimistic pending state.
+    const isUnreadForUser = (msg.direction === 'team' && msg.read_by_user === false);
+    const isUnreadForTeam = (msg.direction === 'user' && msg.read_by_team === false);
+    if (!opts.pending && (isUnreadForUser || isUnreadForTeam)) {
+      wrapper.classList.add('newMessage'); // your existing CSS can style this as the indicator
+    }
+
+    wrapper.appendChild(details);
+    wrapper.appendChild(content);
+    return wrapper;
+  }
+
+  function findTempNode(tempId) {
+    if (!messagesEl) return null;
+    return messagesEl.querySelector(`.message[${tempMessageAttr}="${CSS.escape(tempId)}"]`);
+  }
+
+  function replaceTempWithServer(tempId, serverMsg) {
+    const node = findTempNode(tempId);
+    if (!node) return;
+    const confirmedNode = buildMessageNode(serverMsg, { pending: false });
+    node.replaceWith(confirmedNode);
+    scrollMessagesToBottom();
+  }
+
+  function removeTemp(tempId) {
+    const node = findTempNode(tempId);
+    if (node) node.remove();
+  }
+
+  function appendOptimisticUserMessage(text, tempId) {
+    const optimisticMsg = {
+      direction: 'user',
+      text,
+      // we purposely do NOT set created_at/read flags yet
+    };
+    const node = buildMessageNode(optimisticMsg, { pending: true, tempId });
+    messagesEl.appendChild(node);
+    scrollMessagesToBottom();
   }
 
   // ---- network -------------------------------------------------------------
@@ -144,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(url, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({}) // explicit empty body per spec
+        body: JSON.stringify({})
       });
       if (res.status === 401) {
         console.warn('[Inbox] Unauthorized while marking read');
@@ -159,21 +214,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function postMessage(text) {
     const url = baseUrl() + 'message/';
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ text })
-      });
-      if (res.status === 401) {
-        console.warn('[Inbox] Unauthorized while posting message');
-        return;
-      }
-      if (!res.ok) throw new Error(`Failed to post message: ${res.status}`);
-      await fetchInboxThread();
-    } catch (err) {
-      console.error('[Inbox] postMessage error', err);
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ text })
+    });
+    if (res.status === 401) {
+      console.warn('[Inbox] Unauthorized while posting message');
+      throw new Error('unauthorized');
     }
+    if (!res.ok) throw new Error(`Failed to post message: ${res.status}`);
+    return res.json(); // expect server to return {message: {...}} or thread snapshot
   }
 
   // ---- polling -------------------------------------------------------------
@@ -182,7 +233,6 @@ document.addEventListener('DOMContentLoaded', () => {
     pollTimer = setInterval(fetchInboxThread, POLL_MS);
   }
 
-  // Optional: pause polling when tab is hidden, resume when visible
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       fetchInboxThread(); // immediate refresh on return
@@ -227,12 +277,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Send interactions
-  function handleSend() {
+  // Send interactions with optimistic UI and success/failure handling
+  async function handleSend() {
     const text = (inputEl?.value || '').trim();
-    if (!text) return;
+    if (!text || sending) return;
+
+    // optimistic UI: show immediately as pending
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    appendOptimisticUserMessage(text, tempId);
+
+    // clear input immediately
     inputEl.value = '';
-    postMessage(text);
+
+    // optional: UI state for send button
+    setSendingState(true);
+
+    try {
+      const data = await postMessage(text);
+
+      // If API returns the new message, swap the temp node with confirmed.
+      // Otherwise, just refetch the thread.
+      const serverMsg =
+        data?.message ||
+        (Array.isArray(data?.messages) ? data.messages[data.messages.length - 1] : null);
+
+      if (serverMsg) {
+        // Ensure it has direction and read flags; if not, set reasonable defaults
+        serverMsg.direction = serverMsg.direction || 'user';
+        if (typeof serverMsg.read_by_team === 'undefined') serverMsg.read_by_team = false;
+
+        // success => show the unread indicator on the message (newMessage) by replacing pending node with confirmed node
+        replaceTempWithServer(tempId, serverMsg);
+      } else {
+        // Fallback: refetch to sync everything (will also show unread styles for user->team)
+        removeTemp(tempId);
+        await fetchInboxThread();
+      }
+    } catch (err) {
+      console.error('[Inbox] postMessage error', err);
+
+      // failure => remove optimistic bubble and write text back to input
+      removeTemp(tempId);
+      inputEl.value = text;
+      inputEl.focus();
+    } finally {
+      setSendingState(false);
+    }
+  }
+
+  function setSendingState(isSending) {
+    sending = isSending;
+    if (!sendBtn) return;
+    sendBtn.disabled = isSending;
+    // optional aria/busy attribute
+    if (isSending) {
+      sendBtn.setAttribute('aria-busy', 'true');
+    } else {
+      sendBtn.removeAttribute('aria-busy');
+    }
   }
 
   if (sendBtn) {
