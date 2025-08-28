@@ -1,10 +1,9 @@
-// -----multiPageReader.js-----
 import { AudioSystem } from './audioAndTextGen.js';
 import { ReadAlong } from '../audio/read-along.js';
 
 function slugify(s) {
   return String(s).toLowerCase()
-    .replace(/^[a-z]+:\/\/+/i, '')
+    .replace(/^[a-z]+:\/\/+/, '')
     .replace(/[^a-z0-9]+/gi, '-')
     .replace(/^-+|-+$/g, '');
 }
@@ -446,6 +445,9 @@ export default class MultiPageReader {
     if (url) this._swapAudioUrl(pageIndex, url);
 
     await this.ensureAudioReady(pageIndex);
+    // NEW: warm next page's audio right after current is ready
+    this._prefetchNextAudio(pageIndex);
+
     this.seek(seconds);
     this._stopProgressTimer();
     this._syncPlayButton(false);
@@ -573,6 +575,32 @@ export default class MultiPageReader {
     } catch (e) { console.error('audio swap error:', e); }
   }
 
+  /* ---------- NEW: Next-page audio prefetch ---------- */
+  async _prefetchNextAudio(i) {
+    const next = i + 1;
+    if (next >= this.pageMeta.length) return;
+
+    const metaNext = this.pageMeta[next];
+    if (metaNext?._audioSettled && metaNext?._readyAudioUrl) return; // already ready
+
+    try { await this.hydratePage(next); } catch {}
+
+    // Fire-and-forget polling for next page
+    (async () => {
+      try {
+        const url = await this._awaitReadyAudioAndTranscript(next, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+        if (!url) return;
+        const sysNext = this.instances[next];
+        if (sysNext) {
+          this._swapAudioUrl(next, url);
+          await this.ensureAudioReady(next);
+        }
+      } catch (e) {
+        console.warn('next-page prefetch failed:', e);
+      }
+    })();
+  }
+
   /* ---------- transport ---------- */
   async play() {
     if (this.active < 0) return;
@@ -598,6 +626,9 @@ export default class MultiPageReader {
     this._saveLastPlayedCookie(this.active, this.getCurrentTime());
 
     try { window.app?.holdup?.noteLocalAudioActivity?.(true); } catch {}
+
+    // NEW: warm next after we start playing current
+    this._prefetchNextAudio(this.active);
   }
 
   pause() {
@@ -666,6 +697,9 @@ export default class MultiPageReader {
 
     await this.ensureAudioReady(target);
 
+    // NEW: prefetch the page after the target as well
+    this._prefetchNextAudio(target);
+
     if (auto) {
       // Start playback first so the highlighter paints a current word
       await this.play();
@@ -702,6 +736,10 @@ export default class MultiPageReader {
 
     await this.ensureAudioReady(target);
     await this.play();
+
+    // NEW: warm the next one after moving back (so forward is instant)
+    this._prefetchNextAudio(target);
+
     await this._prefetchAround(target);
     this._saveLastPlayedCookie(target, this.getCurrentTime());
   }
@@ -719,6 +757,9 @@ export default class MultiPageReader {
     await this.ensureAudioReady(index);
 
     try { ReadAlong.get().rebindHighlighter(this.instances[index].highlighter); } catch {}
+
+    // NEW: prefetch next after landing here
+    this._prefetchNextAudio(index);
 
     if (play) await this.play();
     else { this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false); this._saveLastPlayedCookie(index, this.getCurrentTime()); }
@@ -771,6 +812,9 @@ export default class MultiPageReader {
 
     // Chip spinner OFF
     this._setParagraphChipLoading(pageIndex, paragraphText, false);
+
+    // NEW: prefetch next after jumping within this page
+    this._prefetchNextAudio(pageIndex);
 
     this._saveLastPlayedCookie(pageIndex, this.getCurrentTime());
     await this._prefetchAround(pageIndex);
