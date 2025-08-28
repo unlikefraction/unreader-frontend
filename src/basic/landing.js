@@ -333,13 +333,13 @@ if (linkEl) linkEl.href = chosenHref;
 (function () {
   // ===== Tunables =====
   var CONTAINER_SELECTOR = '.mainContent';
-  var START_DELAY_MS     = 300;    // minimum delay before even considering start
+  var START_DELAY_MS     = 100;    // minimum delay before even considering start
   var QUIET_WINDOW_MS    = 500;    // must be no DOM changes for this long
   var MIN_TEXT_LEN       = 200;    // don’t start until there’s at least this much text
   var MAX_WAIT_MS        = 5000;   // safety: start anyway after this much waiting
 
-  var WORD_DELAY_MS      = 28;     // stagger between words (fast)
-  var WORD_FADE_MS       = 140;    // how long each word takes to fade in
+  var WORD_DELAY_MS      = 5;     // stagger between words (fast)
+  var WORD_FADE_MS       = 500;    // how long each word takes to fade in
   var INSTANT_FINISH_KEY = 'Escape';
 
   // Expose live tuning if you want

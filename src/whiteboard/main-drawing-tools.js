@@ -1,6 +1,5 @@
 // -----main-drawing-tools.js-----
 
-
 import { commonVars } from '../common-vars.js';
 import { CanvasManager } from './landingFiles/canvas-manager.js';
 import { saveShapesData, loadShapesData, clearAllShapesData } from './landingFiles/storage.js';
@@ -28,11 +27,14 @@ export class DrawingTools {
     strokeWidth = 2,
     roughness = 3,
     pencilOptions = {},
-    highlightOptions = {}
+    highlightOptions = {},
+    /** Optional: force a storage namespace (e.g., 'landing' | 'pricing' | custom). If omitted, storage.js auto-detects. */
+    storageNamespace = undefined
   } = {}) {
     this.selector = selector;
     this.strokeWidth = strokeWidth;
     this.roughness = roughness;
+    this.storageNamespace = storageNamespace; // NEW: keep which bucket to use for localStorage
 
     // Drawing palette
     this.colorOptions = ['#373737', '#9C0000', '#0099FF', '#045C32', '#FFAA00'];
@@ -81,8 +83,8 @@ export class DrawingTools {
     this.textClickArmed = false;
     this.erasedShapeIds = new Set();
 
-    // Load shapes and canvas
-    this.shapesData = loadShapesData();
+    // Load shapes and canvas (NAMESPACED)
+    this.shapesData = loadShapesData(this.storageNamespace);
     this.canvasManager = new CanvasManager();
 
     initSelectionHandler(this);
@@ -260,7 +262,8 @@ export class DrawingTools {
   }
 
   save() {
-    saveShapesData(this.shapesData);
+    // NAMESPACED SAVE
+    saveShapesData(this.shapesData, this.storageNamespace);
   }
 
   setActiveTool(tool) {
@@ -323,7 +326,7 @@ export class DrawingTools {
 
   clearAll() {
     this.shapesData = clearAllShapesData();
-    this.save();
+    this.save(); // persist clear to the namespaced key
     this.redrawAll();
   }
 
@@ -334,7 +337,14 @@ export class DrawingTools {
 
 // Instantiate on DOM ready
 window.addEventListener('DOMContentLoaded', () => {
-  const drawer = new DrawingTools({ selector: '.w-control', strokeWidth: 2, roughness: 2 });
+  const drawer = new DrawingTools({
+    selector: '.w-control',
+    strokeWidth: 2,
+    roughness: 2
+    // Optionally force a namespace per page if you prefer being explicit:
+    // storageNamespace: 'landing'   // on index.html
+    // storageNamespace: 'pricing'   // on pricing.html
+  });
   initVersioning(drawer, {maxHistory : 10});
   window.drawer = drawer;
   drawer.init();
