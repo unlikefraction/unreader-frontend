@@ -3,6 +3,7 @@ import { Howl, Howler } from 'howler';
 
 /**
  * Core audio functionality using Howler.js
+ * Headless: no DOM mutations; UI is owned by MultiPageReader.
  */
 export class AudioCore {
   static _controlsBound = false; // avoid binding play/ff/rw multiple times
@@ -31,19 +32,16 @@ export class AudioCore {
         rate: this.playbackSpeed,
         onend: () => {
           this.isPlaying = false;
-          this.updatePlayButton(false);
           if (this.onEndCallback) this.onEndCallback();
         },
         onloaderror: (id, error) => {
           printError?.('Audio loading error:', error);
           this.isPlaying = false;
-          this.updatePlayButton(false);
           if (this.onErrorCallback) this.onErrorCallback(error);
         },
         onplayerror: (id, error) => {
           printError?.('Audio play error:', error);
           this.isPlaying = false;
-          this.updatePlayButton(false);
           if (this.onErrorCallback) this.onErrorCallback(error);
         },
         onseek: () => {
@@ -53,11 +51,13 @@ export class AudioCore {
         },
         onplay: () => {
           const startTime = this.getCurrentTime();
+          this.isPlaying = true;
           printl?.(`▶️ Audio started playing from: ${startTime.toFixed(5)}s`);
           if (this.onPlayCallback) this.onPlayCallback(startTime);
         },
         onpause: () => {
           const pauseTime = this.getCurrentTime();
+          this.isPlaying = false;
           printl?.(`⏸️ Audio paused at: ${pauseTime.toFixed(5)}s`);
           if (this.onPauseCallback) this.onPauseCallback(pauseTime);
         }
@@ -78,12 +78,10 @@ export class AudioCore {
       this.setupAudio();
       if (!this.sound.playing()) {
         this.sound.play();
-        this.updatePlayButton(true);
-        this.isPlaying = true;
+        // isPlaying flips true in onplay; UI updates happen in MultiPageReader listeners.
       }
     } catch (error) {
       printError?.('Error playing audio:', error);
-      this.updatePlayButton(false);
       this.isPlaying = false;
       if (this.onErrorCallback) this.onErrorCallback(error);
     }
@@ -92,8 +90,7 @@ export class AudioCore {
   pauseAudio() {
     if (this.sound && this.sound.playing()) {
       this.sound.pause();
-      this.updatePlayButton(false);
-      this.isPlaying = false;
+      // isPlaying flips false in onpause; UI updates happen in MultiPageReader listeners.
     }
   }
 
@@ -130,22 +127,6 @@ export class AudioCore {
     return this.sound ? this.sound.duration() : 0;
   }
 
-  updatePlayButton(playing) {
-    const playButton = document.querySelector('.playButton');
-    if (playButton) {
-      const icon = playButton.querySelector('i');
-      if (icon) {
-        if (playing) {
-          icon.className = 'ph ph-pause';
-          playButton.classList.remove('paused');
-        } else {
-          icon.className = 'ph ph-play';
-          playButton.classList.add('paused');
-        }
-      }
-    }
-  }
-
   // Event callback setters
   onPlay(callback) { this.onPlayCallback = callback; }
   onPause(callback) { this.onPauseCallback = callback; }
@@ -153,6 +134,7 @@ export class AudioCore {
   onSeek(callback) { this.onSeekCallback = callback; }
   onError(callback) { this.onErrorCallback = callback; }
 
+  // Optional: if you really want these global controls here, keep them headless
   setupEventListeners() {
     if (AudioCore._controlsBound) return; // only bind once (first page)
     const playButton = document.querySelector('.playButton');

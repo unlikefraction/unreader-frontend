@@ -81,7 +81,7 @@ export default class MultiPageReader {
     this._isLoadingActiveAudio = false;
     this._autoplayOnReady = false;
 
-    // NEW: scroll-to-playhead UI state
+    // scroll-to-playhead UI
     this._scrollToPlayheadBtn = null;
     this._scrollWatchBound = false;
 
@@ -127,7 +127,6 @@ export default class MultiPageReader {
   _updateTransportMeta({ playing = false, loading = false, pageIndex = this.active, paragraphText = null } = {}) {
     const root = this._transportRoot();
     if (root) {
-      // Do NOT reflect "loading" on the transport anymore. Chips handle spinner.
       root.classList.remove('is-loading');
       root.classList.toggle('is-playing', !!playing);
       root.classList.toggle('is-paused', !playing);
@@ -140,7 +139,6 @@ export default class MultiPageReader {
     const playButton = document.querySelector('.playButton');
     const icon = playButton?.querySelector('i');
     if (playButton) {
-      // Stop toggling loading on the bottom player.
       playButton.classList.remove('loading');
       playButton.classList.toggle('playing', !!playing);
       playButton.classList.toggle('paused', !playing);
@@ -383,7 +381,7 @@ export default class MultiPageReader {
               (typeof hl.getCurrentWordEl === 'function' ? hl.getCurrentWordEl() : null);
             ReadAlong.get().onWordHighlighted(el || null);
           } catch {
-            ReadAlong.get().onWordHighlighted(null);
+            // swallow; ReadAlong is hardened against nulls anyway
           }
           return r;
         };
@@ -441,6 +439,7 @@ export default class MultiPageReader {
     else { pageIndex = this._initialActiveIndex; seconds = 0; this._saveLastPlayedCookie(pageIndex, 0); }
 
     this.setActive(pageIndex);
+    // Keep the initial page load scroll
     this._scrollActivePageIntoView(true);
 
     const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
@@ -456,7 +455,7 @@ export default class MultiPageReader {
     this._setupGlobalParagraphClickDelegation();
     this._setupIntersectionHydrator();
 
-    // NEW: watch scroll to toggle the "scroll to playhead" button
+    // watch scroll to toggle the "scroll to playhead" button
     this._bindScrollWatcher();
     this._updateScrollToPlayheadVisibility();
   }
@@ -483,7 +482,7 @@ export default class MultiPageReader {
     }
     this.active = i;
     this.#applyPageStateClasses(i);
-    this._syncPlayButton(false);
+    // DO NOT force paused UI here — let play()/pause() own the state.
 
     // Bind ReadAlong to the active page’s highlighter
     (async () => {
@@ -603,9 +602,18 @@ export default class MultiPageReader {
 
   pause() {
     if (this.active < 0) return;
+    // If we're auto-advancing/loading, don't flip the UI to paused.
+    const suppressUI = this._autoplayOnReady || this._isLoadingActiveAudio;
+
     this.instances[this.active]?.pause?.();
-    this._isLoadingActiveAudio = false; this._autoplayOnReady = false;
-    this._syncPlayButton(false);
+
+    // Now reset the flags
+    this._isLoadingActiveAudio = false;
+    this._autoplayOnReady = false;
+
+    if (!suppressUI) {
+      this._syncPlayButton(false);
+    }
     this._stopProgressTimer();
     this._saveLastPlayedCookie(this.active, this.getCurrentTime());
     try { window.app?.holdup?.noteLocalAudioActivity?.(false); } catch {}
@@ -637,21 +645,22 @@ export default class MultiPageReader {
     if (this.active >= this.pageMeta.length - 1) {
       const sys = this.instances[this.active];
       if (sys) { sys.highlighter?.handleAudioEnd?.(sys.getDuration()); this.#pageEl(this.active)?.classList.add('pageCompleted'); }
-      this._syncPlayButton(false);
+      // Don't force paused UI here.
       this._stopProgressTimer();
       this._saveLastPlayedCookie(this.active, this.getCurrentTime());
       return;
     }
 
     const target = this.active + 1;
+
+    // MARK INTENT FIRST so any pauses during page switch don't flip the UI
+    this._isLoadingActiveAudio = true;
+    this._autoplayOnReady = !!auto;
+    this._syncPlayButton(true, { loading: true });
+
     this.setActive(target);
-
-    // NOTE: We no longer force-scroll here unconditionally.
-    // Initial-load scroll remains elsewhere; manual next will still center below.
-
     this._stopProgressTimer();
 
-    this._isLoadingActiveAudio = true; this._autoplayOnReady = !!auto; this._syncPlayButton(true, { loading: true });
     const url = await this._awaitReadyAudioAndTranscript(target, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
     if (url) this._swapAudioUrl(target, url);
 
@@ -661,30 +670,14 @@ export default class MultiPageReader {
       // Start playback first so the highlighter paints a current word
       await this.play();
 
-      // Snap to playhead (heightSetter) after render; retry next frame if needed, fallback to centering page
+      // Try to snap to the playhead line only; if there's no word yet, do nothing (no random scroll)
       requestAnimationFrame(() => {
         try {
           const ra = ReadAlong.get();
-          const snapped = ra && typeof ra.snapToCurrentWord === 'function'
-            ? ra.snapToCurrentWord({ smooth: true })
-            : false;
-
-          if (!snapped) {
-            requestAnimationFrame(() => {
-              try {
-                const ra2 = ReadAlong.get();
-                const ok = ra2 && typeof ra2.snapToCurrentWord === 'function'
-                  ? ra2.snapToCurrentWord({ smooth: true })
-                  : false;
-                if (!ok) this._scrollActivePageIntoView(true);
-              } catch {
-                this._scrollActivePageIntoView(true);
-              }
-            });
+          if (ra && typeof ra.snapToCurrentWord === 'function') {
+            ra.snapToCurrentWord({ smooth: true }); // returns false if no current word — fine.
           }
-        } catch {
-          this._scrollActivePageIntoView(true);
-        }
+        } catch { /* no-op */ }
       });
     } else {
       // Manual next: keep the classic centering scroll
@@ -869,7 +862,6 @@ export default class MultiPageReader {
     btn.setAttribute('aria-label', 'Scroll to current page');
     btn.textContent = 'Scroll to playhead';
 
-    // Minimal inline styling (you can theme in CSS later)
     Object.assign(btn.style, {
       position: 'fixed',
       left: '50%',
@@ -886,20 +878,17 @@ export default class MultiPageReader {
       display: 'none'
     });
 
-    // UPDATED: snap the *current highlighted word* to the read-along line
+    // snap the current highlighted word to the read-along line
     btn.addEventListener('click', async () => {
-      // Ensure active page is hydrated so ReadAlong knows the highlighter
       if (this.active >= 0 && !this.instances[this.active]) {
         await this.hydratePage(this.active);
       }
       try {
         const ra = ReadAlong.get();
-        // try a precise snap to the read-along height
         const snapped = ra && typeof ra.snapToCurrentWord === 'function'
           ? ra.snapToCurrentWord({ smooth: true })
           : false;
 
-        // Fallback: center the active page if no word is highlighted yet
         if (!snapped) this._scrollActivePageIntoView(true);
       } catch {
         this._scrollActivePageIntoView(true);
