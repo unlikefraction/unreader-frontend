@@ -331,27 +331,29 @@ if (linkEl) linkEl.href = chosenHref;
 // letter by letter typing animation
 
 (function () {
-  // ===== Vars you can tweak =====
+  // ===== Tunables =====
   var CONTAINER_SELECTOR = '.mainContent';
-  var START_DELAY_MS     = 300;   // minimum delay before even considering start
-  var QUIET_WINDOW_MS    = 500;   // must be no DOM changes for this long
-  var MIN_TEXT_LEN       = 200;   // don’t start until there’s at least this much text
-  var CHAR_DELAY_MS      = 2;     // ~6ms/char; raise to see more dramatic animation
-  var INSTANT_FINISH_KEY = 'Escape'; // press Esc to dump the rest instantly
-  var MAX_WAIT_MS        = 5000; // safety: start anyway after this much waiting
+  var START_DELAY_MS     = 300;    // minimum delay before even considering start
+  var QUIET_WINDOW_MS    = 500;    // must be no DOM changes for this long
+  var MIN_TEXT_LEN       = 200;    // don’t start until there’s at least this much text
+  var MAX_WAIT_MS        = 5000;   // safety: start anyway after this much waiting
+
+  var WORD_DELAY_MS      = 28;     // stagger between words (fast)
+  var WORD_FADE_MS       = 140;    // how long each word takes to fade in
+  var INSTANT_FINISH_KEY = 'Escape';
 
   // Expose live tuning if you want
   if (typeof window !== 'undefined') {
-    window.typeConfig = { start: START_DELAY_MS, char: CHAR_DELAY_MS };
+    window.typeConfig = { start: START_DELAY_MS, wordDelay: WORD_DELAY_MS, fade: WORD_FADE_MS };
   }
 
-  // Hide ASAP (and win against CSS with !important). Preserve exact inline style to restore later.
+  // Hide ASAP to avoid flash before wrapping; keep layout stable
   function hideEarly() {
     var c = document.querySelector(CONTAINER_SELECTOR);
-    if (!c || c.dataset._typedInit === '1') return;
-    c.dataset._typedInit = '1';
+    if (!c || c.dataset._wordfadeInit === '1') return;
+    c.dataset._wordfadeInit = '1';
     c.dataset._oldInlineStyle = c.getAttribute('style') || '';
-    c.style.setProperty('display', 'none', 'important');
+    c.style.setProperty('visibility', 'hidden', 'important'); // invisible but keeps layout
   }
 
   if (document.readyState === 'loading') {
@@ -368,7 +370,7 @@ if (linkEl) linkEl.href = chosenHref;
     var firstPossibleStart = Date.now() + ((window.typeConfig && window.typeConfig.start) || START_DELAY_MS);
     var lastMutation = Date.now();
 
-    // Watch for your data population
+    // Track when your app stops mutating the DOM
     var mo = new MutationObserver(function () { lastMutation = Date.now(); });
     mo.observe(container, { childList: true, subtree: true, characterData: true });
 
@@ -396,7 +398,7 @@ if (linkEl) linkEl.href = chosenHref;
       started = true;
       clearTimeout(forceTimer);
       mo.disconnect();
-      beginTyping(container);
+      beginWordFade(container);
     }
   }
 
@@ -405,8 +407,14 @@ if (linkEl) linkEl.href = chosenHref;
     return txt.length >= MIN_TEXT_LEN;
   }
 
-  function beginTyping(container) {
-    // Collect text nodes in order
+  function beginWordFade(container) {
+    // Restore EXACT inline style the element had
+    var containerStyle = container.dataset._oldInlineStyle || '';
+    if (containerStyle) container.setAttribute('style', containerStyle);
+    else container.removeAttribute('style');
+    delete container.dataset._oldInlineStyle;
+
+    // 1) Collect text nodes (skip script/style/noscript)
     var walker = document.createTreeWalker(
       container,
       NodeFilter.SHOW_TEXT,
@@ -416,73 +424,76 @@ if (linkEl) linkEl.href = chosenHref;
           var p = node.parentNode; if (!p) return NodeFilter.FILTER_REJECT;
           var tag = p.nodeName.toLowerCase();
           if (tag === 'script' || tag === 'style' || tag === 'noscript') return NodeFilter.FILTER_REJECT;
+          // ignore pure-whitespace nodes so we don’t create junk spans
+          if (!node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
         }
       }
     );
 
-    var nodes = [], n;
-    while (n = walker.nextNode()) {
-      nodes.push({ node: n, text: n.nodeValue, i: 0 });
-    }
+    // 2) Replace words with span-wrapped words; preserve whitespace as text nodes
+    var wordSpans = [];
+    var toProcess = [];
+    var n; while (n = walker.nextNode()) toProcess.push(n);
 
-    // Blank the text while still hidden
-    for (var k = 0; k < nodes.length; k++) nodes[k].node.nodeValue = '';
-
-    // Restore the EXACT inline style the element had
-    var containerStyle = container.dataset._oldInlineStyle || '';
-    if (containerStyle) container.setAttribute('style', containerStyle);
-    else container.removeAttribute('style');
-    delete container.dataset._oldInlineStyle;
-
-    if (!nodes.length) return; // nothing to type
-
-    // RAF-driven typer
-    var skip = false;
-    window.addEventListener('keydown', function (e) { if (e.key === INSTANT_FINISH_KEY) skip = true; });
-
-    var last = null, acc = 0;
-    var charDelay = Math.max(1, (window.typeConfig && window.typeConfig.char) || CHAR_DELAY_MS);
-
-    function frame(ts) {
-      if (skip) {
-        for (var a = 0; a < nodes.length; a++) {
-          var it = nodes[a];
-          if (it.i < it.text.length) {
-            it.node.nodeValue += it.text.slice(it.i);
-            it.i = it.text.length;
-          }
+    toProcess.forEach(function (textNode) {
+      var text = textNode.nodeValue;
+      var parts = text.split(/(\s+)/); // capture spaces as separate tokens
+      var frag = document.createDocumentFragment();
+      for (var i = 0; i < parts.length; i++) {
+        var token = parts[i];
+        if (i % 2 === 1) {
+          // whitespace token: keep as text node
+          frag.appendChild(document.createTextNode(token));
+        } else if (token.length) {
+          // word token: wrap
+          var span = document.createElement('span');
+          span.textContent = token;
+          span.style.opacity = '0';
+          span.style.transition = 'opacity ' + ((window.typeConfig && window.typeConfig.fade) || WORD_FADE_MS) + 'ms ease';
+          // prevent awkward line height jumps
+          span.style.display = 'inline-block';
+          span.style.willChange = 'opacity';
+          frag.appendChild(span);
+          wordSpans.push(span);
         }
-        return; // done
       }
+      textNode.parentNode.replaceChild(frag, textNode);
+    });
 
-      if (last == null) last = ts;
-      var dt = ts - last; last = ts; acc += dt;
+    // 3) Reveal container (still invisible words)
+    container.style.visibility = 'visible';
 
-      // Type as many chars as budget allows, capped per frame for visible motion
-      var MAX_CHARS_PER_FRAME = 60;
-      var typedThisFrame = 0;
+    if (!wordSpans.length) return;
 
-      while (acc >= charDelay && typedThisFrame < MAX_CHARS_PER_FRAME) {
-        if (!typeOneChar(nodes)) return; // finished all
-        acc -= charDelay;
-        typedThisFrame++;
+    var skip = false;
+    window.addEventListener('keydown', function (e) {
+      if (e.key === INSTANT_FINISH_KEY) {
+        skip = true;
+        for (var i = 0; i < wordSpans.length; i++) {
+          wordSpans[i].style.transition = 'none';
+          wordSpans[i].style.opacity = '1';
+        }
       }
-      requestAnimationFrame(frame);
+    });
+
+    // 4) Staggered fade of words
+    var delay = Math.max(0, (window.typeConfig && window.typeConfig.wordDelay) || WORD_DELAY_MS);
+    // Use rAF to start smooth, then setTimeout chain for cadence
+    var i = 0;
+    function revealNextBatch(ts) {
+      if (skip) return;
+      // Reveal a small batch per frame to keep it zippy
+      var BATCH = 8; // fast visual ramp; tweak if you want more/less burst
+      for (var k = 0; k < BATCH && i < wordSpans.length; k++, i++) {
+        (function (idx) {
+          setTimeout(function () {
+            if (!skip) wordSpans[idx].style.opacity = '1';
+          }, idx * delay);
+        })(i);
+      }
+      if (i < wordSpans.length && !skip) requestAnimationFrame(revealNextBatch);
     }
-
-    // tiny start delay helps browsers paint the blank state
-    setTimeout(function () { requestAnimationFrame(frame); }, 0);
-  }
-
-  function typeOneChar(nodes) {
-    for (var idx = 0; idx < nodes.length; idx++) {
-      var it = nodes[idx];
-      if (it.i < it.text.length) {
-        it.node.nodeValue += it.text.charAt(it.i++);
-        return true; // still work to do
-      }
-    }
-    return false; // all done
+    requestAnimationFrame(revealNextBatch);
   }
 })();
