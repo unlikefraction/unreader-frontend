@@ -763,7 +763,7 @@ mark{
 }
 
 /* Grab that exact span and give it a yellow background */
-#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="302"] {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="299"] {
   position: relative;
   padding: 2px 6px;
   border: 2px solid transparent;
@@ -789,7 +789,7 @@ mark{
 }
 
 
-#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="302"]::after {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="299"]::after {
   content: 'click to copy';
   position: absolute;
   top: calc(100% + 8px);  /* 4px gap below the span */
@@ -811,13 +811,13 @@ mark{
   box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
 }
 
-#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="320"] {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="317"] {
   position: relative;       /* establishes a positioning context */
   z-index: -1;               /* text stays on top of the pseudo-bg */
   pointer-events: none;
 }
 
-#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="320"]::before {
+#mainContent-transcript-landing-html-order-word-timings-ordered-json-100 span.highlight[data-index="317"]::before {
   content: "";
   position: absolute;
   top: 50%;
@@ -851,6 +851,14 @@ mark{
 
 /* Default: animation on */
 [data-page-id="transcript-landing-html-order-word-timings-ordered-json-100"] 
+[data-paragraph-index="0"] {
+  display: block !important;
+  top: 33px !important;
+  left: -10px !important;
+}
+
+/* Default: animation on */
+[data-page-id="transcript-pricinghtml-html-order-word-timings-pricing-json-100"] 
 [data-paragraph-index="0"] {
   display: block !important;
   top: 33px !important;

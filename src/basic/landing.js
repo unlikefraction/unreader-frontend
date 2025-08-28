@@ -21,11 +21,11 @@ if (linkEl) linkEl.href = chosenHref;
 (() => {
   const ROOT = '#mainContent-transcript-landing-html-order-word-timings-ordered-json-100';
 
-  // 302 = copy coupon
-  const SEL_COPY = `${ROOT} span.highlight[data-index="302"]`;
+  // 299 = copy coupon
+  const SEL_COPY = `${ROOT} span.highlight[data-index="299"]`;
 
   // 320/321/322 = redirect (bling)
-  const REDIRECT_INDEXES = [320, 321, 322];
+  const REDIRECT_INDEXES = [317, 318, 319];
   const REDIRECT_SELECTORS = REDIRECT_INDEXES.map(i => `${ROOT} span.highlight[data-index="${i}"]`);
 
   const q = (sel) => document.querySelector(sel);
@@ -317,5 +317,172 @@ if (linkEl) linkEl.href = chosenHref;
     document.addEventListener("DOMContentLoaded", initLoginGate);
   } else {
     initLoginGate();
+  }
+})();
+
+
+
+
+
+
+
+
+
+// letter by letter typing animation
+
+(function () {
+  // ===== Vars you can tweak =====
+  var CONTAINER_SELECTOR = '.mainContent';
+  var START_DELAY_MS     = 300;   // minimum delay before even considering start
+  var QUIET_WINDOW_MS    = 500;   // must be no DOM changes for this long
+  var MIN_TEXT_LEN       = 200;   // don’t start until there’s at least this much text
+  var CHAR_DELAY_MS      = 2;     // ~6ms/char; raise to see more dramatic animation
+  var INSTANT_FINISH_KEY = 'Escape'; // press Esc to dump the rest instantly
+  var MAX_WAIT_MS        = 5000; // safety: start anyway after this much waiting
+
+  // Expose live tuning if you want
+  if (typeof window !== 'undefined') {
+    window.typeConfig = { start: START_DELAY_MS, char: CHAR_DELAY_MS };
+  }
+
+  // Hide ASAP (and win against CSS with !important). Preserve exact inline style to restore later.
+  function hideEarly() {
+    var c = document.querySelector(CONTAINER_SELECTOR);
+    if (!c || c.dataset._typedInit === '1') return;
+    c.dataset._typedInit = '1';
+    c.dataset._oldInlineStyle = c.getAttribute('style') || '';
+    c.style.setProperty('display', 'none', 'important');
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { hideEarly(); init(); });
+  } else {
+    hideEarly(); init();
+  }
+
+  function init() {
+    var container = document.querySelector(CONTAINER_SELECTOR);
+    if (!container) return;
+
+    var started = false;
+    var firstPossibleStart = Date.now() + ((window.typeConfig && window.typeConfig.start) || START_DELAY_MS);
+    var lastMutation = Date.now();
+
+    // Watch for your data population
+    var mo = new MutationObserver(function () { lastMutation = Date.now(); });
+    mo.observe(container, { childList: true, subtree: true, characterData: true });
+
+    // Manual override: dispatch when your app is ready
+    window.addEventListener('typing:go', function () { tryStart(true); });
+
+    var forceTimer = setTimeout(function () { tryStart(true); }, MAX_WAIT_MS);
+    tickCheck();
+
+    function tickCheck() {
+      if (started) return;
+      var now = Date.now();
+      if (now < firstPossibleStart) { return setTimeout(tickCheck, firstPossibleStart - now); }
+      if (!hasEnoughContent(container)) { return setTimeout(tickCheck, 100); }
+      if (now - lastMutation < QUIET_WINDOW_MS) { return setTimeout(tickCheck, QUIET_WINDOW_MS); }
+      tryStart(false);
+    }
+
+    function tryStart(force) {
+      if (started) return;
+      if (!force) {
+        if (!hasEnoughContent(container)) return tickCheck();
+        if (Date.now() - lastMutation < QUIET_WINDOW_MS) return tickCheck();
+      }
+      started = true;
+      clearTimeout(forceTimer);
+      mo.disconnect();
+      beginTyping(container);
+    }
+  }
+
+  function hasEnoughContent(container) {
+    var txt = (container.textContent || '').trim();
+    return txt.length >= MIN_TEXT_LEN;
+  }
+
+  function beginTyping(container) {
+    // Collect text nodes in order
+    var walker = document.createTreeWalker(
+      container,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: function (node) {
+          if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+          var p = node.parentNode; if (!p) return NodeFilter.FILTER_REJECT;
+          var tag = p.nodeName.toLowerCase();
+          if (tag === 'script' || tag === 'style' || tag === 'noscript') return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+
+    var nodes = [], n;
+    while (n = walker.nextNode()) {
+      nodes.push({ node: n, text: n.nodeValue, i: 0 });
+    }
+
+    // Blank the text while still hidden
+    for (var k = 0; k < nodes.length; k++) nodes[k].node.nodeValue = '';
+
+    // Restore the EXACT inline style the element had
+    var containerStyle = container.dataset._oldInlineStyle || '';
+    if (containerStyle) container.setAttribute('style', containerStyle);
+    else container.removeAttribute('style');
+    delete container.dataset._oldInlineStyle;
+
+    if (!nodes.length) return; // nothing to type
+
+    // RAF-driven typer
+    var skip = false;
+    window.addEventListener('keydown', function (e) { if (e.key === INSTANT_FINISH_KEY) skip = true; });
+
+    var last = null, acc = 0;
+    var charDelay = Math.max(1, (window.typeConfig && window.typeConfig.char) || CHAR_DELAY_MS);
+
+    function frame(ts) {
+      if (skip) {
+        for (var a = 0; a < nodes.length; a++) {
+          var it = nodes[a];
+          if (it.i < it.text.length) {
+            it.node.nodeValue += it.text.slice(it.i);
+            it.i = it.text.length;
+          }
+        }
+        return; // done
+      }
+
+      if (last == null) last = ts;
+      var dt = ts - last; last = ts; acc += dt;
+
+      // Type as many chars as budget allows, capped per frame for visible motion
+      var MAX_CHARS_PER_FRAME = 60;
+      var typedThisFrame = 0;
+
+      while (acc >= charDelay && typedThisFrame < MAX_CHARS_PER_FRAME) {
+        if (!typeOneChar(nodes)) return; // finished all
+        acc -= charDelay;
+        typedThisFrame++;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // tiny start delay helps browsers paint the blank state
+    setTimeout(function () { requestAnimationFrame(frame); }, 0);
+  }
+
+  function typeOneChar(nodes) {
+    for (var idx = 0; idx < nodes.length; idx++) {
+      var it = nodes[idx];
+      if (it.i < it.text.length) {
+        it.node.nodeValue += it.text.charAt(it.i++);
+        return true; // still work to do
+      }
+    }
+    return false; // all done
   }
 })();
