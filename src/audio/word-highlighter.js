@@ -11,7 +11,7 @@ export class WordHighlighter {
     this.loggedWords = new Set();
     this.lastHighlightedIndex = 0;
     this.isInitialHighlightDone = false;
-    this.lookaheadMs = 100;
+    this.lookaheadMs = 50;
     this.processedTimingIndices = new Set();
     this.currentHighlightedWord = null;
 
