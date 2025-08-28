@@ -1,280 +1,289 @@
 // -------playback-controls.js--------
 
-/**
- * Playback speed control and device management
- */
+// Mic input is lazy: no permissions until .hold-up is clicked.
+// Input dropdown shows a placeholder by default.
+// If the user denies mic permission, we show a one-time alert and avoid re-requesting
+// until they manually enable and reload.
+
 export class PlaybackControls {
-    constructor(audioCore) {
-      this.audioCore = audioCore;
-      this.sliderAPI = null;
-      this.setupPlaybackSlider();
-      this.setupDeviceSelection();
-      this.setupSettingsDialog();
-    }
-  
-    createPlaybackSlider(containerSelector, onSpeedChange = null) {
-      const playBackSlider = document.querySelector(containerSelector);
-      if (!playBackSlider) {
-        printError('Playback slider container not found');
-        return null;
-      }
-  
-      const slider = playBackSlider.querySelector('.slider');
-      const thumb = playBackSlider.querySelector('.thumb');
-      const valueDisplay = thumb.querySelector('.value');
-  
-      if (!slider || !thumb || !valueDisplay) {
-        printError('Playback slider elements not found');
-        return null;
-      }
-  
-      let isDragging = false;
-      let sliderRect;
-  
-      function widthToSpeed(widthPercent) {
-        const speed = 0.5 + ((widthPercent - 40) / 60) * 1.5;
-        return Math.round(speed * 10) / 10;
-      }
-  
-      function speedToWidth(speed) {
-        return 40 + ((speed - 0.5) / 1.5) * 60;
-      }
-  
-      function getThumbWidthFromPosition(clientX) {
-        const rect = sliderRect;
-        const relativeX = clientX - rect.left;
-        const clickPercentage = (relativeX / rect.width) * 100;
-        const thumbOffset = -7;
-        const centeredWidth = clickPercentage - thumbOffset;
-        return Math.max(40, Math.min(100, centeredWidth));
-      }
-      
-      function updateSliderDisplay(widthPercent) {
-        thumb.style.width = widthPercent + '%';
-        const speed = widthToSpeed(widthPercent);
-        valueDisplay.textContent = speed.toFixed(1);
-        if (onSpeedChange) onSpeedChange(speed);
-      }
-  
-      function updateSlider(clientX) {
-        const pct = getThumbWidthFromPosition(clientX);
-        updateSliderDisplay(pct);
-      }
-  
-      function handleMouseDown(e) {
-        isDragging = true;
-        sliderRect = slider.getBoundingClientRect();
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        e.preventDefault();
-        updateSlider(e.clientX);
-      }
-  
-      function handleMouseMove(e) {
-        if (!isDragging) return;
-        updateSlider(e.clientX);
-      }
-  
-      function handleMouseUp() {
-        isDragging = false;
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      }
-  
-      function handleTouchStart(e) {
-        isDragging = true;
-        sliderRect = slider.getBoundingClientRect();
-        document.addEventListener('touchmove', handleTouchMove, { passive: false });
-        document.addEventListener('touchend', handleTouchEnd);
-        e.preventDefault();
-        updateSlider(e.touches[0].clientX);
-      }
-  
-      function handleTouchMove(e) {
-        if (!isDragging) return;
-        e.preventDefault();
-        updateSlider(e.touches[0].clientX);
-      }
-  
-      function handleTouchEnd() {
-        isDragging = false;
-        document.removeEventListener('touchmove', handleTouchMove);
-        document.removeEventListener('touchend', handleTouchEnd);
-      }
-  
-      function init() {
-        const initialWidth = speedToWidth(1.0);
-        updateSliderDisplay(initialWidth);
-        thumb.addEventListener('mousedown', handleMouseDown);
-        slider.addEventListener('mousedown', handleMouseDown);
-        thumb.addEventListener('touchstart', handleTouchStart);
-        slider.addEventListener('touchstart', handleTouchStart);
-      }
-  
-      const api = {
-        getCurrentSpeed() {
-          return parseFloat(valueDisplay.textContent);
-        },
-        setSpeed(speed) {
-          const constrainedSpeed = Math.max(0.5, Math.min(2.0, speed));
-          const width = speedToWidth(constrainedSpeed);
-          updateSliderDisplay(width);
-        },
-        destroy() {
-          thumb.removeEventListener('mousedown', handleMouseDown);
-          slider.removeEventListener('mousedown', handleMouseDown);
-          thumb.removeEventListener('touchstart', handleTouchStart);
-          slider.removeEventListener('touchstart', handleTouchStart);
-          document.removeEventListener('mousemove', handleMouseMove);
-          document.removeEventListener('mouseup', handleMouseUp);
-          document.removeEventListener('touchmove', handleTouchMove);
-          document.removeEventListener('touchend', handleTouchEnd);
-        }
-      };
-  
-      init();
-      return api;
-    }
-  
-    setupPlaybackSlider() {
-      this.sliderAPI = this.createPlaybackSlider('.playBack', speed => {
-        this.audioCore.setPlaybackSpeed(speed);
-      });
-      
-      if (this.sliderAPI) {
-        printl('🔗 Speed slider connected to audio');
-      }
-    }
-  
-    async setupDeviceSelection() {
-      try {
-        // Create or get the audio element for Howler output
-        let howlerOutput = document.getElementById('howler-output');
-        if (!howlerOutput) {
-          howlerOutput = new Audio();
-          howlerOutput.autoplay = true;
-          howlerOutput.id = 'howler-output';
-          document.body.appendChild(howlerOutput);
-        }
-      
-        // Route Howler's Web Audio through our custom audio element
-        if (Howler.usingWebAudio && Howler.ctx && Howler.masterGain) {
-          const dest = Howler.ctx.createMediaStreamDestination();
-          Howler.masterGain.connect(dest);
-          howlerOutput.srcObject = dest.stream;
-          printl('🔗 Howler output routed to custom audio element');
-        }
-      
-        // Select elements for device lists
-        const outputSelect = document.querySelector('#output-device select.device-select');
-        const inputSelect = document.querySelector('#input-device select.device-select');
-        
-        if (!outputSelect || !inputSelect) {
-          printError('Device select elements not found');
-          return;
-        }
-  
-        let currentStream;
-      
-        // Set the chosen input device (no further processing for now)
-        async function setInput(id) {
-          if (currentStream) currentStream.getTracks().forEach(t => t.stop());
-          try {
-            currentStream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: id }}});
-            printl(`🎤 Input device selected: ${id}`);
-            // No additional input handling at this time
-          } catch (e) {
-            printError('Input device error:', e);
-          }
-        }
-      
-        // Set the chosen output device for Howler and fallback for other audio elements
-        async function setOutput(id) {
-          if (howlerOutput.setSinkId) {
-            try {
-              await howlerOutput.setSinkId(id);
-              printl(`🔈 Output device set to: ${id}`);
-            } catch(e) {
-              printError('sinkId failed on Howler output:', e);
-            }
-          } else {
-            document.querySelectorAll('audio').forEach(async audio => {
-              if (audio.setSinkId) {
-                try { await audio.setSinkId(id); }
-                catch(err){ printError('sinkId fallback failed', err); }
-              }
-            });
-          }
-        }
-      
-        // Refresh available devices in the select lists
-        async function refreshDevices() {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          outputSelect.innerHTML = '';
-          inputSelect.innerHTML = '';
-          devices.forEach(d => {
-            const opt = document.createElement('option');
-            opt.value = d.deviceId;
-            opt.text = d.label || d.kind;
-            if (d.kind === 'audioinput') inputSelect.append(opt);
-            if (d.kind === 'audiooutput') outputSelect.append(opt);
-          });
-        }
-      
-        navigator.mediaDevices.addEventListener('devicechange', refreshDevices);
-        await refreshDevices();
-      
-        // Wire up change events
-        inputSelect.addEventListener('change', () => setInput(inputSelect.value));
-        outputSelect.addEventListener('change', () => setOutput(outputSelect.value));
-      
-        // Trigger default selection
-        if (inputSelect.options.length) inputSelect.dispatchEvent(new Event('change'));
-        if (outputSelect.options.length) outputSelect.dispatchEvent(new Event('change'));
-  
-      } catch (error) {
-        printError('Error setting up device selection:', error);
-      }
-    }
-  
-    setupSettingsDialog() {
-      const gearBtn = document.querySelector('.settings.control');
-      const settingsD = document.querySelector('.settingsDialog');
-      
-      if (!gearBtn || !settingsD) {
-        printError('Settings dialog elements not found');
-        return;
-      }
-  
-      gearBtn.addEventListener('click', () => {
-        // flip the "active" class
-        settingsD.classList.toggle('active');
-        // optional: animate the gear icon or mark it active
-        gearBtn.classList.toggle('active');
-      });
-  
-      document.addEventListener('click', e => {
-        if (!settingsD.contains(e.target) && !gearBtn.contains(e.target)) {
-          settingsD.classList.remove('active');
-          gearBtn.classList.remove('active');
-        }
-      });
-    }
-  
-    // Public API methods
-    getCurrentSpeed() {
-      return this.sliderAPI ? this.sliderAPI.getCurrentSpeed() : 1.0;
-    }
-  
-    setSpeed(speed) {
-      if (this.sliderAPI) {
-        this.sliderAPI.setSpeed(speed);
-      }
-    }
-  
-    destroy() {
-      if (this.sliderAPI) {
-        this.sliderAPI.destroy();
-      }
+  constructor() {
+    this._currentStream = null;
+    this._currentInputId = null;
+    this._holdupStarted = false;
+
+    this._micPermissionBlocked = false; // sticky after explicit deny
+    this._onDeviceChange = this._refreshDevices.bind(this);
+
+    const boot = () => {
+      this._setupInitialInputUI();  // placeholder only
+      this._bindSettingsDialog();   // dialog only, no device work
+      this._bindHoldUpTrigger();    // permission unlock + list + mic on click
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', boot, { once: true });
+    } else {
+      boot();
     }
   }
+
+  // ----- UI: placeholder text in the input select -----
+  _setupInitialInputUI() {
+    const inputSelect = document.querySelector('#input-device select.device-select');
+    if (!inputSelect) {
+      this._logErr('Input device select element not found');
+      return;
+    }
+    this._setPlaceholder(inputSelect);
+  }
+
+  _setPlaceholder(selectEl) {
+    selectEl.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.text = 'Input device selector when using holdup';
+    opt.disabled = true;
+    opt.selected = true;
+    selectEl.append(opt);
+  }
+
+  // ----- Holdup trigger: unlock permission → enumerate → choose mic → request exact device -----
+  _bindHoldUpTrigger() {
+    const holdBtn = document.querySelector('.hold-up');
+    if (!holdBtn) {
+      this._logErr('.hold-up button not found');
+      return;
+    }
+
+    holdBtn.addEventListener('click', async () => {
+      if (this._micPermissionBlocked) return this._showMicPermissionHelp();
+
+      this._holdupStarted = true;
+
+      // 1) Unlock permission so enumerateDevices returns real IDs + labels
+      const ok = await this._ensurePermissionUnlock();
+      if (!ok) return; // user denied or unlock failed
+
+      // 2) Build input device list
+      await this._refreshDevices();
+
+      // 3) Pick selection (first option if none chosen), then request that exact device
+      const inputSelect = document.querySelector('#input-device select.device-select');
+      if (!inputSelect) return;
+
+      const firstReal = [...inputSelect.options].find(o => o.value);
+      if (firstReal) {
+        if (!inputSelect.value) inputSelect.value = firstReal.value;
+        await this._setInput(inputSelect.value);
+      } else {
+        alert('No microphones detected. Please connect a mic and try again.');
+      }
+    });
+  }
+
+  // One-shot permission unlock (stop tracks immediately)
+  async _ensurePermissionUnlock() {
+    // HTTPS/localhost is required for full media APIs in most browsers.
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      this._logErr('Non-secure context; media device enumeration may fail. Use HTTPS or localhost.');
+    }
+
+    // If the Permissions API already says "denied", don't even prompt.
+    if (await this._isMicPermanentlyDenied()) {
+      this._micPermissionBlocked = true;
+      this._showMicPermissionHelp();
+      return false;
+    }
+
+    try {
+      const tmp = await navigator.mediaDevices.getUserMedia({ audio: true });
+      tmp.getTracks().forEach(t => t.stop());
+      // allow labels to propagate to enumerateDevices
+      await new Promise(r => setTimeout(r, 0));
+      return true;
+    } catch (e) {
+      if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
+        this._micPermissionBlocked = true;
+        this._showMicPermissionHelp();
+        return false;
+      }
+      if (e && e.name === 'NotFoundError') {
+        alert('No microphone found. Plug one in and try again.');
+        return false;
+      }
+      this._logErr('getUserMedia failed during permission unlock:', e);
+      return false;
+    }
+  }
+
+  // Build/refresh the input devices list; attach change handler the first time.
+  async _refreshDevices() {
+    const inputSelect = document.querySelector('#input-device select.device-select');
+    if (!inputSelect) {
+      this._logErr('Input device select element not found');
+      return;
+    }
+
+    let devices = [];
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch (e) {
+      this._logErr('enumerateDevices failed:', e);
+      this._setPlaceholder(inputSelect);
+      return;
+    }
+
+    const prev = inputSelect.value;
+    inputSelect.innerHTML = '';
+    let count = 0;
+
+    for (const d of devices) {
+      if (d.kind !== 'audioinput') continue;
+      const opt = document.createElement('option');
+      opt.value = d.deviceId;                  // concrete IDs after unlock
+      opt.text  = d.label || 'Microphone';     // labels visible post-unlock
+      inputSelect.append(opt);
+      count++;
+    }
+
+    if (count === 0) {
+      // As a fallback, try one more unlock-then-enumerate (some UAs are finicky)
+      const ok = this._holdupStarted ? await this._ensurePermissionUnlock() : false;
+      if (ok) return this._refreshDevices();
+      this._setPlaceholder(inputSelect);
+    } else {
+      // restore prior selection if still valid
+      if (prev && [...inputSelect.options].some(o => o.value === prev)) {
+        inputSelect.value = prev;
+      }
+      // bind change only once
+      if (!inputSelect.dataset.bound) {
+        inputSelect.addEventListener('change', () => this._setInput(inputSelect.value));
+        inputSelect.dataset.bound = 'true';
+      }
+    }
+
+    // devicechange only after holdup begins to avoid background churn
+    navigator.mediaDevices.removeEventListener('devicechange', this._onDeviceChange);
+    if (this._holdupStarted) {
+      navigator.mediaDevices.addEventListener('devicechange', this._onDeviceChange);
+    }
+  }
+
+  // Actually request the selected mic (after holdup click).
+  async _setInput(id) {
+    if (!this._holdupStarted) return; // guard: never request early
+    if (this._micPermissionBlocked) return this._showMicPermissionHelp();
+
+    // If Permissions API says denied, don't call getUserMedia again.
+    if (await this._isMicPermanentlyDenied()) {
+      this._micPermissionBlocked = true;
+      return this._showMicPermissionHelp();
+    }
+
+    try {
+      if (this._currentStream) {
+        this._currentStream.getTracks().forEach(t => t.stop());
+        this._currentStream = null;
+      }
+
+      this._currentStream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: id ? { exact: id } : undefined }
+      });
+
+      this._currentInputId = id || null;
+      this._log(`🎤 Input device selected: ${id || 'default'}`);
+    } catch (e) {
+      if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
+        this._micPermissionBlocked = true;
+        return this._showMicPermissionHelp();
+      }
+      if (e && e.name === 'NotFoundError') {
+        alert('No microphone found. Plug one in and try again.');
+        return;
+      }
+      this._logErr('Input device error:', e);
+    }
+  }
+
+  // ----- Settings dialog: open reliably -----
+  _bindSettingsDialog() {
+    const gearBtn = document.querySelector('.settings.control');
+    const settingsD = document.querySelector('.settingsDialog');
+
+    if (!gearBtn || !settingsD) {
+      // If your DOM mounts later, ctor already handled DOMContentLoaded.
+      this._logErr('Settings dialog elements not found');
+      return;
+    }
+
+    // Ensure it opens even if clicks bubble: stop propagation on the gear.
+    gearBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      settingsD.classList.toggle('active');
+      gearBtn.classList.toggle('active');
+      gearBtn.setAttribute('aria-expanded', settingsD.classList.contains('active') ? 'true' : 'false');
+      settingsD.setAttribute('aria-hidden', settingsD.classList.contains('active') ? 'false' : 'true');
+    });
+
+    // Close on outside click.
+    document.addEventListener('click', (e) => {
+      if (!settingsD.contains(e.target) && !gearBtn.contains(e.target)) {
+        settingsD.classList.remove('active');
+        gearBtn.classList.remove('active');
+        gearBtn.setAttribute('aria-expanded', 'false');
+        settingsD.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    // Close on Escape.
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        settingsD.classList.remove('active');
+        gearBtn.classList.remove('active');
+        gearBtn.setAttribute('aria-expanded', 'false');
+        settingsD.setAttribute('aria-hidden', 'true');
+      }
+    });
+  }
+
+  // ----- Permission helpers -----
+  async _isMicPermanentlyDenied() {
+    try {
+      if (!('permissions' in navigator) || !navigator.permissions?.query) return false;
+      const st = await navigator.permissions.query({ name: 'microphone' });
+      return st.state === 'denied';
+    } catch {
+      return false; // Safari/older browsers: fall back to sticky flag
+    }
+  }
+
+  _showMicPermissionHelp() {
+    alert(
+      "Microphone access is blocked for this site.\n\n" +
+      "Enable it manually and reload:\n" +
+      "• Chrome/Edge: Lock icon → Site settings → Allow Microphone.\n" +
+      "• Safari: Settings → Websites → Microphone → Allow for this site.\n" +
+      "• Firefox: Lock icon → Connection settings → Permissions → Microphone.\n\n" +
+      "After enabling, reload and press Hold Up again."
+    );
+  }
+
+  // ----- Public API -----
+  getCurrentInputId() { return this._currentInputId || null; }
+  getCurrentStream()  { return this._currentStream || null; }
+
+  destroy() {
+    try {
+      navigator.mediaDevices.removeEventListener('devicechange', this._onDeviceChange);
+    } catch {}
+    if (this._currentStream) {
+      this._currentStream.getTracks().forEach(t => t.stop());
+      this._currentStream = null;
+    }
+  }
+
+  // ----- tiny log helpers -----
+  _log(...a)    { try { if (typeof printl === 'function') printl(...a); } catch {} }
+  _logErr(...a) { try { if (typeof printError === 'function') printError(...a); } catch { console.error(...a); } }
+}

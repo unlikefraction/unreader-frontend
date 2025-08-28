@@ -1,6 +1,5 @@
 // holdup.js
 
-
 function getCookie(name) {
   const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return m ? decodeURIComponent(m[2]) : null;
@@ -51,6 +50,9 @@ export class HoldupManager {
     this._inactivityTimer = null;
     this._localAudioActive = false;
 
+    // NEW: sticky mic-permission denial; once set, we never re-request this session
+    this._micPermissionBlocked = false;
+
     this._ensureStatusOutlet();
     this._bindHoldUpButton();
     this._setStatus('Idle');
@@ -62,7 +64,7 @@ export class HoldupManager {
   /* -------------------- UI helpers -------------------- */
   _ensureStatusOutlet() {
     const host = document.querySelector('.holdup') || document.body;
-    // No-op for now, but kept for parity if you add a status element later.
+    // reserved for future status outlet
   }
   _setStatus(text) {
     const el = document.querySelector('.holdup');
@@ -79,7 +81,7 @@ export class HoldupManager {
    * States:
    *  - connecting: when establishing LiveKit connection or switching pages
    *  - loading: when user just pressed to change mute state (optimistic spinner)
-   *  - active: remote+mic engaged (unmuted conversation state)
+   *  - active: conversation engaged (remote unmuted; mic attempted)
    * Default (muted & idle): no classes.
    */
   _setHoldupBtn({ disabled = false, connecting = false, loading = false, active = false } = {}) {
@@ -89,10 +91,10 @@ export class HoldupManager {
     btn.disabled = !!disabled;
 
     // Reset all our managed classes first
-    btn.classList.remove('connecting', 'loading', 'active');
+    btn.classList.remove('loading', 'loading', 'active');
 
     // Apply as requested
-    if (connecting) btn.classList.add('connecting');
+    if (connecting) btn.classList.add('loading');
     if (loading) btn.classList.add('loading');
     if (active) btn.classList.add('active');
   }
@@ -146,13 +148,37 @@ export class HoldupManager {
 
   /* -------------------- remote audio soft-mute helpers -------------------- */
   _applyOutputMuteState() {
-    // ensure every remote audio element respects our mute state
     document.querySelectorAll('audio[data-lk-remote]').forEach(el => {
       try {
         el.muted = this._outputMuted;
         el.volume = this._outputMuted ? 0 : 1;
       } catch {}
     });
+  }
+
+  /* -------------------- mic permission helpers -------------------- */
+  async _isMicPermanentlyDenied() {
+    try {
+      if (!('permissions' in navigator) || !navigator.permissions?.query) return false;
+      const st = await navigator.permissions.query({ name: 'microphone' });
+      return st.state === 'denied';
+    } catch {
+      return false; // Safari/older browsers: fall back to sticky flag
+    }
+  }
+  _showMicPermissionHelp() {
+    alert(
+      "Microphone access is blocked for this site.\n\n" +
+      "Enable it manually and reload:\n" +
+      "• Chrome/Edge: Click the lock icon → Site settings → Allow Microphone.\n" +
+      "• Safari: Settings → Websites → Microphone → Allow for this site.\n" +
+      "• Firefox: Lock icon → Connection settings → Permissions → Microphone.\n\n" +
+      "After enabling, reload and press Hold Up again."
+    );
+  }
+  _getSelectedInputDeviceId() {
+    const sel = document.querySelector('#input-device select.device-select');
+    return sel && sel.value ? sel.value : null;
   }
 
   /* -------------------- public API -------------------- */
@@ -216,22 +242,12 @@ export class HoldupManager {
     this._currentPage = pageNumber;
     this._currentRoomName = roomName;
 
-    // publish mic and mute it immediately (start muted)
-    try {
-      this.localMicTrack = await this.lk.createLocalAudioTrack({ vad: true });
-      await room.localParticipant.publishTrack(this.localMicTrack);
-      await this.localMicTrack.mute(); // 🔇 mic starts muted
-    } catch (e) {
-      console.warn('[Holdup] mic publish failed (continuing):', e);
-      this.localMicTrack = null;
-    }
-
-    // ensure remote audio is also muted on first load
+    // IMPORTANT: do NOT request/publish mic here.
+    // We only request the mic when the user actually unmutes via toggleMute().
     this._outputMuted = true;
     this._applyOutputMuteState();
 
     this._setStatus('Connected (muted)');
-    // Return to neutral state (no classes) once connected & muted
     this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
     this._startInactivityWatch();
     this.bumpActivity();
@@ -250,34 +266,50 @@ export class HoldupManager {
     // optimistic feedback: entering a transition
     this._setHoldupBtn({ disabled: true, connecting: false, loading: true, active: false });
 
-    // try to ensure mic exists when user wants to unmute; but it's optional
-    if (!this.localMicTrack) {
-      try {
-        this.localMicTrack = await this.lk.createLocalAudioTrack({ vad: true });
-        await this.room.localParticipant.publishTrack(this.localMicTrack);
-        await this.localMicTrack.mute();
-      } catch (e) {
-        console.warn('[Holdup] cannot create mic on toggle (still muting/unmuting remote):', e);
-      }
-    }
-
     const micIsMuted = this.localMicTrack ? (this.localMicTrack.isMuted ?? true) : true;
     const currentlyMuted = this._outputMuted && micIsMuted;
 
     if (currentlyMuted) {
-      // UNMUTE: remote first, then mic
+      // UNMUTE: remote first (instant feedback), then mic (if allowed)
       this._outputMuted = false;
       this._applyOutputMuteState();
-      try { await this.localMicTrack?.unmute?.(); } catch {}
+
+      // try to create/publish mic lazily, respecting selected input and denial stickiness
+      if (!this._micPermissionBlocked) {
+        if (await this._isMicPermanentlyDenied()) {
+          this._micPermissionBlocked = true;
+          this._showMicPermissionHelp();
+        } else {
+          try {
+            if (!this.localMicTrack) {
+              const deviceId = this._getSelectedInputDeviceId();
+              const opts = deviceId ? { deviceId } : {};
+              this.localMicTrack = await this.lk.createLocalAudioTrack(opts);
+              await this.room.localParticipant.publishTrack(this.localMicTrack);
+            }
+            await this.localMicTrack?.unmute?.();
+          } catch (e) {
+            // explicit deny → sticky + show help; other errors get a soft warning
+            if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
+              this._micPermissionBlocked = true;
+              this._showMicPermissionHelp();
+            } else if (e && e.name === 'NotFoundError') {
+              alert('No microphone found. Plug one in and try again.');
+            } else {
+              console.warn('[Holdup] mic create/publish failed:', e);
+            }
+          }
+        }
+      }
 
       this._setStatus('Listening…');
-      // done transitioning: show active conversation state
+      // show active state (we are at least listening to remote)
       this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: true });
       if (this._cb.onEngageStart) { try { this._cb.onEngageStart(); } catch {} }
     } else {
-      // MUTE: slam remote output to 0 *immediately*, then mute mic
+      // MUTE: slam remote output to 0 instantly, then mute mic if present
       this._outputMuted = true;
-      this._applyOutputMuteState(); // 🔇 instant: no more agent voice
+      this._applyOutputMuteState();
       try { await this.localMicTrack?.mute?.(); } catch {}
 
       this._setStatus('Connected (muted)');

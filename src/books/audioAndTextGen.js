@@ -4,6 +4,13 @@ import { TextProcessor } from '../audio/text-processor.js';
 import { WordHighlighter } from '../audio/word-highlighter.js';
 import { ReadAlong } from '../audio/read-along.js';
 import { ParagraphSeeker } from '../audio/paragraph-seeker.js';
+import { PlaybackControls } from '../audio/playback-controls.js';
+
+
+// Make it a singleton for the whole app, and bind immediately.
+if (!window.playbackControls) {
+  window.playbackControls = new PlaybackControls();
+}
 
 /**
  * Single-page audio/text orchestrator (UI-agnostic).
