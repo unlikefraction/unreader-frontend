@@ -156,8 +156,9 @@ export default class MultiPageReader {
 
   _scrollActivePageIntoView(center = true) {
     const el = this.#pageEl(this.active); if (!el) return;
-    try { el.scrollIntoView({ behavior: 'auto', block: center ? 'center' : 'nearest', inline: 'nearest' }); }
-    catch {
+    try {
+      el.scrollIntoView({ behavior: 'auto', block: center ? 'center' : 'nearest', inline: 'nearest' });
+    } catch {
       const y = el.getBoundingClientRect().top + window.scrollY;
       const mid = y - (window.innerHeight / 2) + (el.offsetHeight / 2);
       window.scrollTo(0, Math.max(0, mid));
@@ -641,9 +642,13 @@ export default class MultiPageReader {
       this._saveLastPlayedCookie(this.active, this.getCurrentTime());
       return;
     }
+
     const target = this.active + 1;
     this.setActive(target);
-    this._scrollActivePageIntoView(true);
+
+    // NOTE: We no longer force-scroll here unconditionally.
+    // Initial-load scroll remains elsewhere; manual next will still center below.
+
     this._stopProgressTimer();
 
     this._isLoadingActiveAudio = true; this._autoplayOnReady = !!auto; this._syncPlayButton(true, { loading: true });
@@ -651,8 +656,42 @@ export default class MultiPageReader {
     if (url) this._swapAudioUrl(target, url);
 
     await this.ensureAudioReady(target);
-    if (auto) await this.play();
-    else { this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false); }
+
+    if (auto) {
+      // Start playback first so the highlighter paints a current word
+      await this.play();
+
+      // Snap to playhead (heightSetter) after render; retry next frame if needed, fallback to centering page
+      requestAnimationFrame(() => {
+        try {
+          const ra = ReadAlong.get();
+          const snapped = ra && typeof ra.snapToCurrentWord === 'function'
+            ? ra.snapToCurrentWord({ smooth: true })
+            : false;
+
+          if (!snapped) {
+            requestAnimationFrame(() => {
+              try {
+                const ra2 = ReadAlong.get();
+                const ok = ra2 && typeof ra2.snapToCurrentWord === 'function'
+                  ? ra2.snapToCurrentWord({ smooth: true })
+                  : false;
+                if (!ok) this._scrollActivePageIntoView(true);
+              } catch {
+                this._scrollActivePageIntoView(true);
+              }
+            });
+          }
+        } catch {
+          this._scrollActivePageIntoView(true);
+        }
+      });
+    } else {
+      // Manual next: keep the classic centering scroll
+      this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false);
+      this._scrollActivePageIntoView(true);
+    }
+
     await this._prefetchAround(target);
     this._saveLastPlayedCookie(target, this.getCurrentTime());
   }

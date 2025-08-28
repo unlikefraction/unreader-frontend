@@ -10,8 +10,8 @@ export class ReadAlong {
   constructor(highlighter) {
     this.highlighter = highlighter;
 
-    this.autoEnabled     = true;
-    this.isActive        = true;
+    this.autoEnabled        = true;
+    this.isActive           = true;
     this.activationRadiusPx = 250;
 
     this.isUserScrolling = false;
@@ -25,23 +25,24 @@ export class ReadAlong {
     this._rafId      = null;
     this._lastWordEl = null;
 
-    this.scrollRoot  = null;
-    this._boundOnScrollWin   = null;
-    this._boundOnScrollRoot  = null;
+    this.scrollRoot        = null;
+    this._boundOnScrollWin = null;
+    this._boundOnScrollRoot= null;
 
     this._bindUI();
     this._startMonitor();
   }
 
   _getWordEl() {
+    // prefer cached if still in DOM
     if (this._lastWordEl && this._lastWordEl.isConnected) return this._lastWordEl;
     const h = this.highlighter;
     if (!h) return null;
     let el = h.currentHighlightedWord;
-    if (el && el.nodeType === 1) return el;
+    if (el && el.nodeType === 1 && el.isConnected) return el;
     el = h.currentWordEl || h._currentWordEl || h._currentWord || h.lastHighlightedEl;
     if (!el && typeof h.getCurrentWordEl === 'function') el = h.getCurrentWordEl();
-    return (el && el.nodeType === 1) ? el : null;
+    return (el && el.nodeType === 1 && el.isConnected) ? el : null;
   }
 
   _getComputedStyle(el) { try { return window.getComputedStyle(el); } catch { return { overflow: '', overflowY: '' }; } }
@@ -68,8 +69,12 @@ export class ReadAlong {
 
   _rootRect() {
     if (this._isWindowRoot(this.scrollRoot)) return { top: 0, height: window.innerHeight };
-    const r = this.scrollRoot.getBoundingClientRect();
-    return { top: r.top, height: this.scrollRoot.clientHeight };
+    try {
+      const r = this.scrollRoot.getBoundingClientRect();
+      return { top: r.top, height: this.scrollRoot.clientHeight };
+    } catch {
+      return { top: 0, height: window.innerHeight };
+    }
   }
 
   _attachScrollListeners() {
@@ -82,7 +87,7 @@ export class ReadAlong {
     if (!this._isWindowRoot(this.scrollRoot)) {
       if (this.heightSetter && this.heightSetter.parentElement !== this.scrollRoot) {
         Object.assign(this.heightSetter.style, { position: 'absolute', right: '0' });
-        this.scrollRoot.appendChild(this.heightSetter);
+        try { this.scrollRoot.appendChild(this.heightSetter); } catch {}
       }
       this.scrollRoot.addEventListener('scroll', this._boundOnScrollRoot, { passive: true });
     } else {
@@ -214,7 +219,13 @@ export class ReadAlong {
   }
 
   _isInZone(el) {
-    const rect            = el.getBoundingClientRect();
+    if (!el) return false;
+    let rect;
+    try {
+      rect = el.getBoundingClientRect();
+    } catch {
+      return false;
+    }
     const { top, height } = this._rootRect();
     const linePct         = this.getCurrentTopPercent();
     const lineY           = top + (linePct / 100) * height;
@@ -273,23 +284,42 @@ export class ReadAlong {
 
   updateTextPosition() {
     if (!this.isActive || this.isUserScrolling) return;
-    const el = this._getWordEl(); if (!el) return;
+    const el = this._getWordEl(); 
+    if (!el) return;
 
-    const rect            = el.getBoundingClientRect();
+    let rect;
+    try {
+      rect = el.getBoundingClientRect();
+    } catch {
+      return;
+    }
     const { top, height } = this._rootRect();
     const linePct         = this.getCurrentTopPercent();
     const targetY         = top + (linePct / 100) * height;
     const delta           = rect.top - targetY;
 
+    const behavior = 'smooth';
     if (this._isWindowRoot(this.scrollRoot)) {
-      window.scrollTo({ top: window.scrollY + delta, behavior: 'smooth' });
+      window.scrollTo({ top: window.scrollY + delta, behavior });
     } else {
-      this.scrollRoot.scrollTo({ top: this.scrollRoot.scrollTop + delta, behavior: 'smooth' });
+      try {
+        this.scrollRoot.scrollTo({ top: this.scrollRoot.scrollTop + delta, behavior });
+      } catch {}
     }
   }
 
   onWordHighlighted(el) {
-    if (el && el.nodeType === 1) this._lastWordEl = el;
+    // Harden against nulls
+    if (el && el.nodeType === 1 && el.isConnected) {
+      this._lastWordEl = el;
+    } else {
+      // if null or detached, try to recover a current element; if still none, bail quietly
+      const cur = this._getWordEl();
+      if (!cur) return;
+      el = cur;
+      this._lastWordEl = cur;
+    }
+
     if (!this.autoEnabled) return;
     if (this.isUserScrolling) return;
 
@@ -306,6 +336,8 @@ export class ReadAlong {
     this._lastWordEl = null;
     this._detachScrollListeners();
     this.scrollRoot = null;
+    // evaluate on next frame to reattach to new scroll root when a word appears
+    requestAnimationFrame(() => this.evaluateReadAlongState());
   }
 
   setActivationRadius(px) {
@@ -319,7 +351,13 @@ export class ReadAlong {
     const el = this._getWordEl();
     if (!el) return false;
 
-    const rect            = el.getBoundingClientRect();
+    let rect;
+    try {
+      rect = el.getBoundingClientRect();
+    } catch {
+      return false;
+    }
+
     const { top, height } = this._rootRect();
     const linePct         = this.getCurrentTopPercent();
     const targetY         = top + (linePct / 100) * height;
@@ -329,7 +367,9 @@ export class ReadAlong {
     if (this._isWindowRoot(this.scrollRoot)) {
       window.scrollTo({ top: window.scrollY + delta, behavior });
     } else {
-      this.scrollRoot.scrollTo({ top: this.scrollRoot.scrollTop + delta, behavior });
+      try {
+        this.scrollRoot.scrollTo({ top: this.scrollRoot.scrollTop + delta, behavior });
+      } catch {}
     }
 
     this.setReadAlongActive(true);
