@@ -604,6 +604,8 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       }
     }
 
+    unskelton()
+
   } catch (err) {
     console.error("Error fetching book details:", err);
   }

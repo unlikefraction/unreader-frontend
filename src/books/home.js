@@ -5,49 +5,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const bookWrapper  = document.querySelector(".book-wrapper");
   const searchInput  = document.querySelector(".searchText");
 
-  // Loading/skeleton refs
-  const libraryEl     = document.querySelector(".library");
-  const secondarySec  = document.querySelector(".secondarySec");
-  const titleLineEl   = document.querySelector(".titleLine");
+  // our books array (will be filled via fetch)
+  let books = [];
 
-  // ----- Loading state controller (min 500ms, or until data/error finishes, whichever is later) -----
-  let minTimeElapsed = false;
-  let fetchFinished  = false;
-  let minTimerId;
-
-  function startLoading() {
-    // Add skeletons
-    libraryEl?.classList.add("skeleton-ui");
-    secondarySec?.classList.add("skeleton-ui");
-    titleEl?.classList.add("skeleton-ui");
-    // Hide titleLine
-    if (titleLineEl) titleLineEl.style.display = "none";
-    // Arm 500ms minimum timer
-    minTimerId = setTimeout(() => {
-      minTimeElapsed = true;
-      maybeEndLoading();
-    }, 500);
-  }
-
-  function finishFetchPhase() {
-    fetchFinished = true;
-    maybeEndLoading();
-  }
-
-  function maybeEndLoading() {
-    if (minTimeElapsed && fetchFinished) {
-      clearTimeout(minTimerId);
-      // Remove skeletons
-      libraryEl?.classList.remove("skeleton-ui");
-      secondarySec?.classList.remove("skeleton-ui");
-      titleEl?.classList.remove("skeleton-ui");
-      // Show titleLine back
-      if (titleLineEl) titleLineEl.style.display = "block";
-    }
-  }
-
-  // Kick off loading right away
-  startLoading();
 
   // ----- Greeting text -----
   const updateGreeting = () => {
@@ -63,9 +23,6 @@ window.addEventListener("DOMContentLoaded", () => {
     updateGreeting();
     if (++count >= 20) clearInterval(intervalId);
   }, 100);
-
-  // our books array (will be filled via fetch)
-  let books = [];
 
   // render function
   function renderBooks(list) {
@@ -133,13 +90,13 @@ window.addEventListener("DOMContentLoaded", () => {
         language:   b.language
       }));
       renderBooks(books);
-      finishFetchPhase();
+      unskelton();
     })
     .catch(err => {
       printError("Error loading books:", err);
       if (bookWrapper) {
         bookWrapper.innerHTML = `<p class="error">Could not load your books. Please try again later.</p>`;
       }
-      finishFetchPhase();
+      unskelton();
     });
 });

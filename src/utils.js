@@ -16,3 +16,13 @@ function printError(message) {
         console.error(message);
     }
 }
+
+function unskelton() {
+    const elements = document.querySelectorAll(
+      ".skeleton-hide, .skeleton-margin-top, .skeleton-ui"
+    );
+  
+    elements.forEach(el => {
+      el.classList.remove("skeleton-hide", "skeleton-margin-top", "skeleton-ui");
+    });
+}
