@@ -1,3 +1,5 @@
+import { unskelton, printError } from '../utils.js';
+
 window.addEventListener("DOMContentLoaded", () => {
   // DOM refs
   const titleEl      = document.querySelector(".title");

@@ -1,6 +1,7 @@
 // -----appController.js-----
 import MultiPageReader from './multiPageReader.js';
 import { HoldupManager } from './holdup.js';
+import { unskelton } from '../utils.js';
 
 /** tiny silent WAV as a stub until real audio arrives */
 function createSilentWavDataUrl(durationSec = 0.2, sampleRate = 16000) {

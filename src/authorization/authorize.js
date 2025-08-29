@@ -1,3 +1,5 @@
+import { printError } from '../utils.js';
+
 window.onload = function () {
   /**
    * Sets an authentication cookie.

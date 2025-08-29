@@ -5,6 +5,8 @@
 /* ================================
    HELPERS
 ===================================*/
+// Use API_URLS from global (populated by src/apiUrls.js)
+const API_URLS = (typeof window !== 'undefined' && window.API_URLS) ? window.API_URLS : {};
 function getCookie(name) {
   // Escape special regex characters in the cookie name
   const escaped = name.replace(/([.*+?^${}()|[\]\\])/g, "\\$1");

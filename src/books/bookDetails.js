@@ -1,4 +1,5 @@
 // bookDetails.js
+import { unskelton } from '../utils.js';
 
 // === Utility ===
 function getCookie(name) {
