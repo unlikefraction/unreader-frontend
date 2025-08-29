@@ -124,6 +124,7 @@ export class HoldupManager {
     const pn = Number(pageNumber) || 0;
     return `page-${pn}-${this.bookSlug}`;
   }
+  
   async _generateToken({ roomName, metadata }) {
     const token = getCookie('authToken');
     if (!token) throw new Error('Missing auth token');
@@ -135,16 +136,25 @@ export class HoldupManager {
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
+  
+    // ✨ 402 handling
+    if (res.status === 402) {
+      handle402AndRedirect();
+      throw new Error('Payment Required (402)');
+    }
+  
     if (!res.ok) {
       const t = await res.text().catch(() => '');
       throw new Error(`Token request failed (${res.status}): ${t}`);
     }
+  
     const json = await res.json();
     const roomUrl = json.room_url || json.url || json.livekit_url;
     const jwt = json.token;
     if (!roomUrl || !jwt) throw new Error('Token response missing room_url or token');
     return { roomUrl, token: jwt };
   }
+  
 
   /* -------------------- remote audio soft-mute helpers -------------------- */
   _applyOutputMuteState() {

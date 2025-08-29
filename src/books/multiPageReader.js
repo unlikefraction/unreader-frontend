@@ -224,6 +224,10 @@ export default class MultiPageReader {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (res.status === 402) {
+        handle402AndRedirect();
+        return; // bail out of regeneration flow
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       json = await res.json().catch(() => ({}));
     } catch (e) {
@@ -240,8 +244,13 @@ export default class MultiPageReader {
     const getPageUrl = `${this.audioApiBase}book/${encodeURIComponent(this.userBookId)}/page/${encodeURIComponent(meta.page_number)}/`;
     const fetchStatus = async () => {
       const r = await fetch(getPageUrl, { headers: { Authorization: `Bearer ${token}` } });
+      if (r.status === 402) {
+        handle402AndRedirect();
+        throw new Error('Payment Required (402)');
+      }
       if (!r.ok) throw new Error(`Audio API ${r.status}`);
       return r.json();
+
     };
 
     let firstAudioUrl = null;
@@ -430,37 +439,55 @@ export default class MultiPageReader {
   }
 
   async init() {
+    // 1) Build UI scaffolding (this only fetches textBlobUrl for each page)
     await this._buildScaffolding();
-
+  
+    // 2) Restore last position (cookie) and set active page — but do NOT touch audio
     const saved = this._readLastPlayedCookie();
     let pageIndex, seconds;
-    if (saved && typeof saved.page_number !== 'undefined') { pageIndex = this._mapPageNumberToIndex(saved.page_number); seconds = Math.max(0, Number(saved.seconds) || 0); }
-    else { pageIndex = this._initialActiveIndex; seconds = 0; this._saveLastPlayedCookie(pageIndex, 0); }
-
+    if (saved && typeof saved.page_number !== 'undefined') {
+      pageIndex = this._mapPageNumberToIndex(saved.page_number);
+      seconds = Math.max(0, Number(saved.seconds) || 0);
+    } else {
+      pageIndex = this._initialActiveIndex;
+      seconds = 0;
+      this._saveLastPlayedCookie(pageIndex, 0);
+    }
+  
     this.setActive(pageIndex);
-    // Keep the initial page load scroll
+  
+    // Keep the initial page load scroll; no playback yet
     this._scrollActivePageIntoView(true);
-
-    const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
-    if (url) this._swapAudioUrl(pageIndex, url);
-
-    await this.ensureAudioReady(pageIndex);
-    // NEW: warm next page's audio right after current is ready
-    this._prefetchNextAudio(pageIndex);
-
-    this.seek(seconds);
+  
+    // 3) Absolutely NO audio polling / setup here.
+    //    - no _awaitReadyAudioAndTranscript
+    //    - no ensureAudioReady
+    //    - no _prefetchNextAudio
+    //    - no seek() (it would be a no-op, but let’s avoid touching audioCore entirely)
+  
+    // Make sure transport shows paused/idle
     this._stopProgressTimer();
     this._syncPlayButton(false);
-
+  
+    // 4) Prefetch/hydrate around the active page ONLY for text/structure (no audio).
+    //    hydratePage() sets up processors but does not fetch audio unless ensureAudioReady/play is called.
     await this._prefetchAround(pageIndex);
+  
+    // 5) Wire up controls and observers (safe; no audio calls)
     this._setupGlobalControls();
     this._setupGlobalParagraphClickDelegation();
     this._setupIntersectionHydrator();
-
-    // watch scroll to toggle the "scroll to playhead" button
+  
+    // 6) Scroll-to-playhead button visibility tracking
     this._bindScrollWatcher();
     this._updateScrollToPlayheadVisibility();
-  }
+  
+    // NOTE:
+    // Audio (and any holdup notifications) only kick in when the user triggers:
+    // - play()
+    // - next(true)/prev()/goto(..., {play: true})
+    // - jumpToParagraph(..., {play: true})
+  }  
 
   #pageEl(i) { return this._container?.querySelectorAll('.mainContent')[i] || null; }
   #applyPageStateClasses(activeIndex) {
@@ -529,9 +556,13 @@ export default class MultiPageReader {
 
     const fetchOnce = async () => {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.status === 402) {
+        handle402AndRedirect();
+        throw new Error('Payment Required (402)'); // stop further logic/polling
+      }
       if (!res.ok) throw new Error(`Audio API ${res.status}`);
       return res.json();
-    };
+    };    
 
     try {
       while (true) {

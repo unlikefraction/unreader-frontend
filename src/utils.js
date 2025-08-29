@@ -26,3 +26,12 @@ function unskelton() {
       el.classList.remove("skeleton-hide", "skeleton-margin-top", "skeleton-ui");
     });
 }
+
+function handle402AndRedirect() {
+    try {
+      alert('You dont have enough credits, redirecting you to account page.');
+    } finally {
+      window.location.assign('/account.html');
+    }
+  }
+  

@@ -124,6 +124,7 @@ export default class AppController {
       pages.sort((a, b) => (a.page_number || 0) - (b.page_number || 0));
 
       const anchor = computeAnchorIndex(pages);
+      unskelton()
 
       this.pageDescriptors = pages.map(p => ({
         page_number: p.page_number,
@@ -174,8 +175,6 @@ export default class AppController {
 
       await this.reader.init();
 
-      unskelton()
-
       // Initial per-page connect
       const startIndex = this.reader.getActive();
       const startPageNo = this.pageDescriptors[startIndex]?.page_number ?? (startIndex + 1);
@@ -223,9 +222,13 @@ export default class AppController {
     return (meta && meta._html) ? meta._html : null;
   }
   _metadataForIndex(i) {
-    const cur = this._htmlAt(i);
-    const prev = (i > 0) ? this._htmlAt(i - 1) : null;
-    const next = (i < this.pageDescriptors.length - 1) ? this._htmlAt(i + 1) : null;
-    return { current_page: cur || '', previous_page: prev, next_page: next };
-  }
+    const cur  = this._htmlAt(i);
+    const prev = (i > 0) ? this._htmlAt(i - 1) : '';
+    const next = (i < this.pageDescriptors.length - 1) ? this._htmlAt(i + 1) : '';
+    return {
+      current_page:  cur  || '',
+      previous_page: prev || '',
+      next_page:     next || ''
+    };
+  }  
 }

@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="./src/styles/style.css">
     <link rel="stylesheet" href="./src/styles/home.css">
     <link rel="stylesheet" href="./src/styles/account.css">
+    <link rel="stylesheet" href="./src/styles/skeleton.css">
     <link rel="stylesheet" href="./src/styles/animation.css">
     <link rel="preload"
       href="https://cdn.jsdelivr.net/fontsource/fonts/apfel-grotezk@latest/latin-400-normal.woff2"
@@ -45,7 +46,7 @@
     </div>
 
     <div class="homePage">
-        <div class="topSection">
+        <div class="topSection skeleton-ui">
             <img src="/assets/dino.webp" alt="Dinosaur">
             <div class="creditsSection">
                 <h2 class="creditRemaining"><span class="dollarIcon">$</span>--</h2>
@@ -53,7 +54,7 @@
             </div>
         </div>
 
-        <div class="usageSection">
+        <div class="usageSection skeleton-ui">
             <div class="usageHeader">
                 <h3 class="usageHeading">usage history</h3>
                 <select class="usageHistory">
@@ -109,7 +110,6 @@
         </div>
     </div>
 
-
     <script src="./src/utils.js"></script>
     <script type="module" src="./src/analytics.js"></script>
     <script src="./src/apiUrls.js"></script>
@@ -117,5 +117,13 @@
     <script src="./src/authorization/loggedOutRedirect.js"></script>
     <script src="./src/user/userDetails.js"></script>
     <script src="./src/basic/inbox.js"></script>
+
+
+    <script>
+      setTimeout(() => {
+        unskelton()
+      }, 1000)
+    </script>
+
 </body>
 </html>
