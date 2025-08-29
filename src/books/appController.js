@@ -174,6 +174,8 @@ export default class AppController {
 
       await this.reader.init();
 
+      unskelton()
+
       // Initial per-page connect
       const startIndex = this.reader.getActive();
       const startPageNo = this.pageDescriptors[startIndex]?.page_number ?? (startIndex + 1);
