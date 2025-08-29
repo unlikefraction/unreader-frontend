@@ -45,20 +45,43 @@ export class CanvasManager {
     const body = document.body;
     const width = Math.max(doc.scrollWidth, body.scrollWidth, doc.clientWidth);
     const height = Math.max(doc.scrollHeight, body.scrollHeight, doc.clientHeight);
-    
+
+    const dpr = window.devicePixelRatio || 1;
+
     [this.drawCanvas, this.previewCanvas].forEach(c => {
-      c.width = width;
-      c.height = height;
+      // Backing store size in device pixels
+      c.width = Math.max(1, Math.floor(width * dpr));
+      c.height = Math.max(1, Math.floor(height * dpr));
+      // CSS display size in CSS pixels
+      c.style.width = `${width}px`;
+      c.style.height = `${height}px`;
     });
+
+    // Scale contexts so all drawing uses CSS pixel coords but renders sharp
+    if (this.drawCtx) {
+      this.drawCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    if (this.previewCtx) {
+      this.previewCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
   }
 
   /** Clear preview canvas */
   clearPreview() {
+    if (!this.previewCtx) return;
+    this.previewCtx.save();
+    // Clear in device pixel space (identity transform)
+    this.previewCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.previewCtx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+    this.previewCtx.restore();
   }
 
   /** Clear draw canvas */
   clearDraw() {
+    if (!this.drawCtx) return;
+    this.drawCtx.save();
+    this.drawCtx.setTransform(1, 0, 0, 1, 0, 0);
     this.drawCtx.clearRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
+    this.drawCtx.restore();
   }
 }
