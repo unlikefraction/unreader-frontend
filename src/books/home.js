@@ -1,19 +1,63 @@
 window.addEventListener("DOMContentLoaded", () => {
   // DOM refs
-  const titleEl     = document.querySelector(".title");
-  const subEl       = document.querySelector(".secondaryText");
-  const bookWrapper = document.querySelector(".book-wrapper");
-  const searchInput = document.querySelector(".searchText");
+  const titleEl      = document.querySelector(".title");
+  const subEl        = document.querySelector(".secondaryText");
+  const bookWrapper  = document.querySelector(".book-wrapper");
+  const searchInput  = document.querySelector(".searchText");
 
-  // placeholder name
+  // Loading/skeleton refs
+  const libraryEl     = document.querySelector(".library");
+  const secondarySec  = document.querySelector(".secondarySec");
+  const titleLineEl   = document.querySelector(".titleLine");
+
+  // ----- Loading state controller (min 500ms, or until data/error finishes, whichever is later) -----
+  let minTimeElapsed = false;
+  let fetchFinished  = false;
+  let minTimerId;
+
+  function startLoading() {
+    // Add skeletons
+    libraryEl?.classList.add("skeleton-ui");
+    secondarySec?.classList.add("skeleton-ui");
+    titleEl?.classList.add("skeleton-ui");
+    // Hide titleLine
+    if (titleLineEl) titleLineEl.style.display = "none";
+    // Arm 500ms minimum timer
+    minTimerId = setTimeout(() => {
+      minTimeElapsed = true;
+      maybeEndLoading();
+    }, 500);
+  }
+
+  function finishFetchPhase() {
+    fetchFinished = true;
+    maybeEndLoading();
+  }
+
+  function maybeEndLoading() {
+    if (minTimeElapsed && fetchFinished) {
+      clearTimeout(minTimerId);
+      // Remove skeletons
+      libraryEl?.classList.remove("skeleton-ui");
+      secondarySec?.classList.remove("skeleton-ui");
+      titleEl?.classList.remove("skeleton-ui");
+      // Show titleLine back
+      if (titleLineEl) titleLineEl.style.display = "block";
+    }
+  }
+
+  // Kick off loading right away
+  startLoading();
+
+  // ----- Greeting text -----
   const updateGreeting = () => {
     const name = localStorage.getItem("name") || "bro";
-    titleEl.textContent = `what we reading today, ${name}?`;
+    if (titleEl) titleEl.textContent = `what we reading today, ${name}?`;
   };
   updateGreeting();
-  subEl.textContent = "or starting a new book?";
+  if (subEl) subEl.textContent = "or starting a new book?";
 
-  // poll for name changes (20× every 100 ms)
+  // Poll for name changes (20× every 100 ms)
   let count = 0;
   const intervalId = setInterval(() => {
     updateGreeting();
@@ -25,6 +69,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // render function
   function renderBooks(list) {
+    if (!bookWrapper) return;
     bookWrapper.innerHTML = "";
     list.forEach(book => {
       const item = document.createElement("div");
@@ -46,11 +91,11 @@ window.addEventListener("DOMContentLoaded", () => {
       `;
       bookWrapper.appendChild(item);
     });
-  }  
+  }
 
   // search handler: title, subtitle or any author
   function handleSearch() {
-    const q = searchInput.value.trim().toLowerCase();
+    const q = (searchInput?.value || "").trim().toLowerCase();
     if (!q) {
       renderBooks(books);
       return;
@@ -62,7 +107,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
     renderBooks(filtered);
   }
-  searchInput.addEventListener("input", handleSearch);
+  searchInput?.addEventListener("input", handleSearch);
 
   // fetch your books from the API
   const token = getCookie("authToken");
@@ -77,7 +122,7 @@ window.addEventListener("DOMContentLoaded", () => {
       return res.json();
     })
     .then(data => {
-      books = data.books.map(b => ({
+      books = (data.books || []).map(b => ({
         id:         b.user_book_id,
         title:      b.title,
         subtitle:   b.subtitle,
@@ -88,9 +133,13 @@ window.addEventListener("DOMContentLoaded", () => {
         language:   b.language
       }));
       renderBooks(books);
+      finishFetchPhase();
     })
     .catch(err => {
       printError("Error loading books:", err);
-      bookWrapper.innerHTML = `<p class="error">Could not load your books. Please try again later.</p>`;
+      if (bookWrapper) {
+        bookWrapper.innerHTML = `<p class="error">Could not load your books. Please try again later.</p>`;
+      }
+      finishFetchPhase();
     });
 });

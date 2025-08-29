@@ -52,6 +52,7 @@
 }
 
 .titleSec .titleLine{
+    display: block;
     margin-left: -3rem;
     transform: rotate(-3.8deg);
 }
@@ -90,6 +91,10 @@
 
 .topSection .secondarySec .secondaryText:hover {
     text-decoration-style: double !important;
+}
+
+.library{
+    min-height: 560px;
 }
 
 .book-wrapper {
