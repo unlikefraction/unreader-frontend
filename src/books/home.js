@@ -10,6 +10,8 @@ window.addEventListener("DOMContentLoaded", () => {
   // our books array (will be filled via fetch)
   let books = [];
 
+  function getCookie(name) { const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)')); return m ? decodeURIComponent(m[2]) : null; }
+
 
   // ----- Greeting text -----
   const updateGreeting = () => {

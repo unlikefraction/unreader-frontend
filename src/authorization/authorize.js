@@ -16,6 +16,33 @@ window.onload = function () {
     document.cookie = `authToken=${tokenValue || ""}${expires}; path=/; SameSite=Lax; Secure`;
   }
 
+  async function redeemWelcomeCoupon(token) {
+    try {
+      const code = "WELCOME-TO-UNREADER";
+
+      const res = await fetch(`${window.API_URLS.PAYMENT}redeem-coupon/`, {
+        method: "POST",
+        // keepalive lets the request try to finish even if the page is unloading
+        keepalive: true,
+        headers: Object.assign(
+          { "Content-Type": "application/json", "Accept": "application/json" },
+          token ? { "Authorization": `Bearer ${token}` } : {}
+        ),
+        body: JSON.stringify({ code })
+      });
+
+      if (res.ok) {
+        // optional: const data = await res.json();
+        console.log("You have 5$ of free credits.");
+      } else {
+        const txt = await res.text().catch(() => "");
+        printError("Coupon redeem failed:", res.status, txt);
+      }
+    } catch (err) {
+      printError("Coupon redeem error:", err);
+    }
+  }
+
   // Google-specific: extract access_token from URL hash
   if (!window.location.hash.includes("access_token")) {
     document.body.textContent = "⚠️ No access_token found in URL.";
@@ -58,6 +85,11 @@ window.onload = function () {
 
       document.body.textContent = "✅ Login successful! Redirecting…";
 
+      // IMPORTANT: await the coupon redemption BEFORE redirect/close
+      if (is_new_user) {
+        await redeemWelcomeCoupon(apiToken);
+      }
+
       const redirectTo = is_new_user ? "/accountSetup.html" : "/home.html";
 
       if (window.opener && !window.opener.closed) {
@@ -65,7 +97,7 @@ window.onload = function () {
       }
 
       window.close();
-      
+
     } catch (err) {
       document.body.textContent = "⚠️ Login Failed, try again.";
       printError("Error exchanging Google token:", err);
