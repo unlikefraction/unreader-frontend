@@ -3,7 +3,7 @@ import { printError } from '../utils.js';
 
 // ---------- CONFIG ----------
 const GOOGLE_CLIENT_ID     = "814413323140-tmvrg2ad3bhe7j35h1v58v5hrkl311tg.apps.googleusercontent.com";
-const GOOGLE_REDIRECT_URI  = "http://localhost:5173/popup.html";
+const GOOGLE_REDIRECT_URI = `${window.location.origin}/popup.html`;
 const GOOGLE_SCOPE         = "profile email";
 const GOOGLE_RESPONSE_TYPE = "token";
 
