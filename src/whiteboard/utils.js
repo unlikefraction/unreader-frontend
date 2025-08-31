@@ -93,22 +93,28 @@ export function getShapeBounds(type, shape) {
   }
 
   if (type === 'text') {
-    // Measure actual rendered text dimensions for accurate bounds
+    // Multi-line aware measurement for accurate bounds
     const fontSize   = shape.fontSize   || 24;
     const fontFamily = shape.fontFamily || 'sans-serif';
     const ctx = document.createElement('canvas').getContext('2d');
     ctx.font = `${fontSize}px ${fontFamily}`;
-    const metrics   = ctx.measureText(shape.text);
-    const textWidth = metrics.width;
-    const ascent    = metrics.actualBoundingBoxAscent  ?? fontSize * 0.8;
-    const descent   = metrics.actualBoundingBoxDescent ?? fontSize * 0.2;
+    const lines = String(shape.text ?? '').split(/\n/);
+    let textWidth = 0;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width;
+      if (w > textWidth) textWidth = w;
+    }
+    const m = ctx.measureText('Mg');
+    const ascent  = m.actualBoundingBoxAscent  ?? fontSize * 0.8;
+    const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
+    const n = Math.max(1, lines.length);
     const x = shape.xRel;
-    const y = shape.y;
+    const y = shape.y; // baseline of first line
     return {
       minX: x - padding,
       minY: y - ascent - padding,
       maxX: x + textWidth + padding,
-      maxY: y + descent   + padding
+      maxY: y + descent + (n - 1) * fontSize + padding
     };
   }
 
