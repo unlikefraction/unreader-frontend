@@ -166,6 +166,25 @@ export class ParagraphSeeker {
       return { success: false, error: 'Low match probability', match };
     }
 
+    // If the match falls within the first paragraph on the page, snap to audio 0.0.
+    // This avoids unnecessary timing lookup when the user targets the very beginning.
+    try {
+      const paragraphs = this.findParagraphBoundaries();
+      if (paragraphs.length > 0) {
+        // derive absolute span index range from DOM dataset.index
+        const firstPara = paragraphs[0];
+        const firstIdx = Number(firstPara.elements?.[0]?.dataset?.index ?? -1);
+        const lastIdx  = Number(firstPara.elements?.[firstPara.elements.length - 1]?.dataset?.index ?? -1);
+        if (Number.isInteger(firstIdx) && Number.isInteger(lastIdx)) {
+          if (match.start >= Math.min(firstIdx, lastIdx) && match.start <= Math.max(firstIdx, lastIdx)) {
+            this.audioCore.sound?.seek(0);
+            if (log) printl?.('⏮️ Paragraph at page start detected — seeking to 0.0s');
+            return { success: true, timestamp: 0, match, timing: { time_start: 0, time_end: 0 } };
+          }
+        }
+      }
+    } catch {}
+
     const timing = this.findAudioTimestamp(match.start);
     if (!timing) {
       return { success: false, error: 'No audio timing', match };
