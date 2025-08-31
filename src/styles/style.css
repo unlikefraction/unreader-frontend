@@ -451,6 +451,8 @@ nav a{
 .annotation-text-editor,
 .annotation-text-editor.completed {
   font-family: 'excalifont', sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .eraser-mouse{

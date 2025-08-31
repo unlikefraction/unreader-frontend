@@ -6,16 +6,6 @@ import rough from 'roughjs';
  * Canvas manager for drawing and preview canvases
  */
 export class CanvasManager {
-  constructor() {
-    this.drawCanvas = null;
-    this.previewCanvas = null;
-    this.drawCtx = null;
-    this.previewCtx = null;
-    this.drawRough = null;
-    this.previewRough = null;
-    
-    this.setupCanvases();
-  }
 
   /** Create canvases for drawing + preview */
   setupCanvases() {
@@ -28,13 +18,26 @@ export class CanvasManager {
         top: '0',
         left: '0',
         zIndex: '-1',
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        willChange: 'transform'
       });
       document.body.appendChild(c);
     });
     
     this.drawCtx = this.drawCanvas.getContext('2d');
     this.previewCtx = this.previewCanvas.getContext('2d');
+    if (this.drawCtx) {
+      this.drawCtx.imageSmoothingEnabled = true;
+      try { this.drawCtx.imageSmoothingQuality = 'high'; } catch {}
+      this.drawCtx.lineJoin = 'round';
+      this.drawCtx.lineCap = 'round';
+    }
+    if (this.previewCtx) {
+      this.previewCtx.imageSmoothingEnabled = true;
+      try { this.previewCtx.imageSmoothingQuality = 'high'; } catch {}
+      this.previewCtx.lineJoin = 'round';
+      this.previewCtx.lineCap = 'round';
+    }
     this.drawRough = rough.canvas(this.drawCanvas);
     this.previewRough = rough.canvas(this.previewCanvas);
   }
@@ -64,6 +67,23 @@ export class CanvasManager {
     if (this.previewCtx) {
       this.previewCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
+  }
+
+  constructor() {
+    this.drawCanvas = null;
+    this.previewCanvas = null;
+    this.drawCtx = null;
+    this.previewCtx = null;
+    this.drawRough = null;
+    this.previewRough = null;
+    
+    this.setupCanvases();
+    // Initial size and react to layout changes smoothly
+    this.sizeCanvases();
+    try {
+      this._ro = new ResizeObserver(() => this.sizeCanvases());
+      this._ro.observe(document.body);
+    } catch {}
   }
 
   /** Clear preview canvas */

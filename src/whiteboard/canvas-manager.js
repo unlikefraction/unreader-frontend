@@ -40,6 +40,7 @@ export class CanvasManager {
       top: `${this._absTop}px`,
       pointerEvents: 'none',
       zIndex: '1000',
+      willChange: 'transform',
       background: this.bg || 'transparent'
     });
     Object.assign(this.previewCanvas.style, {
@@ -48,6 +49,7 @@ export class CanvasManager {
       top: `${this._absTop}px`,
       pointerEvents: 'none',
       zIndex: '1001',
+      willChange: 'transform',
       background: 'transparent'
     });
 
@@ -58,8 +60,27 @@ export class CanvasManager {
     this.previewCtx = this.previewCanvas.getContext('2d');
     this.drawRough = rough.canvas(this.drawCanvas);
     this.previewRough = rough.canvas(this.previewCanvas);
+    if (this.drawCtx) {
+      this.drawCtx.imageSmoothingEnabled = true;
+      try { this.drawCtx.imageSmoothingQuality = 'high'; } catch {}
+      this.drawCtx.lineJoin = 'round';
+      this.drawCtx.lineCap = 'round';
+    }
+    if (this.previewCtx) {
+      this.previewCtx.imageSmoothingEnabled = true;
+      try { this.previewCtx.imageSmoothingQuality = 'high'; } catch {}
+      this.previewCtx.lineJoin = 'round';
+      this.previewCtx.lineCap = 'round';
+    }
 
     this.sizeCanvases();
+
+    // keep canvases sized to layout changes smoothly
+    try {
+      this._ro?.disconnect?.();
+      this._ro = new ResizeObserver(() => this.sizeCanvases());
+      this._ro.observe(document.body);
+    } catch {}
   }
 
   /** Map page-space (x, y_page) -> canvas-local by translating -_absTop on Y */
@@ -81,17 +102,26 @@ export class CanvasManager {
     const doc = document.documentElement;
     const body = document.body;
     const width = Math.max(doc.scrollWidth, body.scrollWidth, doc.clientWidth);
+    const dpr = window.devicePixelRatio || 1;
 
     [this.drawCanvas, this.previewCanvas].forEach(c => {
-      c.width = width;
-      c.height = Math.max(1, this.height);
+      // Backing store in device pixels for crisp rendering
+      c.width = Math.max(1, Math.floor(width * dpr));
+      c.height = Math.max(1, Math.floor(this.height * dpr));
+      // CSS size in CSS pixels
       c.style.top = `${this._absTop}px`;   // ABSOLUTE
       c.style.width = `${width}px`;
       c.style.height = `${this.height}px`;
     });
 
-    // after resizing, contexts reset; reapply mapping
-    this._applyPageSpaceTransform();
+    // after resizing, contexts reset; apply dpr scaling and page-space mapping
+    const apply = (ctx) => {
+      if (!ctx) return;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); // scale for DPR
+      ctx.translate(0, -this._absTop);        // map page-space Y
+    };
+    apply(this.drawCtx);
+    apply(this.previewCtx);
   }
 
   /** Legacy: update with normalized offset (kept for compatibility) */

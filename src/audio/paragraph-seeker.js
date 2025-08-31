@@ -166,25 +166,6 @@ export class ParagraphSeeker {
       return { success: false, error: 'Low match probability', match };
     }
 
-    // If the match falls within the first paragraph on the page, snap to audio 0.0.
-    // This avoids unnecessary timing lookup when the user targets the very beginning.
-    try {
-      const paragraphs = this.findParagraphBoundaries();
-      if (paragraphs.length > 0) {
-        // derive absolute span index range from DOM dataset.index
-        const firstPara = paragraphs[0];
-        const firstIdx = Number(firstPara.elements?.[0]?.dataset?.index ?? -1);
-        const lastIdx  = Number(firstPara.elements?.[firstPara.elements.length - 1]?.dataset?.index ?? -1);
-        if (Number.isInteger(firstIdx) && Number.isInteger(lastIdx)) {
-          if (match.start >= Math.min(firstIdx, lastIdx) && match.start <= Math.max(firstIdx, lastIdx)) {
-            this.audioCore.sound?.seek(0);
-            if (log) printl?.('⏮️ Paragraph at page start detected — seeking to 0.0s');
-            return { success: true, timestamp: 0, match, timing: { time_start: 0, time_end: 0 } };
-          }
-        }
-      }
-    } catch {}
-
     const timing = this.findAudioTimestamp(match.start);
     if (!timing) {
       return { success: false, error: 'No audio timing', match };
@@ -292,9 +273,22 @@ export class ParagraphSeeker {
     // remove only *this page's* hover UI
     main.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
 
-    this.findParagraphBoundaries().forEach((p, i) => this.setupParagraphHover(p, i));
+    // cache paragraphs and corresponding hover elements for rAF-throttled updates
+    this._paragraphs = this.findParagraphBoundaries();
+    this._hoverAreas = [];
+    this._hoverDivs = [];
+    this._posUpdateScheduled = false;
+
+    this._paragraphs.forEach((p, i) => this.setupParagraphHover(p, i));
 
     this.setupDynamicUpdates();
+
+    // Observe DOM changes to rebuild paragraph map lazily
+    try {
+      this._mo?.disconnect?.();
+      this._mo = new MutationObserver(() => this._scheduleRefresh());
+      this._mo.observe(main, { subtree: true, childList: true, characterData: true });
+    } catch {}
   }
 
   setupParagraphHover(paragraph, index) {
@@ -311,12 +305,13 @@ export class ParagraphSeeker {
       background: 'transparent',
       // make it hoverable immediately unless actively editing
       pointerEvents: commonVars.beingEdited ? 'none' : 'auto',
-      cursor: commonVars.toolActive ? 'crossbow' : 'text'
+      cursor: commonVars.toolActive ? 'crosshair' : 'text'
     });
     hoverArea.className = 'paragraph-hover-area';
     hoverArea.dataset.pageId = this.textProcessor.pageId; // scope tagging
 
     main.appendChild(hoverArea);
+    this._hoverAreas[index] = hoverArea;
     this.updateHoverAreaPosition(hoverArea, paragraph);
 
     // When user presses to select text, let the real content take the events.
@@ -332,7 +327,7 @@ export class ParagraphSeeker {
       display: 'none',
       position: 'absolute',
       zIndex: 2,
-      cursor: 'pointer',
+      cursor: commonVars.toolActive ? 'crosshair' : 'pointer',
       pointerEvents: commonVars.beingEdited ? 'none' : 'auto'
     });
     if (commonVars.toolActive) hoverDiv.style.visibility = 'hidden';
@@ -365,6 +360,7 @@ export class ParagraphSeeker {
     });
 
     main.appendChild(hoverDiv);
+    this._hoverDivs[index] = hoverDiv;
   }
 
   updateHoverAreaPosition(hoverArea, paragraph) {
@@ -378,11 +374,13 @@ export class ParagraphSeeker {
     // position relative to the page container
     const left = Math.min(firstRect.left, lastRect.left) - containerRect.left - 25;
     const top = Math.min(firstRect.top, lastRect.top) - containerRect.top;
-    const height = Math.max(firstRect.bottom, lastRect.bottom) - firstRect.top;
+    const height = Math.max(firstRect.bottom, lastRect.bottom) - Math.min(firstRect.top, lastRect.top);
+    const rightMost = Math.max(firstRect.right, lastRect.right);
+    const width = Math.min(700, Math.max(200, rightMost - containerRect.left + 50));
 
     hoverArea.style.left = `${left}px`;
     hoverArea.style.top = `${top}px`;
-    hoverArea.style.width = `700px`;
+    hoverArea.style.width = `${width}px`;
     hoverArea.style.height = `${height}px`;
   }
 
@@ -397,6 +395,7 @@ export class ParagraphSeeker {
     hoverDiv.style.top = `${rect.top - containerRect.top}px`;
     hoverDiv.style.display = 'block';
     hoverDiv.style.visibility = commonVars.toolActive ? 'hidden' : 'visible';
+    hoverDiv.style.cursor = commonVars.toolActive ? 'crosshair' : 'pointer';
     hoverDiv.dataset.paragraphLength = paragraph.elements.length;
     hoverDiv.dataset.paragraphPreview = paragraph.text.substring(0, 100);
   }
@@ -420,12 +419,13 @@ export class ParagraphSeeker {
     if (main) main.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
     if (this.scrollListener) window.removeEventListener('scroll', this.scrollListener);
     if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
+    try { this._mo?.disconnect?.(); } catch {}
     printl?.('❌ Paragraph hover navigation disabled (page-scoped)');
   }
 
   setupDynamicUpdates() {
-    this.scrollListener = () => this.updateAllHoverAreas();
-    this.resizeListener = () => this.updateAllHoverAreas();
+    this.scrollListener = () => this._schedulePositionsUpdate();
+    this.resizeListener = () => this._schedulePositionsUpdate();
     window.addEventListener('scroll', this.scrollListener, { passive: true });
     window.addEventListener('resize', this.resizeListener, { passive: true });
   }
@@ -434,16 +434,29 @@ export class ParagraphSeeker {
     const main = this.textProcessor?.container;
     if (!main) return;
 
-    const paragraphs = this.findParagraphBoundaries();
-    const areas = main.querySelectorAll('.paragraph-hover-area');
-    areas.forEach((area, idx) => {
-      if (paragraphs[idx]) this.updateHoverAreaPosition(area, paragraphs[idx]);
+    if (!Array.isArray(this._paragraphs) || !this._paragraphs.length) return;
+    this._hoverAreas?.forEach((area, idx) => {
+      const p = this._paragraphs[idx];
+      if (area && p) this.updateHoverAreaPosition(area, p);
     });
   }
 
   refreshParagraphNavigation() {
     this.disableParagraphNavigation();
     this.enableParagraphNavigation();
+  }
+
+  _schedulePositionsUpdate() {
+    if (this._posUpdateScheduled) return;
+    this._posUpdateScheduled = true;
+    requestAnimationFrame(() => {
+      try { this.updateAllHoverAreas(); } finally { this._posUpdateScheduled = false; }
+    });
+  }
+
+  _scheduleRefresh() {
+    clearTimeout(this._refreshTO);
+    this._refreshTO = setTimeout(() => this.refreshParagraphNavigation(), 60);
   }
 
   // ---------- tuning ----------

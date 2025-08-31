@@ -82,6 +82,8 @@ export class DrawingTools {
     this.currentPoints = [];
     this.textClickArmed = false;
     this.erasedShapeIds = new Set();
+    this._moveTicking = false;
+    this._lastMoveEvent = null;
 
     // Load shapes and canvas (NAMESPACED)
     this.shapesData = loadShapesData(this.storageNamespace);
@@ -108,6 +110,38 @@ export class DrawingTools {
     }
   }
 
+  // ===== scroll freeze helpers =====
+  _freezeScroll() {
+    if (this._freeze && this._freeze.active) return;
+    const root = document.scrollingElement || document.documentElement || document.body;
+    const isWindow = true; // we lock window scroll for simplicity
+    const x = window.scrollX;
+    const y = window.scrollY;
+    const onScroll = (e) => { window.scrollTo(x, y); };
+    const onWheel = (e) => { try { e.preventDefault(); } catch {} };
+    const onTouch = (e) => { try { e.preventDefault(); } catch {} };
+    const onKey = (e) => {
+      const keys = ['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '];
+      if (keys.includes(e.key)) { try { e.preventDefault(); } catch {} }
+    };
+    window.addEventListener('scroll', onScroll, { passive: false });
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('touchmove', onTouch, { passive: false });
+    window.addEventListener('keydown', onKey, { passive: false });
+    this._freeze = { active: true, isWindow, x, y, onScroll, onWheel, onTouch, onKey };
+  }
+  _unfreezeScroll() {
+    const f = this._freeze;
+    if (!f || !f.active) return;
+    try {
+      window.removeEventListener('scroll', f.onScroll);
+      window.removeEventListener('wheel', f.onWheel);
+      window.removeEventListener('touchmove', f.onTouch);
+      window.removeEventListener('keydown', f.onKey);
+    } catch {}
+    this._freeze = { active: false };
+  }
+
   init() {
     window.addEventListener('resize', () => {
       this.canvasManager.sizeCanvases();
@@ -131,21 +165,41 @@ export class DrawingTools {
       }
     });
 
-    ['mousedown','mousemove','mouseup'].forEach(evt =>
+    ['mousedown','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
         handleEraser(this, evt, e);
       })
     );
 
+    // rAF-throttled mousemove for eraser + draw tools + cursor update
     document.addEventListener('mousemove', e => {
-      if (this.activeTool?.classList.contains('eraser')) {
-        this.eraserCursor.style.display = 'block';
-        this.eraserCursor.style.left = `${e.pageX}px`;
-        this.eraserCursor.style.top = `${e.pageY}px`;
-      } else {
-        this.eraserCursor.style.display = 'none';
-      }
+      this._lastMoveEvent = e;
+      if (this._moveTicking) return;
+      this._moveTicking = true;
+      requestAnimationFrame(() => {
+        const ev = this._lastMoveEvent; // latest event
+        if (ev) {
+          // eraser move
+          handleEraser(this, 'mousemove', ev);
+          // shapes move
+          handleRectangle(this, 'mousemove', ev, this.selectedColor);
+          handleEllipse(this, 'mousemove', ev, this.selectedColor);
+          handleLine(this, 'mousemove', ev, this.selectedColor);
+          handleArrow(this, 'mousemove', ev, this.selectedColor);
+          handlePencil(this, 'mousemove', ev, this.pencilOptions, this.selectedColor);
+          handleHighlight(this, 'mousemove', ev, this.highlightOptions, this.highlightColor, this.highlightOptions.opacity);
+          // eraser cursor position/update
+          if (this.activeTool?.classList.contains('eraser')) {
+            this.eraserCursor.style.display = 'block';
+            this.eraserCursor.style.left = `${ev.pageX}px`;
+            this.eraserCursor.style.top = `${ev.pageY}px`;
+          } else {
+            this.eraserCursor.style.display = 'none';
+          }
+        }
+        this._moveTicking = false;
+      });
     });
 
     // Text tool (with color)
@@ -154,7 +208,7 @@ export class DrawingTools {
     );
 
     // Drawing shape events
-    ['mousedown','mousemove','mouseup'].forEach(evt =>
+    ['mousedown','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
         handleRectangle(this, evt, e, this.selectedColor);
@@ -294,6 +348,7 @@ export class DrawingTools {
       this.startY = y;
       this.currentSeed = Math.floor(Math.random() * 10000) + 1;
       document.body.style.userSelect = 'none';
+      try { window.dispatchEvent(new CustomEvent('drawing:start')); } catch {}
     } else if (type === 'mousemove' && this.isDrawing) {
       this.canvasManager.clearPreview();
       pF(this.startXRel, this.startY, x, y, this.currentSeed);
@@ -303,6 +358,7 @@ export class DrawingTools {
       this.canvasManager.clearPreview();
       fF(this.startXRel, this.startY, x, y, this.currentSeed);
       this.save();
+      try { window.dispatchEvent(new CustomEvent('drawing:end')); } catch {}
       const c = this.tools.find(t => t.classList.contains('cursor'));
       if (c) this.setActiveTool(c);
     }
