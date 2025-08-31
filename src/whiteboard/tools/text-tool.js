@@ -28,8 +28,8 @@ export function createTextEditor(drawingTools, e) {
     position: 'absolute',
     left: `${cx}px`,
     top: `${cy}px`,
-    transform: 'translate(-50%, -50%)', // center under cursor (matches final placement)
-    transformOrigin: 'center center',
+    transform: 'none', // anchor start exactly at click (adjusted to baseline below)
+    transformOrigin: 'left top',
     display: 'block',
     padding: '4px 6px',
     border: '1px dashed rgba(0,0,0,0.3)',
@@ -39,25 +39,46 @@ export function createTextEditor(drawingTools, e) {
     fontSize: '24px',
     lineHeight: '1.2',
     color: drawingTools.selectedColor,
-    whiteSpace: 'pre-wrap',
-    overflowWrap: 'anywhere',
-    wordBreak: 'break-word',
-    maxWidth: `${maxW}px`,
+    whiteSpace: 'pre',
+    overflow: 'visible',
     minWidth: '40px',
     minHeight: '1em',
-    textAlign: 'center',
+    textAlign: 'left',
     borderRadius: '6px'
   });
 
   document.body.appendChild(el);
-  el.focus();
+  // Prevent initial focus from scrolling viewport
+  try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+
+  // After insertion, align top to baseline so the click point is baseline of first line
+  try {
+    const cs = getComputedStyle(el);
+    const fontSize = parseFloat(cs.fontSize) || 24;
+    const fontFamily = cs.fontFamily || 'sans-serif';
+    const cvs = document.createElement('canvas');
+    const ctx = cvs.getContext('2d');
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    const m = ctx.measureText('Mg');
+    const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
+    el.style.top = `${cy - ascent}px`;
+  } catch {}
 
   // Handle Enter vs Shift+Enter, Esc to cancel
+  const restoreScroll = () => {
+    const x = window.scrollX, y = window.scrollY;
+    requestAnimationFrame(() => window.scrollTo(x, y));
+  };
+
   el.addEventListener('keydown', ev => {
+    // Never allow viewport to shift to keep caret visible
+    restoreScroll();
     if (ev.key === 'Enter') {
       if (ev.shiftKey) {
+        // Insert a literal newline without causing viewport jumps
         ev.preventDefault();
-        try { document.execCommand('insertLineBreak'); } catch {}
+        try { document.execCommand('insertText', false, '\n'); } catch {}
+        restoreScroll();
       } else {
         ev.preventDefault();
         el.blur();
@@ -68,6 +89,10 @@ export function createTextEditor(drawingTools, e) {
       el.blur();
     }
   });
+  // Extra guards against scroll adjustments while typing
+  el.addEventListener('keyup', restoreScroll);
+  el.addEventListener('input', restoreScroll);
+  el.addEventListener('beforeinput', restoreScroll);
 
   // Prevent creating another editor when clicking inside current one
   ['mousedown','click'].forEach(evt => el.addEventListener(evt, ev => ev.stopPropagation()));
@@ -87,23 +112,9 @@ export function createTextEditor(drawingTools, e) {
       return;
     }
 
-    // Measure multi-line metrics to compute left/baseline from center
-    const lines = String(textValue).split(/\n/);
-    const cvs = document.createElement('canvas');
-    const ctx = cvs.getContext('2d');
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    let textWidth = 0;
-    for (const line of lines) {
-      const w = ctx.measureText(line).width;
-      if (w > textWidth) textWidth = w;
-    }
-    const m = ctx.measureText('Mg');
-    const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
-    const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
-    const n = Math.max(1, lines.length);
-    // Invert center -> baseline for multi-line
-    const baselineY = cy - ((descent - ascent) + (n - 1) * fontSize) / 2;
-    const xRel = (cx - zeroX) - textWidth / 2;
+    // Persist with click point as the fixed start (baseline of first line)
+    const baselineY = cy;
+    const xRel = (cx - zeroX);
 
     // Persist text
     drawingTools.shapesData.text.push({

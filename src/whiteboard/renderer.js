@@ -210,18 +210,28 @@ export function redrawAll(drawingTools) {
     });
   });
 
-  // TEXT overlay divs are page-absolute already; leave as-is (but keep on top)
+  // TEXT overlay divs anchored at the click baseline; no viewport shifts
   drawingTools.shapesData.text.forEach((t, i) => {
     const id = `text-${i}`;
-    const bounds = getShapeBounds('text', t);
     const rotDeg = t.rotation || 0;
 
-    // 🔧 FIX: text div must use page-space X, i.e., add zeroX here
-    const cx = getZeroXPoint() + (bounds.minX + bounds.maxX) / 2;
-    const cy = (bounds.minY + bounds.maxY) / 2;
+    const fontSize = t.fontSize || 24;
+    const fontFamily = t.fontFamily || 'sans-serif';
+    const ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = `${fontSize}px ${fontFamily}`;
+    const m = ctx.measureText('Mg');
+    const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
+    const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
+    const lines = String(t.text ?? '').split(/\n/);
+    let textWidth = 0;
+    for (const line of lines) {
+      const w = ctx.measureText(line).width;
+      if (w > textWidth) textWidth = w;
+    }
+    const height = ascent + descent + Math.max(0, lines.length - 1) * fontSize;
 
-    const width = bounds.maxX - bounds.minX;
-    const height = bounds.maxY - bounds.minY;
+    const left = getZeroXPoint() + t.xRel;
+    const top = (t.y - ascent);
 
     const div = document.createElement('div');
     div.innerText = t.text;
@@ -229,22 +239,19 @@ export function redrawAll(drawingTools) {
     div.setAttribute('data-text-id', id);
     Object.assign(div.style, {
       position: 'absolute',
-      left: `${cx}px`,
-      top: `${cy}px`,
-      width: `${width}px`,
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${textWidth}px`,
       height: `${height}px`,
-      // translate to center first, then rotate around center (keeps bbox aligned)
-      transform: `translate(-50%, -50%) rotate(${rotDeg}deg)`,
-      transformOrigin: 'center center',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      textAlign: 'center',
+      transform: `rotate(${rotDeg}deg)`,
+      transformOrigin: 'left top',
+      display: 'block',
       pointerEvents: 'none',
-      fontSize: `${t.fontSize || 24}px`,
-      fontFamily: t.fontFamily || 'sans-serif',
+      textAlign: 'left',
+      fontSize: `${fontSize}px`,
+      fontFamily,
       lineHeight: 'normal',
-      whiteSpace: 'pre-wrap',
+      whiteSpace: 'pre',
       background: 'transparent',
       color: t.color,
       zIndex: '1',
