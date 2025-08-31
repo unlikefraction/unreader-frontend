@@ -20,6 +20,7 @@ export class WordHighlighter {
 
     // timers & perf
     this.highlightInterval = null;
+    this._rafId = null;
     this.nextTimingToConsider = 0; // rolling pointer for perf
   }
 
@@ -52,7 +53,7 @@ export class WordHighlighter {
   _addHighlight(i) {
     const el = this._safeSpan(i);
     if (!el) return false;
-    el.classList.add('highlight');
+    try { el.classList.add('highlight'); } catch {}
     this.highlightedIndices.add(i);
     this._setCurrentWordEl(el);
     return true;
@@ -61,8 +62,56 @@ export class WordHighlighter {
   _removeHighlight(i) {
     const el = this._safeSpan(i);
     if (!el) return false;
-    el.classList.remove('highlight');
+    try { el.classList.remove('highlight'); } catch {}
     return true;
+  }
+
+  /* ---------------- DOM rehydration ---------------- */
+
+  _rehydrateSpansIfDetached() {
+    const spans = this._spans();
+    if (!spans.length) return;
+
+    let detached = 0;
+    for (let i = 0; i < spans.length; i++) {
+      const el = spans[i];
+      if (!this._isValidSpan(el)) detached++;
+      if (detached > 5) break; // early exit once clear
+    }
+
+    // If a handful are detached, rebuild references from DOM
+    if (detached > 0) {
+      const container = this.textProcessor?.container;
+      if (!container || !container.isConnected) return;
+      let fresh;
+      try {
+        fresh = Array.from(container.querySelectorAll('span.word'));
+      } catch { fresh = null; }
+
+      if (!fresh || fresh.length === 0) return;
+
+      // Build an indexable array by data-index, falling back to order
+      const byIndex = [];
+      for (const el of fresh) {
+        const n = Number(el.dataset?.index);
+        if (Number.isInteger(n) && n >= 0) byIndex[n] = el;
+      }
+      const rebuilt = byIndex.length > 0 ? byIndex : fresh;
+
+      // Replace references in textProcessor
+      this.textProcessor.wordSpans = rebuilt;
+
+      // Reapply current highlights idempotently
+      for (const i of this.highlightedIndices) {
+        const el = this._safeSpan(i);
+        if (el) { try { el.classList.add('highlight'); } catch {} }
+      }
+
+      // Reset current word element to a safe handle
+      this._setCurrentWordEl(this._safeSpan(Math.max(0, this.lastHighlightedIndex - 1)));
+
+      try { printl?.(`♻️ Rehydrated ${detached} detached span reference(s)`); } catch {}
+    }
   }
 
   /* ---------------- lifecycle ---------------- */
@@ -219,7 +268,14 @@ export class WordHighlighter {
           }
         }
       } else {
-        try { printl?.(`⏭️ Skipping low-confidence match for "${wordData.word}" (p=${p.toFixed(3)})`); } catch {}
+        // Fallback 1: forward exact search within a small window ahead
+        const forwardIndex = this._forwardExactSearch(wordData.word, this.lastHighlightedIndex);
+        if (forwardIndex !== -1) {
+          this.fillGapsToTarget(forwardIndex, `fallback forward-search for "${wordData.word}"`);
+          this.highlightWordsInRange(forwardIndex, forwardIndex, '(forward exact match)');
+        } else {
+          try { printl?.(`⏭️ Skipping low-confidence match for "${wordData.word}" (p=${p.toFixed(3)})`); } catch {}
+        }
       }
     }
   }
@@ -305,6 +361,14 @@ export class WordHighlighter {
           return { wordData, textIndex: Math.min(bestMatch.index, spans.length - 1) };
         }
 
+        // Fallback: try a quick forward exact search before bailing
+        const forwardIndex = this._forwardExactSearch(wordData.word, this.lastHighlightedIndex);
+        if (forwardIndex !== -1) {
+          this.clearAllHighlights();
+          this.highlightWordsInRange(0, Math.min(forwardIndex, spans.length - 1), '(seek forward exact)');
+          return { wordData, textIndex: Math.min(forwardIndex, spans.length - 1) };
+        }
+
         // Gate: no highlight if below threshold
         return { wordData, textIndex: -1 };
       }
@@ -344,6 +408,13 @@ export class WordHighlighter {
         );
 
         return { wordData: closestWord, textIndex: Math.min(bestMatch.index, spans.length - 1) };
+      }
+      // Fallback: forward exact search
+      const forwardIndex = this._forwardExactSearch(closestWord.word, this.lastHighlightedIndex);
+      if (forwardIndex !== -1) {
+        this.clearAllHighlights();
+        this.highlightWordsInRange(0, Math.min(forwardIndex, spans.length - 1), '(seek closest forward exact)');
+        return { wordData: closestWord, textIndex: Math.min(forwardIndex, spans.length - 1) };
       }
     }
 
@@ -448,9 +519,13 @@ export class WordHighlighter {
   }
 
   async highlightWord(time, audioDuration) {
+    if (!Number.isFinite(time) || time < 0) return;
     try { printl?.(`Audio time: ${time.toFixed(5)}s`); } catch {}
 
     try {
+      // Repair span references if the DOM was re-rendered
+      this._rehydrateSpansIfDetached();
+
       this.handleInitialWords(time);
       // perf: process only what's due
       this.processUpToTime(time);
@@ -471,20 +546,55 @@ export class WordHighlighter {
     }
   }
 
-  startHighlighting(getCurrentTime, getDuration) {
-    if (this.highlightInterval) clearInterval(this.highlightInterval);
+  startHighlighting(getCurrentTime, getDuration, { preferRAF = true } = {}) {
+    // Clear any existing schedulers
+    if (this.highlightInterval) { clearInterval(this.highlightInterval); this.highlightInterval = null; }
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
 
-    this.highlightInterval = setInterval(() => {
-      const currentTime = getCurrentTime();
-      const duration = getDuration();
-      this.highlightWord(currentTime, duration);
-    }, 50);
+    const tick = () => {
+      try {
+        const currentTime = getCurrentTime();
+        const duration = getDuration();
+        this.highlightWord(currentTime, duration);
+      } finally {
+        this._rafId = requestAnimationFrame(tick);
+      }
+    };
+
+    if (preferRAF && typeof requestAnimationFrame === 'function') {
+      this._rafId = requestAnimationFrame(tick);
+    } else {
+      this.highlightInterval = setInterval(() => {
+        const currentTime = getCurrentTime();
+        const duration = getDuration();
+        this.highlightWord(currentTime, duration);
+      }, 50);
+    }
   }
 
   stopHighlighting() {
-    if (this.highlightInterval) {
-      clearInterval(this.highlightInterval);
-      this.highlightInterval = null;
+    if (this.highlightInterval) { clearInterval(this.highlightInterval); this.highlightInterval = null; }
+    if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
+  }
+
+  /* ---------------- util: forward exact search ---------------- */
+  _forwardExactSearch(targetWord, fromIndex, windowSize = this.textProcessor?.referenceWords ?? 10) {
+    const spans = this._spans();
+    if (!spans.length) return -1;
+
+    const cleanTarget = String(targetWord)
+      .toLocaleLowerCase()
+      .normalize('NFKC')
+      .replace(/[^\p{L}\p{N}’']+/gu, '');
+
+    const start = Math.max(0, fromIndex);
+    const end = Math.min(spans.length, start + Math.max(3, windowSize));
+    for (let i = start; i < end; i++) {
+      const el = this._safeSpan(i);
+      if (!el) continue;
+      const ow = el.dataset?.originalWord;
+      if (ow && ow === cleanTarget) return i;
     }
+    return -1;
   }
 }
