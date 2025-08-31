@@ -214,10 +214,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function postMessage(text) {
     const url = baseUrl() + 'message/';
+    const currentPage = (typeof window !== 'undefined' && window.location) ? window.location.pathname : undefined;
+    const metadata = {};
+    if (currentPage) metadata.currentPage = currentPage;
     const res = await fetch(url, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text, metadata })
     });
     if (res.status === 401) {
       console.warn('[Inbox] Unauthorized while posting message');
