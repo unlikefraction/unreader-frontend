@@ -119,6 +119,12 @@ export default class AppController {
       if (!userBookId) throw new Error('Missing ?id=');
 
       const book = await fetchBook(userBookId);
+      // Determine if we should allow word-level highlighting
+      const rawLang = String(book?.language || '').trim().toLowerCase();
+      const isEnglish = !!rawLang && (
+        rawLang === 'en' || rawLang.startsWith('en-') || rawLang.startsWith('en_')
+      );
+      const allowWordHighlighting = !!isEnglish;
       const bookTitle = String(book?.title || '').trim() || 'book';
 
       const pages = Array.isArray(book.pages) ? [...book.pages] : [];
@@ -158,6 +164,8 @@ export default class AppController {
         prefetchRadius: 1,
         observeRadius: 0.75,
         userBookId,
+        // Disable word-level highlighting for non-English content
+        allowWordHighlighting,
         callbacks: {
           onActivePageChanged: async (index) => {
             try {

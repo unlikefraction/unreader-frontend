@@ -60,6 +60,7 @@ export default class MultiPageReader {
     prefetchRadius = 1,
     observeRadius = 0.75,
     userBookId = null,
+    allowWordHighlighting = true,
     callbacks = {}
   } = {}) {
     this.pageMeta = pages.slice();
@@ -86,6 +87,7 @@ export default class MultiPageReader {
 
     this.userBookId = userBookId ?? qs('id');
     this.audioApiBase = window.API_URLS?.AUDIO || '';
+    this.allowWordHighlighting = !!allowWordHighlighting;
 
     this._cb = {
       onActivePageChanged: typeof callbacks.onActivePageChanged === 'function' ? callbacks.onActivePageChanged : null,
@@ -348,7 +350,13 @@ export default class MultiPageReader {
     if (this.instances[i]) return this.instances[i];
 
     const meta = this.pageMeta[i];
-    const sys = new AudioSystem(meta.audioFile, meta.timingFile, meta.textBlobUrl, meta.offsetMs ?? 0);
+    const sys = new AudioSystem(
+      meta.audioFile,
+      meta.timingFile,
+      meta.textBlobUrl,
+      meta.offsetMs ?? 0,
+      { disableWordHighlighting: !this.allowWordHighlighting }
+    );
     sys.textProcessor.pageId = slugify(meta.pageKey || `page-${meta.page_number}-${i}`);
 
     // keep the call name the same; TextProcessor.separateText() now preserves markup internally
@@ -696,7 +704,15 @@ export default class MultiPageReader {
     if (this.active < 0) return;
     const sys = this.instances[this.active]; if (!sys) return;
     sys.audioCore.sound?.seek(seconds);
-    sys.highlighter?.handleSeek?.(seconds);
+    if (this.allowWordHighlighting) {
+      sys.highlighter?.handleSeek?.(seconds);
+    } else {
+      // Non-English mode: keep the entire page highlighted on seek/forward/rewind
+      try {
+        const spans = Array.isArray(sys.textProcessor?.wordSpans) ? sys.textProcessor.wordSpans : [];
+        for (const el of spans) { try { el.classList.add('highlight'); } catch {} }
+      } catch {}
+    }
   }
   setSpeed(speed) { if (this.active < 0) return; this.instances[this.active]?.setSpeed?.(speed); }
   getCurrentTime() { return this.active < 0 ? 0 : (this.instances[this.active]?.getCurrentTime?.() || 0); }

@@ -18,10 +18,11 @@ if (!window.playbackControls) {
  * to the ACTIVE page’s highlighter.
  */
 export class AudioSystem {
-  constructor(audioFile, timingFile, textFile, offsetMs = 0) {
+  constructor(audioFile, timingFile, textFile, offsetMs = 0, options = {}) {
     this.audioCore     = new AudioCore(audioFile, offsetMs);
     this.textProcessor = new TextProcessor(textFile, timingFile, offsetMs);
     this.highlighter   = new WordHighlighter(this.textProcessor);
+    this.disableWordHighlighting = !!(options && options.disableWordHighlighting);
 
     // Create the singleton but DO NOT bind here (binding happens in MultiPageReader).
     this.readAlong = ReadAlong.get();
@@ -33,26 +34,46 @@ export class AudioSystem {
   }
 
   setupConnections() {
-    // Start/stop highlighting loop with audio time.
-    this.audioCore.onPlay(() => {
-      this.highlighter.startHighlighting(
-        () => this.audioCore.getCurrentTime(),
-        () => this.audioCore.getDuration()
-      );
-    });
+    // Start/stop/highlight behavior depends on language capability
+    if (this.disableWordHighlighting) {
+      // Non-English: do not track word-level; on play, just paint the full page once without
+      // advancing internal highlighter state (avoid picking a "current word").
+      this.audioCore.onPlay(() => {
+        try {
+          const spans = Array.isArray(this.textProcessor?.wordSpans)
+            ? this.textProcessor.wordSpans
+            : [];
+          for (const el of spans) {
+            try { el.classList.add('highlight'); } catch {}
+          }
+        } catch {}
+      });
+      // Pause/End/Seek: no word-level updates when disabled
+      this.audioCore.onPause(() => {});
+      this.audioCore.onEnd(() => {});
+      this.audioCore.onSeek(() => {});
+    } else {
+      // English (or en-*): normal word-level highlighting
+      this.audioCore.onPlay(() => {
+        this.highlighter.startHighlighting(
+          () => this.audioCore.getCurrentTime(),
+          () => this.audioCore.getDuration()
+        );
+      });
 
-    this.audioCore.onPause(() => {
-      this.highlighter.stopHighlighting();
-    });
+      this.audioCore.onPause(() => {
+        this.highlighter.stopHighlighting();
+      });
 
-    this.audioCore.onEnd(() => {
-      this.highlighter.stopHighlighting();
-      this.highlighter.handleAudioEnd(this.audioCore.getDuration());
-    });
+      this.audioCore.onEnd(() => {
+        this.highlighter.stopHighlighting();
+        this.highlighter.handleAudioEnd(this.audioCore.getDuration());
+      });
 
-    this.audioCore.onSeek((currentTime) => {
-      this.highlighter.handleSeek(currentTime);
-    });
+      this.audioCore.onSeek((currentTime) => {
+        this.highlighter.handleSeek(currentTime);
+      });
+    }
 
     // Notify ReadAlong after words are painted; pass the concrete element if available.
     const original = this.highlighter.highlightWordsInRange.bind(this.highlighter);
