@@ -71,6 +71,17 @@ export class TextProcessor {
     // strip dangerous/irrelevant nodes
     ["script","style","noscript","template"].forEach(sel => tempRoot.querySelectorAll(sel).forEach(n => n.remove()));
 
+    // ignore all styling coming from backend transcript
+    // remove inline styles, classes, and common presentational attributes
+    const PRESENTATIONAL_ATTRS = [
+      "style", "class", "bgcolor", "color", "background", "align",
+      "border", "cellpadding", "cellspacing", "width", "height",
+      "hspace", "vspace", "face", "size"
+    ];
+    tempRoot.querySelectorAll('*').forEach((el) => {
+      PRESENTATIONAL_ATTRS.forEach(attr => el.removeAttribute(attr));
+    });
+
     // walk text nodes and wrap words
     const BLOCKED = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE"]);
     const walker = document.createTreeWalker(
