@@ -15,6 +15,7 @@ import { handleEraser } from './tools/eraser-tool.js';
 import { isClickOnTool, hexToRgba } from './utils.js';
 import { initSelectionHandler } from './landingFiles/selection.js';
 import { initVersioning } from './version.js';
+import { ReadAlong } from '../audio/read-along.js';
 
 /**
  * Class to manage drawing annotations on the document
@@ -348,6 +349,12 @@ export class DrawingTools {
       this.startY = y;
       this.currentSeed = Math.floor(Math.random() * 10000) + 1;
       document.body.style.userSelect = 'none';
+      // Snapshot read-along zone state, then disable auto-follow while drawing
+      try {
+        const ra = ReadAlong.get();
+        this._wasInReadAlongZone = (ra && typeof ra.isCurrentWordInZone === 'function') ? ra.isCurrentWordInZone() : false;
+        ra?.setAutoEnabled(false);
+      } catch {}
       try { window.dispatchEvent(new CustomEvent('drawing:start')); } catch {}
     } else if (type === 'mousemove' && this.isDrawing) {
       this.canvasManager.clearPreview();
@@ -358,6 +365,15 @@ export class DrawingTools {
       this.canvasManager.clearPreview();
       fF(this.startXRel, this.startY, x, y, this.currentSeed);
       this.save();
+      // If previously in zone, snap once; always re-enable auto-follow
+      try {
+        const ra = ReadAlong.get();
+        if (this._wasInReadAlongZone && ra && typeof ra.snapToCurrentWord === 'function') {
+          ra.snapToCurrentWord({ smooth: true });
+        }
+        ra?.setAutoEnabled(true);
+      } catch {}
+      this._wasInReadAlongZone = undefined;
       try { window.dispatchEvent(new CustomEvent('drawing:end')); } catch {}
       const c = this.tools.find(t => t.classList.contains('cursor'));
       if (c) this.setActiveTool(c);

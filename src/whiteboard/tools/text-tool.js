@@ -2,6 +2,7 @@
 
 
 import { computeCoords, getZeroXPoint } from '../utils.js';
+import { ReadAlong } from '../../audio/read-along.js';
 
 /**
  * Text drawing tool
@@ -50,6 +51,12 @@ export function createTextEditor(drawingTools, e) {
   document.body.appendChild(el);
   // Prevent initial focus from scrolling viewport
   try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+  // Snapshot zone and disable read-along while editing text
+  try {
+    const ra = ReadAlong.get();
+    drawingTools._wasInReadAlongZone = (ra && typeof ra.isCurrentWordInZone === 'function') ? ra.isCurrentWordInZone() : false;
+    ra?.setAutoEnabled(false);
+  } catch {}
 
   // After insertion, align top to baseline so the click point is baseline of first line
   try {
@@ -128,6 +135,15 @@ export function createTextEditor(drawingTools, e) {
     drawingTools.save();
     el.remove();
     drawingTools.redrawAll();
+    // Snap once only if previously in zone; then re-enable
+    try {
+      const ra = ReadAlong.get();
+      if (drawingTools._wasInReadAlongZone && ra && typeof ra.snapToCurrentWord === 'function') {
+        ra.snapToCurrentWord({ smooth: true });
+      }
+      ra?.setAutoEnabled(true);
+    } catch {}
+    drawingTools._wasInReadAlongZone = undefined;
     const cursor = drawingTools.tools.find(t => t.classList.contains('cursor'));
     if (cursor) drawingTools.setActiveTool(cursor);
   });

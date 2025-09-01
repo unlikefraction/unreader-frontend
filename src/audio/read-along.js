@@ -340,6 +340,16 @@ export class ReadAlong {
     requestAnimationFrame(() => this.evaluateReadAlongState());
   }
 
+  // Public helper: is the current word within the activation zone?
+  isCurrentWordInZone() {
+    try {
+      const el = this._getWordEl();
+      return this._isInZone(el);
+    } catch {
+      return false;
+    }
+  }
+
   setActivationRadius(px) {
     const v = Math.max(0, Number(px) || 0);
     this.activationRadiusPx = v;

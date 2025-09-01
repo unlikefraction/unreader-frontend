@@ -2,6 +2,7 @@
 
 import { getStroke } from 'perfect-freehand';
 import { computeCoords, getZeroXPoint } from '../utils.js';
+import { ReadAlong } from '../../audio/read-along.js';
 
 /**
  * Pencil drawing tool
@@ -38,6 +39,12 @@ export function handleFreehand(
     drawingTools.isDrawing = true;
     drawingTools.currentPoints = [{ xRel, y }];
     document.body.style.userSelect = 'none';
+    // Snapshot zone and disable read-along while drawing
+    try {
+      const ra = ReadAlong.get();
+      drawingTools._wasInReadAlongZone = (ra && typeof ra.isCurrentWordInZone === 'function') ? ra.isCurrentWordInZone() : false;
+      ra?.setAutoEnabled(false);
+    } catch {}
   } else if (type === 'mousemove' && drawingTools.isDrawing) {
     drawingTools.currentPoints.push({ xRel, y });
     drawingTools.canvasManager.clearPreview();
@@ -87,6 +94,15 @@ export function handleFreehand(
     ctx.fill();
 
     drawingTools.save();
+    // Snap once only if previously in zone; then re-enable
+    try {
+      const ra = ReadAlong.get();
+      if (drawingTools._wasInReadAlongZone && ra && typeof ra.snapToCurrentWord === 'function') {
+        ra.snapToCurrentWord({ smooth: true });
+      }
+      ra?.setAutoEnabled(true);
+    } catch {}
+    drawingTools._wasInReadAlongZone = undefined;
     // tool remains active for continuous drawing
   }
 }
