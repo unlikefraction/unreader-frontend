@@ -236,3 +236,46 @@
     margin-right: 0.5rem;
     margin-top: 0.15rem;
 }
+
+/* Responsive: up to 800px */
+@media (max-width: 800px) {
+  /* Hide decorative elements */
+  .titleSec .titleLine { display: none !important; }
+  .highlightSec { display: none !important; }
+
+  /* Center align title and secondary sections */
+  .topSection { align-items: center; }
+  .titleSec, .secondarySec { align-items: center; text-align: center; }
+
+  /* Remove rotations and offsets for better readability */
+  .topSection .titleSec .title {
+    transform: none;
+    margin-left: 0;
+    font-size: 24px;
+  }
+  .topSection .secondarySec { right: 0; }
+  .topSection .secondarySec .secondaryText {
+    transform: none;
+    font-size: 14px;
+  }
+
+  /* Books layout: 2 columns, full width */
+  .book-wrapper {
+    width: 100%;
+    column-count: 2;
+    column-gap: 12px;
+    padding: 4px 8px;
+  }
+
+  /* Container width adjustments to prevent overflow */
+  .realvjy { width: 100%; max-width: 100%; }
+}
+
+/* Responsive: up to 400px */
+@media (max-width: 400px) {
+  .topSection .titleSec .title { font-size: 20px; }
+  .topSection .secondarySec .secondaryText { font-size: 13px; }
+
+  /* Books layout: single column on very small screens */
+  .book-wrapper { column-count: 1; }
+}
