@@ -127,6 +127,12 @@
     gap: 8px;               
 }
 
+/* When end date is placed inside the grid, allow space next to the completed dot */
+.progressMarkings > .endDate{
+    grid-column: span 4;
+    align-items: center;
+}
+
 .progressDot{
     width: 20px;
     height: 20px;
@@ -377,7 +383,6 @@
 .endDate{
     position: relative;
     bottom: -0.8rem;
-    right: -1rem;
     display: flex;
     justify-content: end;
 }
@@ -397,4 +402,5 @@
     font-family: 'excalifont', sans-serif;
     color: #000;
     margin-left: 6px;
+    white-space: nowrap; /* keep date on one line */
 }

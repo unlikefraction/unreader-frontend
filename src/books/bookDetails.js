@@ -411,6 +411,12 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
             else if (oath === "blood_oath") symbol = "🩸";
           }
           dot.textContent = symbol;
+
+          // Place the pre-existing endDate element right after the completed dot
+          if (endDateContainer) {
+            // Ensure it will be placed after the completed dot cell
+            // We append it after appending the dot below
+          }
         }
          else {
           if (!book.marked_as_complete && isToday && wasRead) dot.classList.add("todayCompleted");
@@ -419,6 +425,10 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
         }
 
         progressContainer.appendChild(dot);
+        // If this dot is the completed one, place endDate next to it inside the same grid
+        if (dot.classList.contains("bookCompleted") && endDateContainer) {
+          progressContainer.appendChild(endDateContainer);
+        }
         start.setDate(start.getDate() + 1);
       }
 

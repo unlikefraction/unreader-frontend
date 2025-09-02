@@ -718,6 +718,10 @@ nav a{
   line-height: 22px;
 }
 
+.bookSubtitle, .titleSep{
+  display: none;
+}
+
 .sendMessage{
   display: flex;
   width: 100%;
