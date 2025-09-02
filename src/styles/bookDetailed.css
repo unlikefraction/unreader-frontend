@@ -52,3 +52,12 @@
     width: 100%;
     height: 28px;
 }
+
+/* ReadBook responsiveness */
+@media (max-width: 1000px) {
+    /* Hide page x of y on smaller screens */
+    .pageDetailsBottomRight { display: none; }
+
+    /* Make loading skeleton 90% width and centered */
+    .skeletonLoadingMainBook { width: 90%; }
+}
