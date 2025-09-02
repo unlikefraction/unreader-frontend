@@ -126,6 +126,7 @@ export default class AppController {
       );
       const allowWordHighlighting = !!isEnglish;
       const bookTitle = String(book?.title || '').trim() || 'book';
+      try { if (bookTitle) document.title = `${bookTitle} | Unreader`; } catch {}
 
       const pages = Array.isArray(book.pages) ? [...book.pages] : [];
       pages.sort((a, b) => (a.page_number || 0) - (b.page_number || 0));

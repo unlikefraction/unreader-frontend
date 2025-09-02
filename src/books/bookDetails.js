@@ -314,6 +314,12 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     if (!response.ok) throw new Error(`Status: ${response.status}`);
     const book = await response.json();
 
+    // Set page title to the book's title
+    try {
+      const t = String(book?.title || '').trim();
+      if (t) document.title = `${t} | Unreader`;
+    } catch {}
+
     // === Set cover image ===
     const coverImg = document.querySelector('.book-image img');
     if (coverImg && book.cover_image_url) coverImg.src = book.cover_image_url;
