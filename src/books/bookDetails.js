@@ -34,6 +34,17 @@ function countWords(text) {
   return normalized ? normalized.split(" ").length : 0;
 }
 
+// Auto-resize a textarea to fit its content height
+function autoResizeTextarea(el) {
+  if (!el) return;
+  try {
+    el.style.height = 'auto';
+    el.style.overflowY = 'hidden';
+    const h = el.scrollHeight;
+    if (h && Number.isFinite(h)) el.style.height = `${h}px`;
+  } catch {}
+}
+
 // === Timezone Setup ===
 const userTimezoneOffset = new Date().getTimezoneOffset() * 60000; // in ms
 
@@ -291,7 +302,8 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
   }
 
   try {
-    const response = await fetch(`${window.API_URLS.BOOK}get-details/${userBookId}/`, {
+    // Request book details without heavy pages payload
+    const response = await fetch(`${window.API_URLS.BOOK}get-details/${userBookId}/?pages=false`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -316,7 +328,9 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     }
 
     // === Progress bar setup ===
-    const totalPages = book.pages.length;
+    const totalPages = (typeof book.pages_count === 'number' && book.pages_count >= 0)
+      ? book.pages_count
+      : (Array.isArray(book.pages) ? book.pages.length : 0);
     const analytics = book.pages_read_analytics || {};
     let lastPageRead = 0;
     Object.values(analytics).forEach(pages => {
@@ -480,6 +494,12 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       };
       updateThoughtWordCount();
       thoughtsInput.addEventListener('input', updateThoughtWordCount);
+
+      // Ensure textarea height fits full content on load and on changes
+      const doResize = () => autoResizeTextarea(thoughtsInput);
+      // Run after autosaver sets initial value and layout settles
+      requestAnimationFrame(() => requestAnimationFrame(doResize));
+      thoughtsInput.addEventListener('input', doResize);
     }
 
     // === Edit Cover (pencil) → file select → upload → POST update → update UI ===
