@@ -18,6 +18,48 @@ body{
   background: rgb(0, 0, 0);
 }
 
+/* Local Apfel Grotezk font (self-hosted) */
+@font-face {
+  font-family: 'Apfel Grotezk';
+  src: url('/fonts/ApfelGrotezk-Regular.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Apfel Grotezk';
+  src: url('/fonts/ApfelGrotezk-Mittel.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Mittel.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Apfel Grotezk';
+  src: url('/fonts/ApfelGrotezk-Satt.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Satt.woff') format('woff');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Apfel Grotezk';
+  src: url('/fonts/ApfelGrotezk-Fett.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Fett.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Apfel Grotezk';
+  src: url('/fonts/ApfelGrotezk-Brukt.woff2') format('woff2'),
+       url('/fonts/ApfelGrotezk-Brukt.woff') format('woff');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* width */
 ::-webkit-scrollbar {
   width: 12px;
