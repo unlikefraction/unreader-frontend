@@ -124,6 +124,11 @@ const tools = {
     currentHost = null;
   }
 
+  function isEnabled() {
+    // Disable tooltips on narrow viewports
+    return (document.documentElement.clientWidth || window.innerWidth) >= 1000;
+  }
+
   function findMatch(startEl) {
     // find nearest ancestor matching any tool selector
     for (const sel of selectors) {
@@ -135,6 +140,7 @@ const tools = {
 
   // --- Delegated pointer hover ---
   document.addEventListener("mouseover", (e) => {
+    if (!isEnabled()) { hideTooltip(); return; }
     const m = findMatch(e.target);
     if (!m) return;
 
@@ -154,6 +160,7 @@ const tools = {
 
   // --- Keyboard focus (accessibility) ---
   document.addEventListener("focusin", (e) => {
+    if (!isEnabled()) { hideTooltip(); return; }
     const m = findMatch(e.target);
     if (!m) return;
     const [name, shortcut, pos] = m.def;
@@ -167,6 +174,9 @@ const tools = {
   });
 
   // Global hide on resize/scroll
-  window.addEventListener("resize", hideTooltip, true);
+  window.addEventListener("resize", () => {
+    // Always hide on resize; if disabled at this size, keep hidden
+    hideTooltip();
+  }, true);
   window.addEventListener("scroll", hideTooltip, true);
 })();
