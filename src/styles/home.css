@@ -94,6 +94,8 @@
 }
 
 .library{
+    width: 90%;
+    max-width: 750px;
     min-height: 560px;
 }
 
