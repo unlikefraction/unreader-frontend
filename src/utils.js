@@ -6,16 +6,11 @@ let debugging = true;
 // Skips redirect for the extension popup and the small page itself.
 try {
   if (typeof window !== 'undefined' && typeof location !== 'undefined') {
-    const path = (location && location.pathname) || '';
-    const isPopup = /\bpopup\.html$/i.test(path);
-    const isSmallPage = /\bsmall\.html$/i.test(path);
-    if (!isPopup && !isSmallPage) {
       const isSmallViewport = window.matchMedia('(max-width: 999px)').matches;
       if (isSmallViewport) {
         // Use replace to avoid polluting back stack
-        window.location.replace('/small.html');
+        window.location.replace('small.html');
       }
-    }
   }
 } catch (_) {
   // no-op: never block app if something goes wrong
