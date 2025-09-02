@@ -12,6 +12,8 @@ const tools = {
   ".rectangle": ["Rectangle", "R", "right"],
   ".circle": ["Circle", "O", "right"],
   ".inbox": ["Inbox", null, "right"],
+  ".hold-up": ["Holdup", "/", "top"],
+  ".holdup": ["Holdup", "/", "top"],
 
   ".settings": ["Settings", null, "top"],
   ".rewind": ["Rewind", "←", "top"],
