@@ -124,7 +124,8 @@
     display: grid;
     grid-template-columns: repeat(15, 1fr);
     grid-auto-rows: auto;    /* each row height adapts to content */
-    gap: 8px;               
+    gap: 8px;              
+    margin-bottom: 1rem;    /* extra space below markers */
 }
 
 /* When end date is placed inside the grid, allow space next to the completed dot */
@@ -403,4 +404,95 @@
     color: #000;
     margin-left: 6px;
     white-space: nowrap; /* keep date on one line */
+}
+
+/* ------------------ Responsive: <= 900px ------------------ */
+@media (max-width: 900px) {
+  /* Hide decorative top-right image */
+  .oath { display: none !important; }
+
+  /* Container becomes fluid */
+  .mainBookDetails {
+    width: 100%;
+    max-width: 100%;
+    left: 0;
+    transform: none;
+    padding: 0 16px;
+    gap: 32px;
+  }
+
+  /* Stack cover/progress and adjust gaps */
+  .bookCoverAndProgress {
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Progress header tweaks */
+  .progressBook {
+    flex-direction: column;
+    align-items: center;
+    margin-left: 2rem;
+    gap: 8px;
+  }
+
+  .prgressBarBook {
+    height: 12px;
+    width: 170px; /* match cover width */
+  }
+
+  .progressFilledBook{
+    height: 12px;
+  }
+
+  .progressTextBook {
+    margin-top: 0;
+    font-size: 15px;
+  }
+
+  /* Cover and title alignment fixes */
+  .bookCoverDetailed { margin-left: 0; }
+  .title { margin-left: 0; }
+  .book-wrapper-detailed { width: 170px; }
+
+  /* Markers: keep constant gaps; allow more per row */
+  .progressMarkings {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Dates: keep aligned left and readable */
+  .startDate { left: 0; }
+  .endDate { justify-content: flex-start; }
+
+  /* Action buttons: stack and full-width */
+  .bookActionButtons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .bookActionButtons button {
+    width: 100%;
+    padding: 10px 16px;
+  }
+}
+
+/* Tighter layout for very small screens */
+@media (max-width: 600px) {
+  .book-wrapper-detailed { width: 150px; }
+  .prgressBarBook { width: 150px; } /* keep in sync with cover */
+}
+
+@media (max-width: 450px) {
+    .topSectionThoughts{
+        flex-direction: column;
+    }
+
+    .thoughtsInput{
+        text-align: center;
+        margin-top: 1rem;
+    }
+
+    .autosaveInfo{
+        text-align: center;
+    }
 }
