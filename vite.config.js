@@ -18,9 +18,7 @@ export default defineConfig({
         credits: resolve(__dirname, 'credits.html'),
         pricing: resolve(__dirname, 'pricing.html'),
         bookDetails: resolve(__dirname, 'bookDetails.html'),
-        small: resolve(__dirname, 'small.html'),
       },
     },
   },
 })
-

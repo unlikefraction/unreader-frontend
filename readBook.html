@@ -267,15 +267,6 @@
     <br><br><br>
 
     <script type="module" src="./src/utils.js"></script>
-    <script>
-      (function waitForMobileNoRender(){
-        if (window.mobileNoRender) {
-          try { window.mobileNoRender(); } catch {}
-        } else {
-          setTimeout(waitForMobileNoRender, 50);
-        }
-      })();
-    </script>
     <script type="module" src="./src/analytics.js"></script>
     <script type="module" src="./src/apiUrls.js"></script>
     <script type="module" src="/src/books/audioAndTextGen.js"></script>

@@ -181,7 +181,12 @@ export default class MultiPageReader {
     header.id = `pageHeader-${pageId}`;
     header.innerHTML = `
       <p class="regenerateAudio" role="button" tabindex="0" title="Queue a high-priority audio regeneration">regenerate page’s audio</p>
-      <p class="pageNumber">Page ${meta.page_number}</p>
+      <p class="pageNumber">
+        <button class="mobilePlayFromStart" type="button" aria-label="Play page from start" title="Play from start">
+          <i class="ph ph-play"></i>
+        </button>
+        <span>Page ${meta.page_number}</span>
+      </p>
     `;
     Object.assign(header.style, {
       display: 'flex',
@@ -199,6 +204,27 @@ export default class MultiPageReader {
     };
     regen.addEventListener('click', onTrigger);
     regen.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') onTrigger(e); });
+
+    // Play-from-start (mobile-first)
+    const mobilePlayBtn = header.querySelector('.mobilePlayFromStart');
+    if (mobilePlayBtn) {
+      Object.assign(mobilePlayBtn.style, { cursor: 'pointer' });
+      mobilePlayBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+          // Do NOT scroll or paragraph-match; just ensure this page is active, then play from 0
+          if (this.active !== pageIndex) this.setActive(pageIndex);
+
+          // Make sure audio is ready for this page, without moving the viewport
+          const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+          if (url) this._swapAudioUrl(pageIndex, url);
+          await this.ensureAudioReady(pageIndex);
+
+          this.seek(0);
+          await this.play();
+        } catch {}
+      });
+    }
 
     return header;
   }
@@ -1001,27 +1027,17 @@ export default class MultiPageReader {
 
   _updateScrollToPlayheadVisibility() {
     if (!this._scrollToPlayheadBtn || !this._container) return;
-    const pages = [...this._container.querySelectorAll('.mainContent')];
-    if (!pages.length || this.active < 0) {
+    const activeEl = this.#pageEl(this.active);
+    if (!activeEl || this.active < 0) {
       this._scrollToPlayheadBtn.style.display = 'none';
       return;
     }
 
-    // Find the page nearest the viewport center
-    const viewportCenter = window.innerHeight / 2;
-    let bestIdx = 0;
-    let bestDist = Infinity;
-
-    for (let i = 0; i < pages.length; i++) {
-      const r = pages[i].getBoundingClientRect();
-      const pageCenter = r.top + r.height / 2;
-      const dist = Math.abs(pageCenter - viewportCenter);
-      if (dist < bestDist) { bestDist = dist; bestIdx = i; }
-    }
-
-    // Show button if user is >= 1 page away from the active page
-    const far = Math.abs(bestIdx - this.active) >= 1;
-    this._scrollToPlayheadBtn.style.display = far ? 'inline-flex' : 'none';
+    // If any part of the current page is visible in the viewport, hide the button
+    const rect = activeEl.getBoundingClientRect();
+    const vh = window.innerHeight || document.documentElement.clientHeight || 0;
+    const inView = rect.top < vh && rect.bottom > 0;
+    this._scrollToPlayheadBtn.style.display = inView ? 'none' : 'inline-flex';
   }
 
   destroy() {

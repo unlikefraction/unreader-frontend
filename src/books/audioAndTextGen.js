@@ -105,8 +105,15 @@ export class AudioSystem {
       this.audioCore.setupAudio();
       if (typeof printl === 'function') printl('✅ Audio core initialized');
 
-      this.paragraphSeeker.enableParagraphNavigation?.();
-      if (typeof printl === 'function') printl('✅ Paragraph navigation enabled');
+      // Enable paragraph navigation only on hover-capable, wider screens
+      const hoverCapable = !(window.matchMedia && window.matchMedia('(hover: none)').matches);
+      const wideEnough = (window.innerWidth || 0) >= 1000;
+      if (hoverCapable && wideEnough) {
+        this.paragraphSeeker.enableParagraphNavigation?.();
+        if (typeof printl === 'function') printl('✅ Paragraph navigation enabled');
+      } else {
+        if (typeof printl === 'function') printl('📵 Paragraph hover disabled on small/touch screens');
+      }
 
       if (typeof printl === 'function') printl('🚀 Audio system ready!');
     } catch (error) {

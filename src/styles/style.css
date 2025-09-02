@@ -891,6 +891,25 @@ mark{
   font-weight: 600;
 }
 
+/* Inline layout for page number + mobile play */
+.pageHeader .pageNumber {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pageHeader .pageNumber .mobilePlayFromStart {
+  display: none; /* shown on small screens */
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: #000;
+}
+.pageHeader .pageNumber .mobilePlayFromStart i { font-size: 18px; }
+
 .regenerateAudio{
   cursor: pointer;
   transition: 0.1s all;
@@ -1007,4 +1026,56 @@ mark{
 
 canvas{
   z-index: -1 !important;
+}
+
+/* ---------- Responsive reading view ---------- */
+@media (max-width: 1000px) {
+  body { padding: 8px; }
+  /* Hide whiteboard/canvas/tooling */
+  .leftControls,
+  .heightSetter,
+  canvas,
+  .paragraph-hover-nav,
+  .paragraph-hover-area {
+    display: none !important;
+  }
+
+  /* Make text comfortable and fluid */
+  .mainContainer {
+    gap: 2rem;
+    margin: -2rem 0 6rem 0;
+  }
+  .mainContent {
+    min-width: 0;
+    width: 100%;
+    max-width: 100vw;
+    padding: 0 16px;
+    font-size: 22px;
+    line-height: 1.5;
+  }
+
+  /* Show per-page play icon near page number, nudge number right */
+  .pageHeader .pageNumber {
+    padding-left: 6px;
+  }
+  .pageHeader .pageNumber .mobilePlayFromStart {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 768px) {
+  .mainContent {
+    font-size: 20px;
+    line-height: 1.5;
+  }
+  /* Hide inbox/chat on phones */
+  .inbox,
+  .inboxPopup { display: none !important; }
+}
+
+@media (max-width: 480px) {
+  .mainContent {
+    font-size: 18px;
+    line-height: 1.5;
+  }
 }
