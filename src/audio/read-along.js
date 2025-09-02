@@ -125,7 +125,18 @@ export class ReadAlong {
       });
       document.body.appendChild(this.heightSetter);
     }
-    if (!this.heightSetter.style.top) this.heightSetter.style.top = '50%';
+    // Restore last saved top% if available; else keep current or default to 50%
+    try {
+      const saved = localStorage.getItem('ui:heightSetterTopPercent');
+      if (saved != null) {
+        const v = Math.max(10, Math.min(90, parseFloat(saved)));
+        this.heightSetter.style.top = `${isNaN(v) ? 50 : v}%`;
+      } else if (!this.heightSetter.style.top) {
+        this.heightSetter.style.top = '50%';
+      }
+    } catch {
+      if (!this.heightSetter.style.top) this.heightSetter.style.top = '50%';
+    }
     this._setupHeightSetterDragging();
 
     let ctrl = document.querySelector('.read-along.control');
@@ -268,6 +279,7 @@ export class ReadAlong {
     if (!this.heightSetter) return;
     const clamped = Math.max(10, Math.min(90, pct));
     this.heightSetter.style.top = `${clamped}%`;
+    try { localStorage.setItem('ui:heightSetterTopPercent', String(clamped)); } catch {}
     if (this.autoEnabled && this.isActive) this.updateTextPosition();
   }
 

@@ -191,6 +191,35 @@ export default class AppController {
       // Seed the Page X of Y UI immediately on load
       updatePageDetails(startPageNo, this.pageDescriptors.length);
 
+      // Align the start of the active page so its top sits at the height-setter line
+      const alignToHeightSetter = (pageIndex) => {
+        try {
+          const wrappers = Array.from(document.querySelectorAll('.pageWrapper'));
+          const el = wrappers[pageIndex] || wrappers[0];
+          if (!el) return;
+          const setter = document.getElementById('heightSetter');
+          // Ensure heightSetter reflects last saved top% before reading it
+          try {
+            if (setter) {
+              const saved = localStorage.getItem('ui:heightSetterTopPercent');
+              if (saved != null) {
+                const v = Math.max(10, Math.min(90, parseFloat(saved)));
+                setter.style.top = `${isNaN(v) ? 50 : v}%`;
+              }
+            }
+          } catch {}
+          const pct = setter && setter.style.top ? parseFloat(String(setter.style.top).replace('%','')) : 50;
+          const vh = window.innerHeight || 800;
+          const targetY = window.scrollY + (Math.max(0, Math.min(100, isNaN(pct) ? 50 : pct)) / 100) * vh;
+          const rect = el.getBoundingClientRect();
+          const elTopAbs = rect.top + window.scrollY;
+          const delta = elTopAbs - targetY;
+          window.scrollTo({ top: Math.max(0, window.scrollY + delta), behavior: 'auto' });
+        } catch {}
+      };
+      // Run after layout settles
+      requestAnimationFrame(() => requestAnimationFrame(() => alignToHeightSetter(startIndex)));
+
       await this.holdup.connectForPage({
         pageNumber: startPageNo,
         metadata: this._metadataForIndex(startIndex)
