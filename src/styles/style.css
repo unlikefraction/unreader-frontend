@@ -558,6 +558,12 @@ nav a{
   transform: translateY(-50%);
 }
 
+/* Phone tweaks: landing (index/pricing) */
+@media (max-width: 600px) {
+  .main.landing { margin-top: 2rem; }
+  .main.landing .pageDetailsBottomRight { display: none; }
+}
+
 .thumb{
   display: flex;
   justify-content: space-between;
@@ -1030,7 +1036,6 @@ canvas{
 
 /* ---------- Responsive reading view ---------- */
 @media (max-width: 1000px) {
-  body { padding: 8px; }
   /* Hide whiteboard/canvas/tooling */
   .leftControls,
   .heightSetter,
@@ -1064,9 +1069,14 @@ canvas{
 }
 
 @media (max-width: 768px) {
+  body{
+    padding: 0;
+  }
+
   .mainContent {
     font-size: 20px;
     line-height: 1.5;
+    margin-top: 2rem;
   }
   /* Hide inbox/chat on phones */
   .inbox,
