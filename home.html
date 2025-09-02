@@ -133,4 +133,14 @@
     <script type="module" src="./src/user/userDetails.js"></script>
     <script type="module" src="./src/basic/inbox.js"></script>
 </body>
+    <script type="module" src="./src/utils.js"></script>
+    <script>
+      (function waitForMobileNoRender(){
+        if (window.mobileNoRender) {
+          try { window.mobileNoRender(); } catch {}
+        } else {
+          setTimeout(waitForMobileNoRender, 50);
+        }
+      })();
+    </script>
 </html>
