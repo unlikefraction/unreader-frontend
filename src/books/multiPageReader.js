@@ -237,6 +237,7 @@ export default class MultiPageReader {
     const regenEl = header?.querySelector?.('.regenerateAudio');
 
     const url = `${this.audioApiBase}regenerate/book/${encodeURIComponent(this.userBookId)}/page/${encodeURIComponent(meta.page_number)}/`;
+    try { if (window.Analytics) window.Analytics.capture('reader_audio_regenerate', { page_number: meta.page_number, book_id: this.userBookId }); } catch {}
 
     // optimistic UI
     if (regenEl) {
@@ -556,7 +557,14 @@ export default class MultiPageReader {
     // Refresh scroll-to-playhead visibility on active change
     this._updateScrollToPlayheadVisibility();
 
-    if (prev !== i) this._emitActiveChanged(i);
+    if (prev !== i) {
+      this._emitActiveChanged(i);
+      try {
+        const meta = this.pageMeta[i] || {};
+        const pn = meta.page_number ?? i;
+        window.dispatchEvent(new CustomEvent('reader:active_page', { detail: { index: i, page_number: pn } }));
+      } catch {}
+    }
   }
 
   getActive() { return this.active; }

@@ -32,18 +32,27 @@ export class AudioCore {
         onend: () => {
           this.isPlaying = false;
           this.updatePlayButton(false);
+          try { if (window.Analytics) window.Analytics.isAudioPlaying = () => false; } catch {}
+          try {
+            if (window.Analytics) {
+              const dur = this.getDuration();
+              window.Analytics.capture('audio_end', { path: location.pathname, duration_s: dur });
+            }
+          } catch {}
           if (this.onEndCallback) this.onEndCallback();
         },
         onloaderror: (id, error) => {
           printError?.('Audio loading error:', error);
           this.isPlaying = false;
           this.updatePlayButton(false);
+          try { if (window.Analytics) window.Analytics.isAudioPlaying = () => false; } catch {}
           if (this.onErrorCallback) this.onErrorCallback(error);
         },
         onplayerror: (id, error) => {
           printError?.('Audio play error:', error);
           this.isPlaying = false;
           this.updatePlayButton(false);
+          try { if (window.Analytics) window.Analytics.isAudioPlaying = () => false; } catch {}
           if (this.onErrorCallback) this.onErrorCallback(error);
         },
         onseek: () => {
@@ -54,11 +63,14 @@ export class AudioCore {
         onplay: () => {
           const startTime = this.getCurrentTime();
           printl?.(`▶️ Audio started playing from: ${startTime.toFixed(5)}s`);
+          try { if (window.Analytics) window.Analytics.isAudioPlaying = () => true; } catch {}
+          try { if (window.Analytics) window.Analytics.capture('audio_play', { path: location.pathname, at_s: startTime }); } catch {}
           if (this.onPlayCallback) this.onPlayCallback(startTime);
         },
         onpause: () => {
           const pauseTime = this.getCurrentTime();
           printl?.(`⏸️ Audio paused at: ${pauseTime.toFixed(5)}s`);
+          try { if (window.Analytics) window.Analytics.isAudioPlaying = () => false; } catch {}
           if (this.onPauseCallback) this.onPauseCallback(pauseTime);
         }
       });

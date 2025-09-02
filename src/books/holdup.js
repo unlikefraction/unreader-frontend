@@ -251,6 +251,7 @@ export class HoldupManager {
     this._connecting = false;
     this._currentPage = pageNumber;
     this._currentRoomName = roomName;
+    try { if (window.Analytics) window.Analytics.capture('holdup_connect', { page_number: pageNumber, room: roomName }); } catch {}
 
     // IMPORTANT: do NOT request/publish mic here.
     // We only request the mic when the user actually unmutes via toggleMute().
@@ -289,6 +290,7 @@ export class HoldupManager {
         if (await this._isMicPermanentlyDenied()) {
           this._micPermissionBlocked = true;
           this._showMicPermissionHelp();
+          try { if (window.Analytics) window.Analytics.capture('holdup_mic_permission_denied', { page_number: this._currentPage || null }); } catch {}
         } else {
           try {
             if (!this.localMicTrack) {
@@ -303,6 +305,7 @@ export class HoldupManager {
             if (e && (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError')) {
               this._micPermissionBlocked = true;
               this._showMicPermissionHelp();
+              try { if (window.Analytics) window.Analytics.capture('holdup_mic_permission_denied', { page_number: this._currentPage || null }); } catch {}
             } else if (e && e.name === 'NotFoundError') {
               alert('No microphone found. Plug one in and try again.');
             } else {
@@ -316,6 +319,7 @@ export class HoldupManager {
       // show active state (we are at least listening to remote)
       this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: true });
       if (this._cb.onEngageStart) { try { this._cb.onEngageStart(); } catch {} }
+      try { if (window.Analytics) window.Analytics.capture('holdup_engage_start', { page_number: this._currentPage || null }); } catch {}
     } else {
       // MUTE: slam remote output to 0 instantly, then mute mic if present
       this._outputMuted = true;
@@ -326,6 +330,7 @@ export class HoldupManager {
       // back to neutral (no classes)
       this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
       if (this._cb.onEngageEnd) { try { this._cb.onEngageEnd(); } catch {} }
+      try { if (window.Analytics) window.Analytics.capture('holdup_engage_end', { page_number: this._currentPage || null }); } catch {}
     }
 
     this.bumpActivity();
@@ -347,6 +352,7 @@ export class HoldupManager {
       // on disconnect, drop to neutral classes
       this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
       document.querySelectorAll('audio[data-lk-remote]').forEach(el => { try { el.remove(); } catch {} });
+      try { if (window.Analytics) window.Analytics.capture('holdup_disconnect', { page_number: this._currentPage || null }); } catch {}
     }
   }
 }

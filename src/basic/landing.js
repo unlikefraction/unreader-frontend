@@ -16,6 +16,17 @@ function weightedRandom(options, weights) {
 const chosenHref = weightedRandom(options, weights);
 const linkEl = document.querySelector(".logInLink");
 if (linkEl) linkEl.href = chosenHref;
+// Analytics: mark A/B landing variant exposure
+try {
+  if (window.Analytics) {
+    window.Analytics.setProps({ landing_variant: chosenHref });
+    window.Analytics.capture('landing_variant_exposed', { variant: chosenHref, path: location.pathname });
+    // Also capture explicit login link clicks
+    linkEl?.addEventListener('click', () => {
+      try { if (window.Analytics) window.Analytics.capture('landing_login_link_click', { href: linkEl.getAttribute('href') || chosenHref, path: location.pathname }); } catch {}
+    });
+  }
+} catch {}
 
 /* === click/hover logic for the highlight spans === */
 (() => {
@@ -103,6 +114,7 @@ if (linkEl) linkEl.href = chosenHref;
     // keep the .logInLink in sync, too
     const link = document.querySelector(".logInLink");
     if (link) link.href = dest;
+    try { if (window.Analytics) window.Analytics.capture('landing_redirect_to_login', { variant: dest, path: location.pathname }); } catch {}
     window.location.href = dest;
   }
 
@@ -171,6 +183,7 @@ if (linkEl) linkEl.href = chosenHref;
     const elCopy = q(SEL_COPY);
     if (hit(elCopy, x, y)) {
       await copyCoupon("I-UNREAD-IT-ALL");
+      try { if (window.Analytics) window.Analytics.capture('coupon_copy_clicked', { path: location.pathname }); } catch {}
       showCopiedBadge(elCopy);
     }
   });
