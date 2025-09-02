@@ -415,6 +415,44 @@
   .footerGap {
     height: 40px;
   }
+
+  /* Phone responsiveness for Oath step */
+  @media (max-width: 600px) {
+    #step3 {
+      max-width: 100%;
+      padding: 0 12px;
+    }
+    .oathTabs { justify-content: center; }
+    .oathCard {
+      grid-template-columns: 1fr;
+      padding: 20px;
+      text-align: center;
+    }
+    .oathBadge {
+      font-size: 16px;
+      margin: 0 auto;
+    }
+    .oathCopy {
+      font-size: 18px;
+      line-height: 28px;
+      padding-top: 12px;
+    }
+    .oathImg {
+      position: static;
+      right: auto;
+      top: auto;
+      width: 150px;
+      margin: 8px auto 0;
+      display: block;
+    }
+    #takeOathBtn {
+      width: 100%;
+      max-width: 420px;
+      left: 50%;
+      transform: translateX(-50%);
+      margin-top: 2rem;
+    }
+  }
   
   /* Loading overlay */
   .loadingOverlay {
