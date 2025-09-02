@@ -267,7 +267,7 @@ export class AudioSystem {
 
 // Create and initialize the audio system
 const audioSystem = new AudioSystem(
-  '/audio/suckAtReading.wav',
+  'https://cdn.unlikefraction.com/suckAtReading.wav',
   '/order/word_timings_ordered.json',
   '/transcript/landing.html',
   -100

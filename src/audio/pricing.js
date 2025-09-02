@@ -267,7 +267,7 @@ export class AudioSystem {
 
 // Create and initialize the audio system
 const audioSystem = new AudioSystem(
-  '/audio/pricing.wav',
+  'https://cdn.unlikefraction.com/unreader-pricing.wav',
   '/order/word_timings_pricing.json',
   '/transcript/pricingHtml.html',
   -100

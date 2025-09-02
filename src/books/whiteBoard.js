@@ -11,6 +11,7 @@ const PAGES_PER_BAND = 2;
 import { commonVars } from '../common-vars.js';
 import { CanvasManager } from '../whiteboard/canvas-manager.js';
 import { saveShapesData, loadShapesData, clearAllShapesData } from '../whiteboard/storage.js';
+import { initScribblesSync } from '../whiteboard/scribbles-sync.js';
 import { redrawAll } from '../whiteboard/renderer.js';
 import { handleRectangle } from '../whiteboard/tools/rectangle-tools.js';
 import { handleEllipse } from '../whiteboard/tools/elipse-tool.js';
@@ -66,7 +67,17 @@ export class DrawingTools {
     this.textClickArmed = false;
     this.erasedShapeIds = new Set();
 
+    // Load local scribbles immediately (book-scoped via URL id)
     this.shapesData = loadShapesData();
+
+    // Start backend sync: fetch remote in background; debounce push on local saves
+    const sync = initScribblesSync({
+      getData: () => this.shapesData,
+      setData: (data) => { this.shapesData = data; this.redrawAll(); },
+      // Push instantly after saving to localStorage
+      debounceMs: 0
+    });
+    this._scheduleScribblesPush = sync.schedulePush;
 
     // ring buffer of band managers
     this.canvasManagers = [];
@@ -424,7 +435,7 @@ export class DrawingTools {
 
   _hideColorPicker() { this.colorPicker.style.display = 'none'; }
   redrawAll() { redrawAll(this); }
-  save() { saveShapesData(this.shapesData); }
+  save() { saveShapesData(this.shapesData); try { this._scheduleScribblesPush?.(); } catch {} }
 
   setActiveTool(tool) {
     if (tool === this.activeTool) return;
