@@ -7,6 +7,7 @@
     margin-top: 8rem;
     width: 100%;
     max-width: 650px;
+    padding: 0 12px; /* small side margin so content doesn't touch edges */
 }
 
 .addAmount{
@@ -63,6 +64,12 @@
     margin-top: 40px;
     width: 100%;
     align-items: center;
+}
+
+/* Keep layout readable on small screens without changing design */
+@media (max-width: 400px) {
+    .inputAmountSection input { font-size: 48px; }
+    .payNowButton { padding: 12px 48px; }
 }
 
 .payOptions{

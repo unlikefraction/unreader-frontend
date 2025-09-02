@@ -82,3 +82,38 @@
     font-size: 16px;
     font-weight: 400;
 }
+
+/* Responsive: up to 800px - make layout full-width and center aligned */
+@media (max-width: 800px) {
+    .topSection {
+        flex-direction: column;
+        align-items: center;
+        min-width: 0;
+        width: 100%;
+    }
+    /* Hide dino image on small screens */
+    .topSection img { display: none; }
+
+    /* Center and remove rotation for credits area */
+    .creditsSection {
+        align-items: center;
+        text-align: center;
+        margin-left: 0;
+        margin-top: 1rem;
+        transform: none;
+    }
+    .addCreditsButton { align-self: center; margin-top: 6px; }
+
+    /* Usage section full width with side padding */
+    .usageSection {
+        width: 100%;
+        padding: 0 12px;
+        box-sizing: border-box;
+    }
+}
+
+/* Extra small tweaks */
+@media (max-width: 400px) {
+    .creditsSection .creditRemaining { font-size: 42px; }
+    .usageHeader .usageHeading { font-size: 19px; }
+}
