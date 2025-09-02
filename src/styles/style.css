@@ -1076,7 +1076,7 @@ canvas{
   .mainContent {
     font-size: 20px;
     line-height: 1.5;
-    margin-top: 2rem;
+    margin-top: 1rem;
   }
   /* Hide inbox/chat on phones */
   .inbox,
