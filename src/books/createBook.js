@@ -333,7 +333,7 @@ function initStep2() {
       </div>
       <div>
         <button id="confirmBookBtn" class="btn skeleton-ui" disabled>yes, continue   →</button>
-        <button id="selectAnotherBtn" class="btn secondary skeleton-ui" style="margin-left: 8px;">no, select another</button>
+        <button id="selectAnotherBtn" class="btn secondary skeleton-ui" style="margin-left: 8px;">no, show me options</button>
       </div>
     </div>
   `;
@@ -490,7 +490,7 @@ function selectBook(book, el) {
       </div>
       <div>
         <button id="confirmBookBtn" class="btn">yes, continue   →</button>
-        <button id="selectAnotherBtn" class="btn secondary" style="margin-left: 8px;">no, select another</button>
+        <button id="selectAnotherBtn" class="btn secondary" style="margin-left: 8px;">no, show options</button>
       </div>
     </div>
   `;
