@@ -175,6 +175,57 @@ export default class MultiPageReader {
     document.body.appendChild(container);
   }
 
+  /** Floating notice shown while audio is generating/queued */
+  _ensureGeneratingNotice() {
+    if (this._genNotice) return this._genNotice;
+    const el = document.createElement('div');
+    el.className = 'audioGeneratingNotice';
+    Object.assign(el.style, {
+      position: 'fixed',
+      left: '50%',
+      bottom: '140px',
+      zIndex: '9999',
+      padding: '10px 12px',
+      borderRadius: '20px',
+      border: '1px solid rgba(54, 54, 54, 0.36)',
+      background: 'rgba(255, 255, 255, 0.5)',
+      color: '#121212',
+      fontWeight: '500',
+      fontSize: '16px',
+      boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.2)',
+      backdropFilter: 'blur(5px)',
+      WebkitBackdropFilter: 'blur(5px)',
+      display: 'none',
+      textAlign: 'center',
+      transform: 'translateX(-50%)'
+    });
+    el.textContent = '';
+    document.body.appendChild(el);
+    this._genNotice = el;
+    return el;
+  }
+  _positionGeneratingNotice() {
+    const el = this._genNotice || null;
+    if (!el) return;
+    // Keep a consistent base position for the notice
+    const bottomPx = 100;
+    el.style.bottom = bottomPx + 'px';
+  }
+  _showGeneratingNotice(pageNumber) {
+    const el = this._ensureGeneratingNotice();
+    el.textContent = `Generating audio for page ${pageNumber}. can take upto 5mins. will auto-play`;
+    this._positionGeneratingNotice();
+    // Ensure the scroll-to-playhead button sits above the notice when both visible
+    this._positionScrollToPlayhead();
+    el.style.display = 'inline-flex';
+  }
+  _hideGeneratingNotice() {
+    const el = this._ensureGeneratingNotice();
+    el.style.display = 'none';
+    // Reposition scroll button back to default
+    this._positionScrollToPlayhead();
+  }
+
   _buildPerPageHeader(meta, pageIndex, pageId) {
     const header = document.createElement('div');
     header.className = 'pageDetails pageHeader';
@@ -216,7 +267,7 @@ export default class MultiPageReader {
           if (this.active !== pageIndex) this.setActive(pageIndex);
 
           // Make sure audio is ready for this page, without moving the viewport
-          const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+          const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000, showNotice: true });
           if (url) this._swapAudioUrl(pageIndex, url);
           await this.ensureAudioReady(pageIndex);
 
@@ -585,7 +636,7 @@ export default class MultiPageReader {
   }
 
   /* ---------- AUDIO API polling / swap ---------- */
-  async _awaitReadyAudioAndTranscript(i, { pollGeneratingMs = 5000, pollQueuedMs = 5000 } = {}) {
+  async _awaitReadyAudioAndTranscript(i, { pollGeneratingMs = 5000, pollQueuedMs = 5000, showNotice = false } = {}) {
     const meta = this.pageMeta[i];
     if (!meta) return null;
     if (!this.audioApiBase || !this.userBookId) { console.warn('⚠️ Missing audio API base or userBookId.'); return null; }
@@ -606,6 +657,7 @@ export default class MultiPageReader {
       return res.json();
     };    
 
+    let noticeShown = false;
     try {
       while (true) {
         const data = await fetchOnce();
@@ -618,19 +670,30 @@ export default class MultiPageReader {
             meta._readyTranscript = transcript;
             meta._readyTranscriptFlat = normalizeWordTimings(transcript);
             meta._audioSettled = true;
+            if (noticeShown) this._hideGeneratingNotice();
             return audioUrl;
           }
           await new Promise(r => setTimeout(r, pollGeneratingMs));
           continue;
         }
-        if (status === 'generating') { await new Promise(r => setTimeout(r, pollGeneratingMs)); continue; }
-        if (status === 'queued')     { await new Promise(r => setTimeout(r, pollQueuedMs));     continue; }
+        if (status === 'generating' || status === 'queued') {
+          if (showNotice && i === this.active) {
+            const pageNo = this.pageMeta[i]?.page_number ?? (i + 1);
+            this._showGeneratingNotice(pageNo);
+            noticeShown = true;
+          }
+          await new Promise(r => setTimeout(r, status === 'generating' ? pollGeneratingMs : pollQueuedMs));
+          continue;
+        }
         await new Promise(r => setTimeout(r, pollGeneratingMs));
       }
     } catch (e) {
       console.error(`❌ [page ${meta.page_number}] audio polling failed:`, e);
       return null;
-    } finally { meta._polling = false; }
+    } finally {
+      meta._polling = false;
+      if (noticeShown) this._hideGeneratingNotice();
+    }
   }
 
   _swapAudioUrl(i, audioUrl) {
@@ -685,7 +748,7 @@ export default class MultiPageReader {
 
     const meta = this.pageMeta[this.active];
     if (!meta?._audioSettled) { this._isLoadingActiveAudio = true; this._autoplayOnReady = true; this._syncPlayButton(true, { loading: true }); }
-    const url = await this._awaitReadyAudioAndTranscript(this.active, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+    const url = await this._awaitReadyAudioAndTranscript(this.active, { pollGeneratingMs: 5000, pollQueuedMs: 5000, showNotice: true });
     if (url) this._swapAudioUrl(this.active, url);
 
     const sys = await this.ensureAudioReady(this.active);
@@ -773,7 +836,7 @@ export default class MultiPageReader {
     this.setActive(target);
     this._stopProgressTimer();
 
-    const url = await this._awaitReadyAudioAndTranscript(target, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+    const url = await this._awaitReadyAudioAndTranscript(target, { pollGeneratingMs: 5000, pollQueuedMs: 5000, showNotice: true });
     if (url) this._swapAudioUrl(target, url);
 
     await this.ensureAudioReady(target);
@@ -812,7 +875,7 @@ export default class MultiPageReader {
     this._stopProgressTimer();
 
     this._isLoadingActiveAudio = true; this._autoplayOnReady = true; this._syncPlayButton(true, { loading: true });
-    const url = await this._awaitReadyAudioAndTranscript(target, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+    const url = await this._awaitReadyAudioAndTranscript(target, { pollGeneratingMs: 5000, pollQueuedMs: 5000, showNotice: true });
     if (url) this._swapAudioUrl(target, url);
 
     await this.ensureAudioReady(target);
@@ -832,7 +895,7 @@ export default class MultiPageReader {
     this._stopProgressTimer();
 
     if (play) { this._isLoadingActiveAudio = true; this._autoplayOnReady = true; this._syncPlayButton(true, { loading: true }); }
-    const url = await this._awaitReadyAudioAndTranscript(index, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+    const url = await this._awaitReadyAudioAndTranscript(index, { pollGeneratingMs: 5000, pollQueuedMs: 5000, showNotice: !!play });
     if (url) this._swapAudioUrl(index, url);
 
     await this.ensureAudioReady(index);
@@ -862,7 +925,7 @@ export default class MultiPageReader {
       this.instances[pageIndex].audioCore.audioFile === meta._readyAudioUrl;
 
     if (!alreadySettled) {
-      const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000 });
+      const url = await this._awaitReadyAudioAndTranscript(pageIndex, { pollGeneratingMs: 5000, pollQueuedMs: 5000, showNotice: !!play });
       if (url) this._swapAudioUrl(pageIndex, url);
     }
 
@@ -1022,6 +1085,8 @@ export default class MultiPageReader {
 
     document.body.appendChild(btn);
     this._scrollToPlayheadBtn = btn;
+    // Initial positioning relative to generating notice (if it appears later, we'll update again)
+    this._positionScrollToPlayhead();
   }
 
   _bindScrollWatcher() {
@@ -1031,6 +1096,21 @@ export default class MultiPageReader {
     window.addEventListener('scroll', this._onScrollWatch, { passive: true });
     window.addEventListener('resize', this._onResizeWatch);
     this._scrollWatchBound = true;
+  }
+
+  // Ensure the scroll-to-playhead button stays above the generating notice when both are visible
+  _positionScrollToPlayhead() {
+    const btn = this._scrollToPlayheadBtn || null;
+    if (!btn) return;
+    try {
+      const notice = this._genNotice || null;
+      const noticeVisible = !!notice && window.getComputedStyle(notice).display !== 'none';
+      // Base position for the button
+      let bottomPx = 100;
+      // If notice is visible, nudge the button above it
+      if (noticeVisible) bottomPx = 150;
+      btn.style.bottom = bottomPx + 'px';
+    } catch {}
   }
 
   _updateScrollToPlayheadVisibility() {
@@ -1046,6 +1126,9 @@ export default class MultiPageReader {
     const vh = window.innerHeight || document.documentElement.clientHeight || 0;
     const inView = rect.top < vh && rect.bottom > 0;
     this._scrollToPlayheadBtn.style.display = inView ? 'none' : 'inline-flex';
+    // Reposition both elements to maintain intended stacking
+    this._positionGeneratingNotice();
+    this._positionScrollToPlayhead();
   }
 
   destroy() {
