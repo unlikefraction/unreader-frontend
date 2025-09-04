@@ -343,10 +343,11 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       pages.forEach(p => { if (p > lastPageRead) lastPageRead = p; });
     });
 
-    // If already completed, show 100%, else compute normally
-    const percentageRead = book.marked_as_complete
+    // If already completed, show 100%, else compute normally. Fallback to 0% when NaN/invalid.
+    const rawPct = book.marked_as_complete
       ? 100
       : Math.min(Math.round((lastPageRead / totalPages) * 100), 100);
+    const percentageRead = Number.isFinite(rawPct) && rawPct >= 0 ? rawPct : 0;
 
     const filledBar = document.querySelector('.progressFilledBook');
     const percentText = document.querySelector('.percentRead');
