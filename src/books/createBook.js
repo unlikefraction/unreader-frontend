@@ -67,6 +67,11 @@ let titleOverride  = "";   // edited title (if any)
 /* Track outside-click handler for inline title editing */
 let titleDocHandler = null;
 
+/* Auto-pick flow flags for Step 2 */
+let autoPickArmed = false;       // set true when we land in Step 2 with derived metadata
+let autoPickInProgress = false;  // true while we are default-selecting + checking backend
+let pendingCheckCount = 0;       // number of in-flight backend existence checks
+
 /* ================================
    STEP 1 — Upload
 ===================================*/
@@ -216,8 +221,19 @@ async function handleUpload(file) {
     initStep2();
     setStep(2);
 
-    if (searchInput.value.trim()) {
-      doSearch(searchInput.value.trim());
+    // Decide whether to auto-pick based on presence of metadata from backend
+    const haveGoodMeta = !!(meta && meta.metadata && (
+      (meta.metadata.title && String(meta.metadata.title).trim()) ||
+      (Array.isArray(meta.metadata.authors) && meta.metadata.authors.length > 0)
+    ));
+
+    if (searchInput.value.trim() && haveGoodMeta) {
+      autoPickArmed = true;
+      toggleSearchArea(false); // keep hidden while we auto-select
+      await doSearch(searchInput.value.trim());
+    } else {
+      // No metadata from backend — reveal search so user can select manually
+      toggleSearchArea(true);
     }
 
   } catch (err) {
@@ -288,16 +304,57 @@ async function uploadCoverImage(file) {
 function initStep2() {
   searchInput.value = uploadedFilename || "";
   bookList.innerHTML = "";
-  pickedBox.className = "pickedBox";
+  pickedBox.className = "pickedBox bookSelected";
   pickedBox.innerHTML = `
-    <i class="ph ph-book-open" style="font-size:20px"></i>
-    <span>no book selected</span>
+    <div class="book-cover-main-div"> 
+      <button id="editCoverBtn" class="editCoverBtn" title="Change cover"> 
+        <i class="ph ph-pencil-simple skeleton-hide"></i>
+      </button>
+      <div class="book-cover editable-cover"> 
+        <div class="book-inside"></div>
+        <div class="book-image skeleton-ui">
+          <img id="pickedCoverImg" src="${DEFAULT_THUMBNAIL}" alt="Cover loading"> 
+          <div class="effect"></div>
+          <div class="light"></div>
+          <input type="file" id="coverFileInput" accept="image/png, image/webp, image/jpeg, image/jpg" style="display:none" />
+        </div>
+      </div>
+    </div>
+
+    <div class="pickedMeta"> 
+      <div class="mataDeta skeleton-ui"> 
+        <h4 class="titleRow"> 
+          <input id="pickedTitleInput" class="editableTitle skeleton-ui" type="text" value="" placeholder="Enter title" readonly />
+          <button id="editTitleBtn" class="editTitleBtn" title="Edit title" style="margin-left:8px"> 
+            <i class="ph ph-pencil-simple skeleton-hide"></i>
+          </button>
+        </h4>
+        <p class="skeleton-ui" style="height: 20px;"></p>
+      </div>
+      <div>
+        <button id="confirmBookBtn" class="btn skeleton-ui" disabled>yes, continue   →</button>
+        <button id="selectAnotherBtn" class="btn secondary skeleton-ui" style="margin-left: 8px;">no, select another</button>
+      </div>
+    </div>
   `;
-  if (searchInput.value.trim()) doSearch(searchInput.value.trim());
+  // By default keep search hidden; if there is no search text, show it for manual entry
+  toggleSearchArea(!searchInput.value.trim());
+
+  // Reveal search if user clicks "select another"
+  const selectAnotherBtn = document.getElementById("selectAnotherBtn");
+  selectAnotherBtn?.addEventListener("click", () => {
+    autoPickArmed = false;
+    autoPickInProgress = false;
+    toggleSearchArea(true);
+    try { searchInput?.focus(); } catch {}
+  });
 }
 
 searchInput.addEventListener("input", debounce(e => {
   const q = e.target.value.trim();
+  // User is typing a new query — disable auto-pick behavior and ensure search is visible
+  autoPickArmed = false;
+  toggleSearchArea(true);
   if (!q) { bookList.innerHTML = ""; return; }
   doSearch(q);
 }, 300));
@@ -309,7 +366,7 @@ async function doSearch(q) {
     const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}`);
     if (!r.ok) throw new Error(`Books API ${r.status}`);
     const data = await r.json();
-    renderSearch(data.items || []);
+    await renderSearch(data.items || []);
   } catch (err) {
     console.error(err);
     bookList.innerHTML = "";
@@ -322,12 +379,15 @@ function getYear(publishedDate = "") {
   return m ? m[0] : "";
 }
 
-function renderSearch(items) {
+async function renderSearch(items) {
   bookList.innerHTML = "";
   if (!items.length) {
     bookList.innerHTML = `<div class="status">No results. Try refining your title.</div>`;
+    // If nothing came back, make sure search is visible for trying again
+    toggleSearchArea(true);
     return;
   }
+  let firstEl = null;
   items.forEach(item => {
     const info    = item.volumeInfo || {};
     const img     = (info.imageLinks && (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail)) || DEFAULT_THUMBNAIL;
@@ -347,7 +407,23 @@ function renderSearch(items) {
     `;
     el.addEventListener("click", () => selectBook(item, el));
     bookList.appendChild(el);
+    if (!firstEl) firstEl = el;
   });
+
+  // Auto-pick the first book if armed (initial flow with derived metadata)
+  if (autoPickArmed && firstEl) {
+    // ensure we only do this once for the initial load
+    autoPickArmed = false;
+    autoPickInProgress = true;
+    const firstItem = items[0];
+    // Render selection UI and await backend check (selectBook returns a promise)
+    try { await selectBook(firstItem, firstEl); }
+    finally {
+      autoPickInProgress = false;
+      // Hide the entire search section after both Google fetch and backend check complete
+      toggleSearchArea(false);
+    }
+  }
 }
 
 function selectBook(book, el) {
@@ -412,7 +488,10 @@ function selectBook(book, el) {
         </h4>
         <p>${pickedDetails.authors ? pickedDetails.authors.replace(/\|/g, ", ") : "Unknown author"}${year ? ` • ${year}` : ""}</p>
       </div>
-      <button id="confirmBookBtn" class="btn">yes, continue   →</button>
+      <div>
+        <button id="confirmBookBtn" class="btn">yes, continue   →</button>
+        <button id="selectAnotherBtn" class="btn secondary" style="margin-left: 8px;">no, select another</button>
+      </div>
     </div>
   `;
 
@@ -495,7 +574,29 @@ function selectBook(book, el) {
   document.addEventListener("mousedown", titleDocHandler, true);
 
   // === NEW: check if this book already exists on backend; if yes, use that title/cover ===
-  checkAndApplyExistingBook(pickedDetails.google_books_id);
+  // Apply skeleton while we check the backend for existing mapping
+  applyPickedSkeleton(true);
+  pendingCheckCount++;
+  const p = checkAndApplyExistingBook(pickedDetails.google_books_id)
+    .finally(() => {
+      pendingCheckCount = Math.max(0, pendingCheckCount - 1);
+      if (pendingCheckCount === 0) {
+        applyPickedSkeleton(false);
+      }
+    });
+
+  // Wire up the secondary action to reveal search
+  const selectAnotherBtn = document.getElementById("selectAnotherBtn");
+  selectAnotherBtn?.addEventListener("click", () => {
+    autoPickArmed = false;
+    autoPickInProgress = false;
+    applyPickedSkeleton(false);
+    toggleSearchArea(true);
+    try { searchInput?.focus(); } catch {}
+  });
+
+  // Return the backend check promise so callers (auto-pick flow) can await
+  return p;
 }
 
 /* Check if the selected Google Books ID already exists; if so, use its title & cover */
@@ -563,6 +664,44 @@ document.addEventListener("click", e => {
     setStep(3);
   }
 });
+
+/* -----------------------------
+   UI helpers: search visibility + skeletons
+------------------------------*/
+function toggleSearchArea(show) {
+  const searchSection = document.getElementById("searchSection");
+  if (searchSection) {
+    searchSection.style.display = show ? "" : "none";
+    return;
+  }
+  // Fallback if wrapper missing
+  const label = document.getElementById("searchLabel") || searchInput?.previousElementSibling;
+  if (label) label.style.display = show ? "" : "none";
+  if (searchInput) searchInput.style.display = show ? "" : "none";
+  if (bookList) bookList.style.display = show ? "" : "none";
+  if (searchStatus) searchStatus.style.display = show ? "" : "none";
+}
+
+function applyPickedSkeleton(on) {
+  const root = pickedBox;
+  if (!root) return;
+  const cover = root.querySelector('.book-image');
+  const title = root.querySelector('#pickedTitleInput');
+  const author = root.querySelector('.pickedMeta .mataDeta p');
+  const metaBox = root.querySelector('.pickedMeta .mataDeta');
+  const yesBtn = root.querySelector('#confirmBookBtn');
+  const noBtn  = root.querySelector('#selectAnotherBtn');
+  const pencils = root.querySelectorAll('.editCoverBtn i, .editTitleBtn i');
+
+  const targets = [cover, metaBox, title, author, yesBtn, noBtn].filter(Boolean);
+  targets.forEach(el => {
+    if (on) el.classList.add('skeleton-ui'); else el.classList.remove('skeleton-ui');
+    if (el.tagName === 'BUTTON') el.disabled = !!on;
+  });
+  pencils.forEach(i => {
+    if (on) i.classList.add('skeleton-hide'); else i.classList.remove('skeleton-hide');
+  });
+}
 
 /* ================================
    STEP 3 — Oath + Create
