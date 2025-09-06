@@ -11,15 +11,13 @@ export function initSelectionHandler(drawingTools) {
       : (dt.canvasManager ? [dt.canvasManager] : []);
     if (!list.length) return null;
 
-    let chosen = list[0];
     for (const m of list) {
       // USE ABSOLUTE TOP; fallback to topOffset if needed
       const top = (typeof m._absTop === 'number') ? m._absTop : (m.topOffset || 0);
-      const bottom = top + (m.height || m.drawCanvas?.height || 0);
+      const bottom = top + (m.height || 0);
       if (y >= top && y <= bottom) return m;
-      if (y > bottom) chosen = m;
     }
-    return chosen;
+    return null; // nothing covers this Y
   }
   function clearAllPreviews(dt) {
     const list = dt.canvasManagers && dt.canvasManagers.length

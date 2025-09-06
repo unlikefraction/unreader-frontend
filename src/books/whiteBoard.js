@@ -5,8 +5,10 @@
 const PADDING_REM = 5;
 // How many canvases to keep alive at once (ring buffer)
 const BAND_COUNT = 3;
-// How many pages each band spans
-const PAGES_PER_BAND = 2;
+// How many pages each band spans (1 page per canvas)
+const PAGES_PER_BAND = 1;
+// If a computed band height exceeds this, do not draw a canvas
+const MAX_CANVAS_HEIGHT = 10000;
 
 import { commonVars } from '../common-vars.js';
 import { CanvasManager } from '../whiteboard/canvas-manager.js';
@@ -218,10 +220,23 @@ export class DrawingTools {
       const mgr = this.canvasManagers[i];
       const prevTop = typeof mgr._absTop === 'number' ? mgr._absTop : 0;
       const prevH = mgr.height || 0;
-      if (prevTop !== p.top || prevH !== p.height) {
-        // Use absolute updater so contexts remap page-space correctly
-        mgr.updateAbsoluteTopAndHeight(p.top, p.height);
-        anyChanged = true;
+      const overLimit = p.height > MAX_CANVAS_HEIGHT;
+      // Hide canvases entirely if over 10,000px
+      if (overLimit) {
+        if (mgr.drawCanvas) mgr.drawCanvas.style.display = 'none';
+        if (mgr.previewCanvas) mgr.previewCanvas.style.display = 'none';
+        if (prevTop !== p.top || prevH !== 0) {
+          mgr.updateAbsoluteTopAndHeight(p.top, 0);
+          anyChanged = true;
+        }
+      } else {
+        if (mgr.drawCanvas) mgr.drawCanvas.style.display = '';
+        if (mgr.previewCanvas) mgr.previewCanvas.style.display = '';
+        if (prevTop !== p.top || prevH !== p.height) {
+          // Use absolute updater so contexts remap page-space correctly
+          mgr.updateAbsoluteTopAndHeight(p.top, p.height);
+          anyChanged = true;
+        }
       }
     });
 
@@ -367,7 +382,7 @@ export class DrawingTools {
       }
     }
 
-    this.canvasManager = chosen || this.canvasManagers[0] || null;
+    this.canvasManager = chosen || null;
     return this.canvasManager;
   }
 

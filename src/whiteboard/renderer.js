@@ -22,14 +22,12 @@ export function redrawAll(drawingTools) {
 
   // helper: pick manager by a page-space Y (ABSOLUTE top)
   const pickManagerByY = (y) => {
-    let chosen = drawingTools.canvasManagers[0] || null;
     for (const m of drawingTools.canvasManagers) {
       const top = (typeof m._absTop === 'number') ? m._absTop : m.topOffset;
-      const bottom = top + m.height;
+      const bottom = top + (m.height || 0);
       if (y >= top && y <= bottom) return m;
-      if (y > bottom) chosen = m;
     }
-    return chosen;
+    return null; // if no band covers this Y, do not draw
   };
 
   const runDraw = (id, mgr, drawFn) => {
@@ -237,6 +235,10 @@ export function redrawAll(drawingTools) {
     const centerY = leftTopY + height / 2;
     const left = centerX - textWidth / 2;
     const top = centerY - height / 2;
+
+    // Only draw text if a canvas band covers this Y
+    const mgr = pickManagerByY(centerY);
+    if (!mgr) return;
 
     const div = document.createElement('div');
     div.innerText = t.text;
