@@ -25,6 +25,65 @@
     <title>Read Book | Unreader</title>
   </head>
   <body>
+    <!-- Boot skeleton overlay: shows and animates before CSS/JS load -->
+    <div id="bootSkeleton" class="skeletonLoadingMainBook" style="position:absolute;top:8rem;left:50%;transform:translateX(-50%);width:min(650px,calc(100vw - 32px));display:flex;flex-direction:column;gap:10px;z-index:2147483647;">
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+      <div class="sk-line"></div>
+    </div>
+    <style>
+      /* Inline shimmer for boot skeleton */
+      #bootSkeleton .sk-line { position: relative; width: 100%; height: 36px; border-radius: 8px; overflow: hidden; background: #ececec; }
+      #bootSkeleton .sk-line::before { content:""; position:absolute; inset:0; background:linear-gradient(90deg,#e0e0e0,#f0f0f0,#e0e0e0); background-size:200% 100%; animation:boot-shimmer 1.2s infinite; }
+      @keyframes boot-shimmer { 0%{ background-position:200% 0 } 100%{ background-position:-200% 0 } }
+    </style>
+    <script>
+      // Ensure no browser restores scroll and enable our initializing UI state
+      try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch {}
+      try {
+        document.documentElement.classList.add('js');
+        // Support both spellings to match any existing code paths
+        document.body.classList.add('initializing');
+        document.body.classList.add('initialising');
+      } catch {}
+    </script>
     <div id="app">
         <nav>
             <a href="/">
@@ -73,91 +132,6 @@
             <path d="M20.0148 5.1128C18.8318 17.0633 7.07198 20.8686 1.33998 21.2774C-3.13643 39.2701 15.462 28.5007 26.6234 16.0549C31.9666 10.0967 21.1979 -6.83769 20.0148 5.1128Z" fill="#FBCB04"/>
           </svg>                  
         </div>
-      </div>
-
-      <div class="skeletonLoadingMainBook">
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
-        <div class="skeletonLineMainBook skeleton-ui"></div>
       </div>
 
       <div class="settingsDialog">

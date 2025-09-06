@@ -45,12 +45,13 @@
     display: flex;
     flex-direction: column;
     gap: 0.9rem;
-    z-index: -1;
+    /* keep on top by default so it shows even before JS toggles */
+    z-index: 10;
 }
 
 .skeletonLineMainBook{
     width: 100%;
-    height: 28px;
+    height: 36px;
 }
 
 /* ReadBook responsiveness */
@@ -60,4 +61,50 @@
 
     /* Make loading skeleton 90% width and centered */
     .skeletonLoadingMainBook { width: 90%; }
+}
+
+/* Initial page-loading overlay and content suppression */
+body.initializing,
+body.initialising {
+  /* prevent accidental interactions while we prepare the scroll */
+  cursor: progress;
+}
+/* Hide dynamic reader UI until we’ve aligned the viewport */
+body.initializing .mainContainer,
+body.initialising .mainContainer,
+body.initializing .leftControls,
+body.initialising .leftControls,
+body.initializing .bottomControl,
+body.initialising .bottomControl,
+body.initializing .settingsDialog,
+body.initialising .settingsDialog,
+body.initializing #heightSetter,
+body.initialising #heightSetter,
+body.initializing .inbox,
+body.initialising .inbox,
+body.initializing .inboxPopup,
+body.initialising .inboxPopup {
+  visibility: hidden !important;
+}
+/* Optionally hide the top nav during initial load to avoid flicker */
+/* Keep nav visible during initializing so users see the shell */
+/* body.initializing nav { visibility: hidden !important; } */
+
+/* While initializing, promote the skeleton as a fixed overlay so it doesn't affect layout */
+body.initializing .skeletonLoadingMainBook,
+body.initialising .skeletonLoadingMainBook {
+  position: absolute !important;
+  top: 8rem; /* align below nav */
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0;
+  width: min(650px, calc(100vw - 32px));
+  z-index: 2147483647 !important; /* above everything */
+  opacity: 1;
+}
+
+/* Make skeleton lines visible even before shimmer applies */
+.skeletonLineMainBook {
+  background-color: #ececec;
+  border-radius: 8px;
 }

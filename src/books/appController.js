@@ -132,7 +132,7 @@ export default class AppController {
       pages.sort((a, b) => (a.page_number || 0) - (b.page_number || 0));
 
       const anchor = computeAnchorIndex(pages);
-      unskelton()
+      // Delay removing skeleton UI until after we’ve aligned the initial scroll
 
       this.pageDescriptors = pages.map(p => ({
         page_number: p.page_number,
@@ -218,8 +218,18 @@ export default class AppController {
           window.scrollTo({ top: Math.max(0, window.scrollY + delta), behavior: 'auto' });
         } catch {}
       };
-      // Run after layout settles
-      requestAnimationFrame(() => requestAnimationFrame(() => alignToHeightSetter(startIndex)));
+      // Run after layout settles; then reveal content (no janky scroll)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        try { alignToHeightSetter(startIndex); } catch {}
+        // Reveal content only after we’re positioned at the correct page
+        try {
+          document.body.classList.remove('initializing');
+          document.body.classList.remove('initialising');
+          // Hide the skeleton block and remove skeleton classes
+          document.querySelectorAll('.skeletonLoadingMainBook').forEach(el => { el.style.display = 'none'; });
+          unskelton();
+        } catch {}
+      }));
 
       await this.holdup.connectForPage({
         pageNumber: startPageNo,
@@ -251,6 +261,12 @@ export default class AppController {
       console.log('📚 AppController ready.');
     } catch (err) {
       console.error('App bootstrap failed:', err);
+      try {
+        document.body.classList.remove('initializing');
+        document.body.classList.remove('initialising');
+        document.querySelectorAll('.skeletonLoadingMainBook').forEach(el => { el.style.display = 'none'; });
+        unskelton();
+      } catch {}
     }
   }
 
