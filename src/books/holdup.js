@@ -49,6 +49,10 @@ export class HoldupManager {
     this._lastActivityAt = Date.now();
     this._inactivityTimer = null;
     this._localAudioActive = false;
+    
+    // Strict lifetime cap: hard-disconnect 5 minutes after token creation
+    this._tokenCreatedAt = 0;
+    this._strictCapTimer = null;
 
     // NEW: sticky mic-permission denial; once set, we never re-request this session
     this._micPermissionBlocked = false;
@@ -59,6 +63,12 @@ export class HoldupManager {
 
     // Default: no state classes applied (starts muted)
     this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+
+    // Ensure we drop the connection on navigation changes
+    try {
+      window.addEventListener('pagehide', () => this.disconnect());
+      window.addEventListener('beforeunload', () => this.disconnect());
+    } catch {}
   }
 
   /* -------------------- UI helpers -------------------- */
@@ -125,6 +135,24 @@ export class HoldupManager {
     return `page-${pn}-${this.bookSlug}`;
   }
   
+  _clearStrictCapTimer() {
+    try { if (this._strictCapTimer) clearTimeout(this._strictCapTimer); } catch {}
+    this._strictCapTimer = null;
+  }
+  _scheduleStrictCapTimer() {
+    this._clearStrictCapTimer();
+    if (!this._tokenCreatedAt) return;
+    const FIVE_MIN_MS = 5 * 60 * 1000;
+    const elapsed = Date.now() - this._tokenCreatedAt;
+    const remain = Math.max(0, FIVE_MIN_MS - elapsed);
+    this._strictCapTimer = setTimeout(() => {
+      // Hard stop regardless of activity
+      this.disconnect().finally(() => {
+        this._setStatus('Disconnected (5 min cap)');
+      });
+    }, remain);
+  }
+  
   async _generateToken({ roomName, metadata }) {
     const token = getCookie('authToken');
     if (!token) throw new Error('Missing auth token');
@@ -152,6 +180,9 @@ export class HoldupManager {
     const roomUrl = json.room_url || json.url || json.livekit_url;
     const jwt = json.token;
     if (!roomUrl || !jwt) throw new Error('Token response missing room_url or token');
+    // mark token creation and schedule strict cap
+    this._tokenCreatedAt = Date.now();
+    this._scheduleStrictCapTimer();
     return { roomUrl, token: jwt };
   }
   
@@ -250,6 +281,7 @@ export class HoldupManager {
     this._connected = true;
     this._connecting = false;
     this._currentPage = pageNumber;
+    this._lastMetadata = metadata || null;
     this._currentRoomName = roomName;
     try { if (window.Analytics) window.Analytics.capture('holdup_connect', { page_number: pageNumber, room: roomName }); } catch {}
 
@@ -272,7 +304,20 @@ export class HoldupManager {
 
   async toggleMute() {
     if (this._connecting) return;
-    if (!this.room) return;
+    // If not connected (or room torn down), reconnect on-demand first
+    if (!this.room || !this._connected) {
+      if (this._currentPage != null) {
+        try {
+          await this.connectForPage({ pageNumber: this._currentPage, metadata: this._lastMetadata || {} });
+        } catch (e) {
+          console.warn('Re-connect on toggle failed:', e);
+          return;
+        }
+      } else {
+        // No page context; cannot proceed
+        return;
+      }
+    }
 
     // optimistic feedback: entering a transition
     this._setHoldupBtn({ disabled: true, connecting: false, loading: true, active: false });
@@ -326,9 +371,10 @@ export class HoldupManager {
       this._applyOutputMuteState();
       try { await this.localMicTrack?.mute?.(); } catch {}
 
-      this._setStatus('Connected (muted)');
-      // back to neutral (no classes)
-      this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+      // Immediately drop the session when user stops engaging
+      this._setStatus('Disconnecting…');
+      await this.disconnect();
+      // After disconnect(), button is reset to neutral
       if (this._cb.onEngageEnd) { try { this._cb.onEngageEnd(); } catch {} }
       try { if (window.Analytics) window.Analytics.capture('holdup_engage_end', { page_number: this._currentPage || null }); } catch {}
     }
@@ -339,6 +385,8 @@ export class HoldupManager {
   async disconnect() {
     try { if (this._inactivityTimer) clearInterval(this._inactivityTimer); } catch {}
     this._inactivityTimer = null;
+    this._clearStrictCapTimer();
+    this._tokenCreatedAt = 0;
 
     if (!this.room) return;
 
