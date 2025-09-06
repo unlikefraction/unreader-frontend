@@ -197,7 +197,12 @@ export function initSelectionHandler(drawingTools) {
       }
     } else if (mode === 'rotate') {
       const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
-      shape.rotation = dragInfo.origRot + (ang - dragInfo.startAng) * 180 / Math.PI;
+      let deltaDeg = (ang - dragInfo.startAng) * 180 / Math.PI;
+      if (e.shiftKey) {
+        const snap = 15;
+        deltaDeg = Math.round(deltaDeg / snap) * snap;
+      }
+      shape.rotation = dragInfo.origRot + deltaDeg;
     }
 
     drawingTools.canvasManager.clearPreview();

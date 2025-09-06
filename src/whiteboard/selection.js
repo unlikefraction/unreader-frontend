@@ -231,7 +231,13 @@ export function initSelectionHandler(drawingTools) {
       }
     } else if (mode === 'rotate') {
       const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
-      shape.rotation = dragInfo.origRot + (ang - dragInfo.startAng) * 180 / Math.PI;
+      let deltaDeg = (ang - dragInfo.startAng) * 180 / Math.PI;
+      // Hold Shift to snap to 15-degree increments for precise angles
+      if (e.shiftKey) {
+        const snap = 15; // degrees
+        deltaDeg = Math.round(deltaDeg / snap) * snap;
+      }
+      shape.rotation = dragInfo.origRot + deltaDeg;
     }
 
     clearAllPreviews(drawingTools);

@@ -217,9 +217,14 @@ export function redrawAll(drawingTools) {
       if (w > textWidth) textWidth = w;
     }
     const height = ascent + descent + Math.max(0, lines.length - 1) * fontSize;
-
-    const left = zeroX + t.xRel;
-    const top = (t.y - ascent);
+    // Compute axis-aligned top-left based on baseline anchor
+    const leftTopX = zeroX + t.xRel;
+    const leftTopY = (t.y - ascent);
+    // Compute center so DOM rotates around true center (matches selection math)
+    const centerX = leftTopX + textWidth / 2;
+    const centerY = leftTopY + height / 2;
+    const left = centerX - textWidth / 2;
+    const top = centerY - height / 2;
 
     const div = document.createElement('div');
     div.innerText = t.text;
@@ -232,7 +237,7 @@ export function redrawAll(drawingTools) {
       width: `${textWidth}px`,
       height: `${height}px`,
       transform: `rotate(${rotDeg}deg)`,
-      transformOrigin: 'left top',
+      transformOrigin: 'center center',
       display: 'block',
       pointerEvents: 'none',
       textAlign: 'left',
