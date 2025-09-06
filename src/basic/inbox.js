@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function authHeaders() {
     const token = getCookie('authToken');
-    if (!token) console.warn('[Inbox] Missing auth token cookie: authToken');
+    if (!token) printWarning('[Inbox] Missing auth token cookie: authToken');
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'
@@ -173,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const res = await fetch(url, { headers: authHeaders() });
       if (res.status === 401) {
-        console.warn('[Inbox] Unauthorized while fetching thread');
+        printWarning('[Inbox] Unauthorized while fetching thread');
         return;
       }
       if (!res.ok) throw new Error(`Failed to fetch thread: ${res.status}`);
@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const serverUnread = data?.thread?.unread_for_user;
       if (typeof serverUnread === 'number') updateUnreadBadge(serverUnread);
     } catch (err) {
-      console.error('[Inbox] fetchInboxThread error', err);
+      printError('[Inbox] fetchInboxThread error', err);
     }
   }
 
@@ -202,13 +202,13 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({})
       });
       if (res.status === 401) {
-        console.warn('[Inbox] Unauthorized while marking read');
+        printWarning('[Inbox] Unauthorized while marking read');
         return;
       }
       if (!res.ok) throw new Error(`Failed to mark read: ${res.status}`);
       await fetchInboxThread();
     } catch (err) {
-      console.error('[Inbox] markThreadRead error', err);
+      printError('[Inbox] markThreadRead error', err);
     }
   }
 
@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
       body: JSON.stringify({ text, metadata })
     });
     if (res.status === 401) {
-      console.warn('[Inbox] Unauthorized while posting message');
+      printWarning('[Inbox] Unauthorized while posting message');
       throw new Error('unauthorized');
     }
     if (!res.ok) throw new Error(`Failed to post message: ${res.status}`);
@@ -317,7 +317,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await fetchInboxThread();
       }
     } catch (err) {
-      console.error('[Inbox] postMessage error', err);
+      printError('[Inbox] postMessage error', err);
 
       // failure => remove optimistic bubble and write text back to input
       removeTemp(tempId);

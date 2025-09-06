@@ -83,7 +83,7 @@ export class HoldupManager {
   _bindHoldUpButton() {
     const btn = document.querySelector('.hold-up');
     if (!btn) return;
-    btn.addEventListener('click', () => this.toggleMute().catch(e => console.warn('toggleMute err', e)));
+    btn.addEventListener('click', () => this.toggleMute().catch(e => printWarning('toggleMute err', e)));
   }
   /**
    * Manage state classes on the .hold-up button.
@@ -310,7 +310,7 @@ export class HoldupManager {
         try {
           await this.connectForPage({ pageNumber: this._currentPage, metadata: this._lastMetadata || {} });
         } catch (e) {
-          console.warn('Re-connect on toggle failed:', e);
+          printWarning('Re-connect on toggle failed:', e);
           return;
         }
       } else {
@@ -354,7 +354,7 @@ export class HoldupManager {
             } else if (e && e.name === 'NotFoundError') {
               alert('No microphone found. Plug one in and try again.');
             } else {
-              console.warn('[Holdup] mic create/publish failed:', e);
+              printWarning('[Holdup] mic create/publish failed:', e);
             }
           }
         }
@@ -391,7 +391,7 @@ export class HoldupManager {
     if (!this.room) return;
 
     try { await this.room.disconnect(); }
-    catch (e) { console.warn('Holdup disconnect warning:', e); }
+    catch (e) { printWarning('Holdup disconnect warning:', e); }
     finally {
       this._connected = false;
       this._connecting = false;

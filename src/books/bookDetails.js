@@ -77,14 +77,14 @@ async function uploadCoverImage(file, token) {
     hideOverlay();
 
     if (!res.ok) {
-      console.error("Cover upload error:", data);
+      printError("Cover upload error:", data);
       alert(`Cover upload failed (${res.status}).`);
       return null;
     }
     return data.files?.[file.name] || null;
   } catch (err) {
     hideOverlay();
-    console.error("Cover upload network error:", err);
+    printError("Cover upload network error:", err);
     alert("Network error while uploading cover.");
     return null;
   }
@@ -180,7 +180,7 @@ function wireInlineTitleEditing({ container, initialTitle, onCommit }) {
     } catch (err) {
       // revert on failure
       input.value = preEditTitle;
-      console.error(err);
+      printError(err);
       alert(err.message || "Failed to update title.");
     }
   };
@@ -259,7 +259,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       lastSent = txt;
       dirty = false;
     } catch (err) {
-      console.error("Thoughts sync failed:", err);
+      printError("Thoughts sync failed:", err);
       // keep dirty so we retry on next tick or click
     } finally {
       syncing = false;
@@ -297,7 +297,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
   const token = getCookie("authToken");
 
   if (!userBookId || !token) {
-    console.error("Missing userBookId or authToken");
+    printError("Missing userBookId or authToken");
     return;
   }
 
@@ -550,7 +550,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
           const img = document.querySelector(".book-image img");
           if (img) img.src = url;
         } catch (err) {
-          console.error(err);
+          printError(err);
           alert(err.message || "Failed to update cover.");
         }
       });
@@ -631,7 +631,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
 
           } catch (err) {
             hideOverlay();
-            console.error(err);
+            printError(err);
             alert(err.message || "Unexpected error while marking as complete.");
             if (markBtn) {
               markBtn.disabled = false;
@@ -645,6 +645,6 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     unskelton()
 
   } catch (err) {
-    console.error("Error fetching book details:", err);
+    printError("Error fetching book details:", err);
   }
 })();

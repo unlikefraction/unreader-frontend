@@ -112,11 +112,11 @@ export function initScribblesSync({ getData, setData, debounceMs = 0 } = {}) {
       setInterval(async () => {
         try {
           const res = await fetch(pollUrl, { headers: { Authorization: `Bearer ${token}` } });
-          if (!res.ok) { console.warn('[Scribbles poll] HTTP', res.status); return; }
+          if (!res.ok) { printWarning('[Scribbles poll] HTTP', res.status); return; }
           const json = await res.json();
-          console.log('[Scribbles poll]', json);
+          printl('[Scribbles poll]', json);
         } catch (e) {
-          console.warn('[Scribbles poll] error', e);
+          printWarning('[Scribbles poll] error', e);
         }
       }, 5000);
     }

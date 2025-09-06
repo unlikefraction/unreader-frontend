@@ -251,7 +251,7 @@ export default class MultiPageReader {
 
     const onTrigger = (e) => {
       e.preventDefault();
-      this._regeneratePageAudio(pageIndex).catch(err => console.warn('regenerate error', err));
+      this._regeneratePageAudio(pageIndex).catch(err => printWarning('regenerate error', err));
     };
     regen.addEventListener('click', onTrigger);
     regen.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') onTrigger(e); });
@@ -481,7 +481,7 @@ export default class MultiPageReader {
         };
         hl._raPatched = true;
       }
-    } catch (e) { console.warn('ReadAlong notify patch failed:', e); }
+    } catch (e) { printWarning('ReadAlong notify patch failed:', e); }
 
     this.instances[i] = sys;
     return sys;
@@ -586,7 +586,7 @@ export default class MultiPageReader {
       else el.classList.add('pageActive');
     }
   }
-  _emitActiveChanged(i) { if (this._cb.onActivePageChanged) { try { this._cb.onActivePageChanged(i, this.pageMeta[i]); } catch (e) { console.warn(e); } } }
+  _emitActiveChanged(i) { if (this._cb.onActivePageChanged) { try { this._cb.onActivePageChanged(i, this.pageMeta[i]); } catch (e) { printWarning(e); } } }
 
   setActive(i) {
     if (i < 0 || i >= this.pageMeta.length) return;
@@ -602,7 +602,7 @@ export default class MultiPageReader {
     // Bind ReadAlong to the active page’s highlighter
     (async () => {
       const sys = this.instances[i] || await this.hydratePage(i);
-      try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch (e) { console.warn(e); }
+      try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch (e) { printWarning(e); }
     })();
 
     // Refresh scroll-to-playhead visibility on active change
@@ -639,7 +639,7 @@ export default class MultiPageReader {
   async _awaitReadyAudioAndTranscript(i, { pollGeneratingMs = 5000, pollQueuedMs = 5000, showNotice = false } = {}) {
     const meta = this.pageMeta[i];
     if (!meta) return null;
-    if (!this.audioApiBase || !this.userBookId) { console.warn('⚠️ Missing audio API base or userBookId.'); return null; }
+    if (!this.audioApiBase || !this.userBookId) { printWarning('⚠️ Missing audio API base or userBookId.'); return null; }
     if (meta._audioSettled && meta._readyAudioUrl) return meta._readyAudioUrl;
     if (meta._polling) return null;
     meta._polling = true;
@@ -688,7 +688,7 @@ export default class MultiPageReader {
         await new Promise(r => setTimeout(r, pollGeneratingMs));
       }
     } catch (e) {
-      console.error(`❌ [page ${meta.page_number}] audio polling failed:`, e);
+      printError(`❌ [page ${meta.page_number}] audio polling failed:`, e);
       return null;
     } finally {
       meta._polling = false;
@@ -708,7 +708,7 @@ export default class MultiPageReader {
       sys.audioCore.setupAudio();
       if (pos && typeof sys.audioCore?.sound?.seek === 'function') sys.audioCore.sound.seek(pos);
       if (wasPlaying) sys.audioCore.playAudio();
-    } catch (e) { console.error('audio swap error:', e); }
+    } catch (e) { printError('audio swap error:', e); }
   }
 
   /* ---------- NEW: Next-page audio prefetch ---------- */
@@ -732,7 +732,7 @@ export default class MultiPageReader {
           await this.ensureAudioReady(next);
         }
       } catch (e) {
-        console.warn('next-page prefetch failed:', e);
+        printWarning('next-page prefetch failed:', e);
       }
     })();
   }
@@ -939,7 +939,7 @@ export default class MultiPageReader {
         else if (typeof sys.textProcessor.ingestWordTimings === 'function')            await sys.textProcessor.ingestWordTimings(flat);
         else if (typeof sys.textProcessor.setWordTimings === 'function')               sys.textProcessor.setWordTimings(flat);
         else { sys.textProcessor.wordTimings = flat; sys.textProcessor._wordTimings = flat; sys.refreshParagraphNavigation?.(); }
-      } catch (e) { console.warn('timings ingest failed; will still attempt seek:', e); }
+      } catch (e) { printWarning('timings ingest failed; will still attempt seek:', e); }
     }
 
     try { ReadAlong.get().rebindHighlighter(sys.highlighter); } catch {}
@@ -1139,7 +1139,7 @@ export default class MultiPageReader {
       window.removeEventListener('resize', this._onResizeWatch);
       this._scrollWatchBound = false;
     }
-    for (const sys of this.instances) { try { sys?.destroy?.(); } catch (e) { console.error('Destroy error:', e); } }
+    for (const sys of this.instances) { try { sys?.destroy?.(); } catch (e) { printError('Destroy error:', e); } }
     this.instances = [];
     this.active = -1;
     if (this._cb.onDestroyed) { try { this._cb.onDestroyed(); } catch {} }

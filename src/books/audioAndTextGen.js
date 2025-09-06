@@ -119,7 +119,7 @@ export class AudioSystem {
     } catch (error) {
       try {
         if (typeof printError === 'function') printError('❌ Error initializing audio system:', error);
-        else console.error('❌ Error initializing audio system:', error);
+        else printError('❌ Error initializing audio system:', error);
       } catch {}
       throw error;
     }

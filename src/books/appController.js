@@ -177,7 +177,7 @@ export default class AppController {
               const ctx = { pageNumber: pageNo, metadata: this._metadataForIndex(index) };
               // Switch LiveKit room on page change, show loading in holdup status
               await this.holdup.switchToPage(ctx);
-            } catch (e) { console.warn('Holdup switchToPage error:', e); }
+            } catch (e) { printWarning('Holdup switchToPage error:', e); }
           },
           onDestroyed: () => this.holdup?.disconnect()
         }
@@ -258,9 +258,9 @@ export default class AppController {
         if (this._localAudioWatch) clearInterval(this._localAudioWatch);
       });
 
-      console.log('📚 AppController ready.');
+      printl('📚 AppController ready.');
     } catch (err) {
-      console.error('App bootstrap failed:', err);
+      printError('App bootstrap failed:', err);
       try {
         document.body.classList.remove('initializing');
         document.body.classList.remove('initialising');

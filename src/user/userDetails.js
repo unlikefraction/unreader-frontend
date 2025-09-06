@@ -49,7 +49,7 @@ async function fetchUserInfo() {
 
   const data = await res.json();
   localStorage.setItem('name', data.name); // store name in localStorage
-  console.log('fetched user info:', data);
+  printl('fetched user info:', data);
   return data;
 }
 
@@ -73,7 +73,7 @@ async function updateUserDetails() {
       });
     }
   } catch (err) {
-    console.error('⚠️ updateUserDetails error:', err);
+    printError('⚠️ updateUserDetails error:', err);
   }
 }
 

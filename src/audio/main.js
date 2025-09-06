@@ -103,7 +103,7 @@ export class AudioSystem {
       try { if (typeof printl === 'function') printl('🚀 Audio system ready!'); } catch {}
 
     } catch (error) {
-      try { if (typeof printError === 'function') printError('❌ Error initializing audio system:', error); else console.error('❌ Error initializing audio system:', error); } catch {}
+      try { if (typeof printError === 'function') printError('❌ Error initializing audio system:', error); else printError('❌ Error initializing audio system:', error); } catch {}
       throw error;
     }
   }
@@ -204,7 +204,7 @@ export class AudioSystem {
     const paragraphs = this.extractParagraphs();
 
     if (!Array.isArray(paragraphs) || paragraphs.length === 0) {
-      try { if (typeof printError === 'function') printError('No paragraphs found in text'); else console.error('No paragraphs found in text'); } catch {}
+      try { if (typeof printError === 'function') printError('No paragraphs found in text'); else printError('No paragraphs found in text'); } catch {}
       return [];
     }
 
@@ -220,7 +220,7 @@ export class AudioSystem {
         if (result?.success) {
           try { if (typeof printl === 'function') printl(`✅ Navigated to paragraph ${index + 1}`); } catch {}
         } else {
-          try { if (typeof printError === 'function') printError(`❌ Failed to navigate to paragraph ${index + 1}:`, result?.error); else console.error('Failed to navigate', result); } catch {}
+          try { if (typeof printError === 'function') printError(`❌ Failed to navigate to paragraph ${index + 1}:`, result?.error); else printError('Failed to navigate', result); } catch {}
         }
         return result;
       }
@@ -234,7 +234,7 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.enableParagraphNavigation === 'function') {
       this.paragraphSeeker.enableParagraphNavigation();
     } else {
-      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else console.error('Paragraph navigation not available'); } catch {}
+      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else printError('Paragraph navigation not available'); } catch {}
     }
   }
 
@@ -242,7 +242,7 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.disableParagraphNavigation === 'function') {
       this.paragraphSeeker.disableParagraphNavigation();
     } else {
-      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else console.error('Paragraph navigation not available'); } catch {}
+      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else printError('Paragraph navigation not available'); } catch {}
     }
   }
 
@@ -250,7 +250,7 @@ export class AudioSystem {
     if (this.paragraphSeeker && typeof this.paragraphSeeker.refreshParagraphNavigation === 'function') {
       this.paragraphSeeker.refreshParagraphNavigation();
     } else {
-      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else console.error('Paragraph navigation not available'); } catch {}
+      try { if (typeof printError === 'function') printError('Paragraph navigation not available'); else printError('Paragraph navigation not available'); } catch {}
     }
   }
 
@@ -279,7 +279,7 @@ window.audioSetup = audioSystem; // Keep backward compatibility
 
 // Initialize the system
 audioSystem.init().catch(error => {
-  try { if (typeof printError === 'function') printError('Failed to initialize audio system:', error); else console.error('Failed to initialize audio system:', error); } catch {}
+  try { if (typeof printError === 'function') printError('Failed to initialize audio system:', error); else printError('Failed to initialize audio system:', error); } catch {}
 });
 
 // Add some convenience global functions for easy testing

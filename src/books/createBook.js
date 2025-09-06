@@ -147,7 +147,7 @@ async function fetchEpubMetadata(epubUrl, token) {
       if (res.status === 401) msg = "Auth failed while reading metadata; using file name.";
       if (res.status === 413) msg = "EPUB is too large for metadata parse; using file name.";
       if (res.status === 502) msg = "Server couldn't fetch the EPUB; using file name.";
-      console.warn("EPUB metadata error:", data || res.statusText);
+      printWarning("EPUB metadata error:", data || res.statusText);
       searchStatus.textContent = msg;
       return null;
     }
@@ -155,7 +155,7 @@ async function fetchEpubMetadata(epubUrl, token) {
     return data; // { source_url, metadata: {...} }
   } catch (err) {
     hideOverlay();
-    console.error("EPUB metadata network error:", err);
+    printError("EPUB metadata network error:", err);
     searchStatus.textContent = "Network error while extracting metadata; using file name.";
     return null;
   }
@@ -203,7 +203,7 @@ async function handleUpload(file) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       uploadStatus.textContent = `Upload failed (${res.status}).`;
-      console.error("Upload error:", data);
+      printError("Upload error:", data);
       return;
     }
 
@@ -238,7 +238,7 @@ async function handleUpload(file) {
 
   } catch (err) {
     hideOverlay();
-    console.error(err);
+    printError(err);
     uploadStatus.textContent = "Unexpected error while uploading.";
   }
 }
@@ -286,7 +286,7 @@ async function uploadCoverImage(file) {
     hideOverlay();
 
     if (!res.ok) {
-      console.error("Cover upload error:", data);
+      printError("Cover upload error:", data);
       alert(`Cover upload failed (${res.status}).`);
       return null;
     }
@@ -295,7 +295,7 @@ async function uploadCoverImage(file) {
     return url || null;
   } catch (err) {
     hideOverlay();
-    console.error("Cover upload network error:", err);
+    printError("Cover upload network error:", err);
     alert("Network error while uploading cover.");
     return null;
   }
@@ -368,7 +368,7 @@ async function doSearch(q) {
     const data = await r.json();
     await renderSearch(data.items || []);
   } catch (err) {
-    console.error(err);
+    printError(err);
     bookList.innerHTML = "";
     searchStatus.textContent = "Problem searching Google Books.";
   }
@@ -611,7 +611,7 @@ async function checkAndApplyExistingBook(googleBooksId) {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      console.warn("Book check failed:", res.status, data);
+      printWarning("Book check failed:", res.status, data);
       return;
     }
 
@@ -636,7 +636,7 @@ async function checkAndApplyExistingBook(googleBooksId) {
       }
     }
   } catch (err) {
-    console.error("Error checking existing book:", err);
+    printError("Error checking existing book:", err);
   }
 }
 
@@ -838,7 +838,7 @@ async function createBookOnBackend() {
     hideOverlay();
 
     if (!res.ok) {
-      console.error("Create Book Error:", data);
+      printError("Create Book Error:", data);
       createStatus.textContent = data?.detail || "Error creating book.";
       takeOathBtn.disabled = false;
       takeOathBtn.textContent = "I take the oath, continue →";
@@ -852,7 +852,7 @@ async function createBookOnBackend() {
 
   } catch (err) {
     hideOverlay();
-    console.error(err);
+    printError(err);
     createStatus.textContent = "Network error while creating the book.";
     takeOathBtn.disabled = false;
     takeOathBtn.textContent = "I take the oath, continue →";

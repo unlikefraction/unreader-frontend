@@ -281,7 +281,7 @@ export class DrawingTools {
     setTimeout(() => {
       if (this.canvasManagers.length) return;
       this._buildWindowedBands();
-      console.warn('[Whiteboard] Fallback boot: windowed bands created.');
+      printWarning('[Whiteboard] Fallback boot: windowed bands created.');
     }, 5000);
   }
 

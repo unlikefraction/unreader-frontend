@@ -285,5 +285,5 @@ export class PlaybackControls {
 
   // ----- tiny log helpers -----
   _log(...a)    { try { if (typeof printl === 'function') printl(...a); } catch {} }
-  _logErr(...a) { try { if (typeof printError === 'function') printError(...a); } catch { console.error(...a); } }
+  _logErr(...a) { try { if (typeof printError === 'function') printError(...a); } catch { try { printError(...a); } catch {} } }
 }

@@ -47,7 +47,7 @@ function migrateLegacyIfNeeded(bookId) {
       console.info(`Migrated legacy annotations -> ${namespacedKey}`);
     }
   } catch (e) {
-    console.warn('Migration check failed:', e);
+    printWarning('Migration check failed:', e);
   }
 }
 
@@ -57,7 +57,7 @@ export function saveShapesData(shapesData, bookId) {
     localStorage.setItem(storageKey(bookId), JSON.stringify(shapesData));
   } catch (e) {
     // non-fatal
-    console.warn('saveShapesData failed:', e);
+    printWarning('saveShapesData failed:', e);
   }
 }
 
@@ -73,7 +73,7 @@ export function loadShapesData(bookId) {
       return Object.assign({ ...defaultShapesData }, shapesData);
     }
   } catch (error) {
-    console.warn(`Failed to load annotations from ${key}:`, error);
+    printWarning(`Failed to load annotations from ${key}:`, error);
   }
   // Return default if no saved data or corrupted
   return { ...defaultShapesData };

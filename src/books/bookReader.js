@@ -3,7 +3,7 @@ import AppController from './appController.js';
 
 (() => {
   if (window.__bookAppBootstrapped) {
-    console.warn('🔁 App already bootstrapped; skipping.');
+    printWarning('🔁 App already bootstrapped; skipping.');
     return;
   }
   window.__bookAppBootstrapped = true;
@@ -14,7 +14,7 @@ import AppController from './appController.js';
       await app.bootstrap();
       window.app = app;
     } catch (err) {
-      console.error('Book init failed:', err);
+      printError('Book init failed:', err);
     }
   })();
 })();

@@ -45,7 +45,7 @@ export function saveShapesData(shapesData, namespace) {
   try {
     localStorage.setItem(storageKey(namespace), JSON.stringify(shapesData));
   } catch (e) {
-    console.warn('saveShapesData failed:', e);
+    printWarning('saveShapesData failed:', e);
   }
 }
 
@@ -66,7 +66,7 @@ function migrateLegacyIfNeeded(namespace) {
       console.info(`Migrated legacy annotations -> ${namespacedKey}`);
     }
   } catch (e) {
-    console.warn('Migration check failed:', e);
+    printWarning('Migration check failed:', e);
   }
 }
 
@@ -86,7 +86,7 @@ export function loadShapesData(namespace) {
       return Object.assign({ ...defaultShapesData }, shapesData);
     }
   } catch (error) {
-    console.warn(`Failed to load annotations from ${key}:`, error);
+    printWarning(`Failed to load annotations from ${key}:`, error);
   }
   return { ...defaultShapesData };
 }

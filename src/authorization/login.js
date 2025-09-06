@@ -29,7 +29,7 @@ async function redeemWelcomeCoupon(token) {
 
     if (res.ok) {
       // optional: const data = await res.json();
-      console.log("You have 5$ of free credits.");
+      printl("You have 5$ of free credits.");
     } else {
       const txt = await res.text().catch(() => "");
       printError("Coupon redeem failed:", res.status, txt);
