@@ -256,11 +256,10 @@ export class AudioSystem {
 
   // Cleanup method
   destroy() {
-    this.highlighter.stopHighlighting();
+    try { this.highlighter?.destroy?.(); } catch {}
+    try { this.paragraphSeeker?.destroy?.(); } catch {}
     this.playbackControls?.destroy?.();
-    if (this.audioCore?.sound) {
-      try { this.audioCore.sound.unload(); } catch {}
-    }
+    if (this.audioCore?.sound) { try { this.audioCore.sound.unload(); } catch {} }
     try { if (typeof printl === 'function') printl('🧹 Audio system destroyed'); } catch {}
   }
 }

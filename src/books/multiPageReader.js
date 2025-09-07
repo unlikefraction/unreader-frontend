@@ -80,6 +80,11 @@ export default class MultiPageReader {
     this._progressTimer = null;
     this._isLoadingActiveAudio = false;
     this._autoplayOnReady = false;
+    this._destroyed = false;
+
+    // Track which pages are currently visible and where nav is enabled
+    this._visiblePages = new Set();
+    this._navEnabled = new Set();
 
     // scroll-to-playhead UI
     this._scrollToPlayheadBtn = null;
@@ -375,10 +380,13 @@ export default class MultiPageReader {
     };
 
     // Poll every 5 seconds until changed
+    try { if (meta._regenPoll) clearInterval(meta._regenPoll); } catch {}
     const poll = setInterval(async () => {
+      if (this._destroyed) { try { clearInterval(poll); } catch {} meta._regenPoll = null; return; }
       const changed = await checkChanged();
-      if (changed) clearInterval(poll);
+      if (changed) { try { clearInterval(poll); } catch {} meta._regenPoll = null; }
     }, 5000);
+    meta._regenPoll = poll;
   }
 
   /* ---------- scaffolding ---------- */
@@ -439,7 +447,8 @@ export default class MultiPageReader {
 
     // keep the call name the same; TextProcessor.separateText() now preserves markup internally
     await sys.textProcessor.separateText();
-    sys.paragraphSeeker.enableParagraphNavigation();
+    // Do NOT enable paragraph navigation here; it is heavy and adds listeners.
+    // We'll enable it only for the ACTIVE page inside setActive().
 
     // hook end-of-page → next
     const onEnd = () => this.next(true);
@@ -493,7 +502,7 @@ export default class MultiPageReader {
     if (!sys.audioCore.sound) {
       await sys.textProcessor.loadWordTimings();
       sys.audioCore.setupAudio();
-      sys.refreshParagraphNavigation?.();
+      // Do not (re)wire paragraph navigation here; handled in setActive()
     }
     return sys;
   }
@@ -512,14 +521,20 @@ export default class MultiPageReader {
     if (this._io) this._io.disconnect();
     const rootMargin = `${Math.round(this.observeRadius * 100)}% 0%`;
     this._io = new IntersectionObserver(async entries => {
+      const all = [...this._container.querySelectorAll('.mainContent')];
       for (const e of entries) {
+        const i = all.indexOf(e.target);
+        if (i < 0) continue;
         if (e.isIntersecting) {
-          const el = e.target;
-          const all = [...this._container.querySelectorAll('.mainContent')];
-          const i = all.indexOf(el);
-          if (i >= 0 && !this.instances[i]) await this.hydratePage(i);
+          // Mark visible and ensure hydration for visible pages
+          this._visiblePages.add(i);
+          if (!this.instances[i]) { try { await this.hydratePage(i); } catch {} }
+        } else {
+          this._visiblePages.delete(i);
         }
       }
+      // Reconcile paragraph navigation enablement for visible±1 and active page
+      this._reconcileParagraphNavEnabled();
     }, { root: null, rootMargin, threshold: 0.01 });
     this._container.querySelectorAll('.mainContent').forEach(p => this._io.observe(p));
   }
@@ -567,7 +582,10 @@ export default class MultiPageReader {
     // 6) Scroll-to-playhead button visibility tracking
     this._bindScrollWatcher();
     this._updateScrollToPlayheadVisibility();
-  
+
+    // Seed paragraph navigation around the initial active page
+    this._seedParagraphNavAround(pageIndex);
+
     // NOTE:
     // Audio (and any holdup notifications) only kick in when the user triggers:
     // - play()
@@ -584,6 +602,49 @@ export default class MultiPageReader {
       if (i < activeIndex) el.classList.add('pageCompleted');
       else if (i > activeIndex) el.classList.add('pageRemaining');
       else el.classList.add('pageActive');
+    }
+  }
+
+  _seedParagraphNavAround(i) {
+    try {
+      this._visiblePages.add(i);
+      // Attempt hydration and enable nav for i-1, i, i+1
+      const wanted = [i - 1, i, i + 1].filter(x => x >= 0 && x < this.pageMeta.length);
+      wanted.forEach(idx => { if (idx !== i) this._visiblePages.add(idx); });
+      this._reconcileParagraphNavEnabled();
+    } catch {}
+  }
+
+  _reconcileParagraphNavEnabled() {
+    if (!this.instances || !this.instances.length) return;
+    // Compute desired indices: active + neighbors for each visible page
+    const desired = new Set();
+    desired.add(this.active);
+    for (const v of this._visiblePages) {
+      if (v >= 0 && v < this.pageMeta.length) {
+        desired.add(v);
+        if (v - 1 >= 0) desired.add(v - 1);
+        if (v + 1 < this.pageMeta.length) desired.add(v + 1);
+      }
+    }
+
+    // Enable for desired set, disable elsewhere (hydrate on-demand for small neighbor set)
+    for (let k = 0; k < this.pageMeta.length; k++) {
+      if (desired.has(k)) {
+        if (!this._navEnabled.has(k)) {
+          const maybeEnable = async () => {
+            const sys = this.instances[k] || await this.hydratePage(k);
+            if (!this._destroyed && sys && desired.has(k)) {
+              try { sys.paragraphSeeker?.enableParagraphNavigation?.(); this._navEnabled.add(k); } catch {}
+            }
+          };
+          maybeEnable();
+        }
+      } else if (this._navEnabled.has(k)) {
+        const sys = this.instances[k];
+        if (sys) { try { sys.paragraphSeeker?.disableParagraphNavigation?.(); } catch {} }
+        this._navEnabled.delete(k);
+      }
     }
   }
   _emitActiveChanged(i) { if (this._cb.onActivePageChanged) { try { this._cb.onActivePageChanged(i, this.pageMeta[i]); } catch (e) { printWarning(e); } } }
@@ -607,6 +668,8 @@ export default class MultiPageReader {
 
     // Refresh scroll-to-playhead visibility on active change
     this._updateScrollToPlayheadVisibility();
+    // Reconcile paragraph navigation after active changes
+    this._reconcileParagraphNavEnabled();
 
     if (prev !== i) {
       this._emitActiveChanged(i);
@@ -660,6 +723,7 @@ export default class MultiPageReader {
     let noticeShown = false;
     try {
       while (true) {
+        if (this._destroyed) return null;
         const data = await fetchOnce();
         const status = data?.status;
         if (status === 'ready') {
@@ -1132,6 +1196,7 @@ export default class MultiPageReader {
   }
 
   destroy() {
+    this._destroyed = true;
     if (this._io) { try { this._io.disconnect(); } catch {} }
     this._stopProgressTimer();
     if (this._scrollWatchBound) {
@@ -1139,9 +1204,21 @@ export default class MultiPageReader {
       window.removeEventListener('resize', this._onResizeWatch);
       this._scrollWatchBound = false;
     }
-    for (const sys of this.instances) { try { sys?.destroy?.(); } catch (e) { printError('Destroy error:', e); } }
+    // Clear any per-page regeneration pollers
+    try {
+      (this.pageMeta || []).forEach(m => { if (m && m._regenPoll) { try { clearInterval(m._regenPoll); } catch {} m._regenPoll = null; } });
+    } catch {}
+    for (const sys of this.instances) {
+      try {
+        // Ensure paragraph UI/listeners are removed
+        sys?.paragraphSeeker?.disableParagraphNavigation?.();
+      } catch {}
+      try { sys?.destroy?.(); } catch (e) { printError('Destroy error:', e); }
+    }
     this.instances = [];
     this.active = -1;
+    try { this._visiblePages?.clear?.(); } catch {}
+    try { this._navEnabled?.clear?.(); } catch {}
     if (this._cb.onDestroyed) { try { this._cb.onDestroyed(); } catch {} }
   }
 }

@@ -255,6 +255,7 @@ export default class AppController {
         try { this.pageDescriptors.forEach(pg => URL.revokeObjectURL(pg.textBlobUrl)); } catch {}
         this.holdup?.disconnect();
         try { URL.revokeObjectURL(DEFAULT_AUDIO_FILE); } catch {}
+        try { this.reader?.destroy?.(); } catch {}
         if (this._localAudioWatch) clearInterval(this._localAudioWatch);
       });
 

@@ -195,7 +195,9 @@ export class AudioSystem {
 
   destroy() {
     try {
-      this.highlighter.stopHighlighting();
+      // Stop any schedulers and clear DOM state
+      try { this.highlighter?.destroy?.(); } catch {}
+      try { this.paragraphSeeker?.destroy?.(); } catch {}
       if (this.audioCore?.sound) this.audioCore.sound.unload();
     } catch {}
     try { if (typeof printl === 'function') printl('🧹 Audio system destroyed'); } catch {}

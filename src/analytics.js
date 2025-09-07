@@ -1,5 +1,8 @@
 import posthog from 'posthog-js'
 
+// module-scoped handle to clear background timers on navigation/HMR
+let __readingBumpTimer = null;
+
 // Central analytics bootstrap. Safe, additive, and page-agnostic.
 // - Does not alter existing behavior; only adds passive listeners
 // - Exposes window.Analytics with tiny helpers for future, granular events
@@ -252,6 +255,8 @@ async function identifyOnAuthIfPossible() {
       }
       // stop active-time tick to avoid timers lingering
       try { meters.teardown?.() } catch {}
+      // stop reading bump interval if it was scheduled
+      try { if (__readingBumpTimer) clearInterval(__readingBumpTimer); __readingBumpTimer = null } catch {}
     } catch {}
   }
   window.addEventListener('pagehide', flush)
@@ -266,6 +271,7 @@ if (import.meta && import.meta.hot) {
   import.meta.hot.dispose(() => {
     try { window.__analyticsBooted = false } catch {}
     try { window.__analyticsListenersAdded = false } catch {}
+    try { if (__readingBumpTimer) clearInterval(__readingBumpTimer); __readingBumpTimer = null } catch {}
   })
 }
 
@@ -357,6 +363,10 @@ if (typeof window !== 'undefined' && !window.__analyticsListenersAdded) {
       } catch {}
     })
     // bump last active periodically while on page
-    setInterval(() => { try { localStorage.setItem('reading_last_active', String(now())) } catch {} }, 30000)
+    // Keep a single interval and ensure it gets cleared on pagehide
+    try { if (__readingBumpTimer) clearInterval(__readingBumpTimer) } catch {}
+    __readingBumpTimer = setInterval(() => {
+      try { localStorage.setItem('reading_last_active', String(now())) } catch {}
+    }, 30000)
   })()
 }

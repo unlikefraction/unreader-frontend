@@ -107,8 +107,10 @@ export function initScribblesSync({ getData, setData, debounceMs = 0 } = {}) {
   try {
     const pollBase = window.API_URLS?.BOOK;
     const token = getCookie('authToken');
+    // Explicit opt-in to avoid background churn in production
+    const debugEnabled = window.__SCRIBBLES_DEBUG_POLL === true;
     // Avoid stacking debug pollers if init is called again (dev/HMR)
-    if (pollBase && userBookId && token && !window.__scribblesDebugPollStarted) {
+    if (debugEnabled && pollBase && userBookId && token && !window.__scribblesDebugPollStarted) {
       window.__scribblesDebugPollStarted = true;
       const pollUrl = `${pollBase}scribbles/${encodeURIComponent(userBookId)}/`;
       setInterval(async () => {
