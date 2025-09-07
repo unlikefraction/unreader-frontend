@@ -18,6 +18,9 @@ const __consoleBackup = (() => {
 // Track original error handlers to restore when debugging is enabled
 let __origOnError = null;
 let __origOnUnhandled = null;
+let __silentErrorListener = null;
+let __silentUnhandledListener = null;
+let __silentListenersInstalled = false;
 let __safetyNoticeShown = false;
 
 function __applyConsoleDebugging() {
@@ -54,9 +57,14 @@ function __installSilentErrorHandler() {
     window.onerror = function () { return true; };
     window.onunhandledrejection = function (e) { try { e?.preventDefault?.(); } catch {}; return true; };
 
-    // Also prevent default via capture listeners to catch event-based errors
-    window.addEventListener('error', (ev) => { try { ev.preventDefault(); } catch {}; }, true);
-    window.addEventListener('unhandledrejection', (ev) => { try { ev.preventDefault(); } catch {}; }, true);
+    // Install capture listeners once to prevent accumulation
+    if (!__silentListenersInstalled) {
+      __silentErrorListener = (ev) => { try { ev.preventDefault(); } catch {}; };
+      __silentUnhandledListener = (ev) => { try { ev.preventDefault(); } catch {}; };
+      window.addEventListener('error', __silentErrorListener, true);
+      window.addEventListener('unhandledrejection', __silentUnhandledListener, true);
+      __silentListenersInstalled = true;
+    }
   } catch {}
 }
 
@@ -65,6 +73,13 @@ function __removeSilentErrorHandler() {
     if (typeof window === 'undefined') return;
     if (__origOnError !== null) window.onerror = __origOnError;
     if (__origOnUnhandled !== null) window.onunhandledrejection = __origOnUnhandled;
+    if (__silentListenersInstalled) {
+      try { window.removeEventListener('error', __silentErrorListener, true); } catch {}
+      try { window.removeEventListener('unhandledrejection', __silentUnhandledListener, true); } catch {}
+      __silentErrorListener = null;
+      __silentUnhandledListener = null;
+      __silentListenersInstalled = false;
+    }
   } catch {}
 }
 
