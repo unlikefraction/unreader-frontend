@@ -1,5 +1,10 @@
 import posthog from 'posthog-js'
 
+// Global kill-switch: hard-disable all analytics.
+// When true, nothing initializes, no events are captured,
+// and the public API becomes a no-op.
+const ANALYTICS_DISABLED = true
+
 // module-scoped handle to clear background timers on navigation/HMR
 let __readingBumpTimer = null;
 
@@ -11,13 +16,15 @@ const PH_PROJECT_KEY = 'phc_8CyOzFvrraB0asG5M4IPk7rFiSQ7k9EWPg0qazr6kzM'
 const PH_API_HOST = 'https://cue.shubhastro2.workers.dev'
 
 // Init PostHog
-posthog.init(PH_PROJECT_KEY, {
-  api_host: PH_API_HOST,
-  person_profiles: 'always',
-  capture_pageview: true,
-  capture_pageleave: true,
-  autocapture: true,
-})
+if (!ANALYTICS_DISABLED) {
+  posthog.init(PH_PROJECT_KEY, {
+    api_host: PH_API_HOST,
+    person_profiles: 'always',
+    capture_pageview: true,
+    capture_pageleave: true,
+    autocapture: true,
+  })
+}
 
 // ---- helpers ----
 function now() { return Date.now() }
@@ -199,6 +206,7 @@ async function identifyOnAuthIfPossible() {
 
 // ---- Bootstrap ----
 ;(function boot() {
+  if (ANALYTICS_DISABLED) return;
   if (typeof window !== 'undefined') {
     if (window.__analyticsBooted) return; // idempotent boot
     window.__analyticsBooted = true;
@@ -278,12 +286,15 @@ if (import.meta && import.meta.hot) {
 // ---- Public, safe facade for future use ----
 window.Analytics = Object.freeze({
   capture: (name, props = {}) => {
+    if (ANALYTICS_DISABLED) return;
     try { posthog.capture(name, props) } catch {}
   },
   setProps: (props = {}) => {
+    if (ANALYTICS_DISABLED) return;
     try { posthog.register(props) } catch {}
   },
   identify: (email, props = {}) => {
+    if (ANALYTICS_DISABLED) return;
     try { if (email) posthog.identify(String(email), props) } catch {}
   },
   // External systems can toggle this to improve active-time fidelity
@@ -292,7 +303,7 @@ window.Analytics = Object.freeze({
 })
 
 // ---- Idempotent wiring to avoid duplicate listeners (HMR/page injections) ----
-if (typeof window !== 'undefined' && !window.__analyticsListenersAdded) {
+if (typeof window !== 'undefined' && !window.__analyticsListenersAdded && !ANALYTICS_DISABLED) {
   window.__analyticsListenersAdded = true
 
   // ---- Lightweight navigation click tracking (non-intrusive) ----
