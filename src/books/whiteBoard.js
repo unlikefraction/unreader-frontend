@@ -514,9 +514,20 @@ export class DrawingTools {
   _handleFreehand(t, e, d, o, c, op) { handleFreehand(this, t, e, d, o, c, op); }
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  const drawer = new DrawingTools({ selector: '.w-control', strokeWidth: 2, roughness: 2 });
-  initVersioning(drawer, { maxHistory: 10 });
-  window.drawer = drawer;
-  drawer.init();
-});
+if (typeof window !== 'undefined' && !window.__whiteboardBooted) {
+  window.__whiteboardBooted = true;
+  window.addEventListener('DOMContentLoaded', () => {
+    const drawer = new DrawingTools({ selector: '.w-control', strokeWidth: 2, roughness: 2 });
+    initVersioning(drawer, { maxHistory: 10 });
+    window.drawer = drawer;
+    drawer.init();
+  });
+}
+
+// HMR/dev cleanup so repeated inits don't leak canvases/listeners
+if (import.meta && import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    try { Array.from(window.drawer?.canvasManagers || []).forEach(m => m?.destroy?.()); } catch {}
+    try { window.__whiteboardBooted = false } catch {}
+  })
+}

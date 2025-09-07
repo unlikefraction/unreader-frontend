@@ -408,16 +408,27 @@ export class DrawingTools {
 }
 
 // Instantiate on DOM ready
-window.addEventListener('DOMContentLoaded', () => {
-  const drawer = new DrawingTools({
-    selector: '.w-control',
-    strokeWidth: 2,
-    roughness: 2
-    // Optionally force a namespace per page if you prefer being explicit:
-    // storageNamespace: 'landing'   // on index.html
-    // storageNamespace: 'pricing'   // on pricing.html
+if (typeof window !== 'undefined' && !window.__wbLandingBooted) {
+  window.__wbLandingBooted = true;
+  window.addEventListener('DOMContentLoaded', () => {
+    const drawer = new DrawingTools({
+      selector: '.w-control',
+      strokeWidth: 2,
+      roughness: 2
+      // Optionally force a namespace per page if you prefer being explicit:
+      // storageNamespace: 'landing'   // on index.html
+      // storageNamespace: 'pricing'   // on pricing.html
+    });
+    initVersioning(drawer, {maxHistory : 10});
+    window.drawer = drawer;
+    drawer.init();
   });
-  initVersioning(drawer, {maxHistory : 10});
-  window.drawer = drawer;
-  drawer.init();
-});
+}
+
+// HMR/dev cleanup so repeated inits don't leak canvases/listeners
+if (import.meta && import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    try { window.drawer?.canvasManager?.destroy?.(); } catch {}
+    try { window.__wbLandingBooted = false } catch {}
+  })
+}

@@ -90,8 +90,12 @@ function loginWithApple() {
 
   const popup = window.open(url, "_blank", "width=500,height=600");
 
+  let tries = 0;
+  const MAX_TRIES = 300; // ~5 minutes at 1s per poll
   const intervalId = setInterval(async () => {
     try {
+      if (popup && popup.closed) { clearInterval(intervalId); return; }
+      if (++tries > MAX_TRIES) { clearInterval(intervalId); return; }
       const res = await fetch(
         `${window.API_URLS.APPLE_TOKEN}?state=${encodeURIComponent(state)}`,
         { method: "GET", credentials: "include" }

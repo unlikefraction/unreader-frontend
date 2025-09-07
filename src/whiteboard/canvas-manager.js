@@ -161,6 +161,7 @@ export class CanvasManager {
   }
 
   destroy() {
+    try { this._ro?.disconnect?.(); } catch {}
     try { this.drawCanvas?.remove(); } catch {}
     try { this.previewCanvas?.remove(); } catch {}
     this.drawCanvas = this.previewCanvas = null;

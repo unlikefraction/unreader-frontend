@@ -104,4 +104,14 @@ export class CanvasManager {
     this.drawCtx.clearRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
     this.drawCtx.restore();
   }
+
+  /** Disconnect observers and remove canvases */
+  destroy() {
+    try { this._ro?.disconnect?.(); } catch {}
+    try { this.drawCanvas?.remove(); } catch {}
+    try { this.previewCanvas?.remove(); } catch {}
+    this.drawCanvas = this.previewCanvas = null;
+    this.drawCtx = this.previewCtx = null;
+    this.drawRough = this.previewRough = null;
+  }
 }

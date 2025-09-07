@@ -196,6 +196,10 @@ async function identifyOnAuthIfPossible() {
 
 // ---- Bootstrap ----
 ;(function boot() {
+  if (typeof window !== 'undefined') {
+    if (window.__analyticsBooted) return; // idempotent boot
+    window.__analyticsBooted = true;
+  }
   // First touch persistence
   const first = persistFirstTouch()
 
@@ -246,6 +250,8 @@ async function identifyOnAuthIfPossible() {
           localStorage.setItem('reading_last_session_id', String(s.id || ''))
         } catch {}
       }
+      // stop active-time tick to avoid timers lingering
+      try { meters.teardown?.() } catch {}
     } catch {}
   }
   window.addEventListener('pagehide', flush)
@@ -254,6 +260,14 @@ async function identifyOnAuthIfPossible() {
   // Try identification once DOM is up (and when user cookie exists)
   onReady(() => { identifyOnAuthIfPossible() })
 })();
+
+// HMR/dev: allow hot reload to rewire safely by clearing boot/listener flags
+if (import.meta && import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    try { window.__analyticsBooted = false } catch {}
+    try { window.__analyticsListenersAdded = false } catch {}
+  })
+}
 
 // ---- Public, safe facade for future use ----
 window.Analytics = Object.freeze({
@@ -271,73 +285,78 @@ window.Analytics = Object.freeze({
   isAudioPlaying: () => false,
 })
 
-// ---- Lightweight navigation click tracking (non-intrusive) ----
-document.addEventListener('click', (e) => {
-  try {
-    const a = e.target?.closest?.('a[href]')
-    if (!a) return
-    const href = a.getAttribute('href') || ''
-    const path = href.replace(location.origin, '')
-    if (/pricing\.html(?:$|[?#])/.test(path) || path === '/pricing.html') {
-      posthog.capture('nav_to_pricing', { from_path: location.pathname, link: href })
-    }
-    if (/login(?:Og)?\.html(?:$|[?#])/.test(path)) {
-      posthog.capture('nav_to_login', { from_path: location.pathname, link: href })
-    }
-    if (/bookDetails\.html(?:$|[?#])/.test(path)) {
-      posthog.capture('nav_to_book_details', { from_path: location.pathname, link: href })
-    }
-    if (/readBook\.html(?:$|[?#])/.test(path)) {
-      posthog.capture('nav_to_read_book', { from_path: location.pathname, link: href })
-    }
-    if (/createBook\.html(?:$|[?#])/.test(path)) {
-      posthog.capture('nav_to_create_book', { from_path: location.pathname, link: href })
-    }
-    if (/credits\.html(?:$|[?#])/.test(path)) {
-      posthog.capture('nav_to_credits', { from_path: location.pathname, link: href })
-    }
-  } catch {}
-}, { capture: true })
+// ---- Idempotent wiring to avoid duplicate listeners (HMR/page injections) ----
+if (typeof window !== 'undefined' && !window.__analyticsListenersAdded) {
+  window.__analyticsListenersAdded = true
 
-// ---- Canvas interactions (landing; books later) ----
-window.addEventListener('drawing:start', () => {
-  try { posthog.capture('canvas_draw_start', { path: location.pathname }) } catch {}
-})
-window.addEventListener('drawing:end', () => {
-  try { posthog.capture('canvas_draw_end', { path: location.pathname }) } catch {}
-})
-
-document.addEventListener('click', (e) => {
-  try {
-    const tool = e.target?.closest?.('.w-control')
-    if (!tool) return
-    const toolName = ['cursor','highlighter','pencil','text','line','arrow','eraser','rectangle','circle'].find(c => tool.classList?.contains?.(c)) || 'unknown'
-    posthog.capture('canvas_tool_select', { tool: toolName, path: location.pathname })
-    // if on reading page, tally tool usage for session summary
-    if (/\/readBook\.html$/.test(location.pathname)) {
-      const s = window.__readingSession
-      if (s) s.toolCounts[toolName] = (s.toolCounts[toolName] || 0) + 1
-    }
-  } catch {}
-}, { capture: true })
-
-// ---- Reading session (10 min inactivity == new) ----
-;(function initReadingSession() {
-  if (!/\/readBook\.html$/.test(location.pathname)) return
-  const TEN_MIN = 10 * 60 * 1000
-  let last = 0
-  try { last = Number(localStorage.getItem('reading_last_active') || '0') || 0 } catch {}
-  const isFresh = !last || (now() - last) > TEN_MIN
-  const id = isFresh ? (Math.random().toString(36).slice(2) + Date.now().toString(36)) : (localStorage.getItem('reading_last_session_id') || (Math.random().toString(36).slice(2)))
-  const sess = { id, started_at: now(), pages: new Set(), toolCounts: {} }
-  window.__readingSession = sess
-  try { posthog.capture('reading_session_start', { session_id: id }) } catch {}
-  window.addEventListener('reader:active_page', (e) => {
+  // ---- Lightweight navigation click tracking (non-intrusive) ----
+  document.addEventListener('click', (e) => {
     try {
-      const pn = e?.detail?.page_number
-      if (pn != null) sess.pages.add(Number(pn))
+      const a = e.target?.closest?.('a[href]')
+      if (!a) return
+      const href = a.getAttribute('href') || ''
+      const path = href.replace(location.origin, '')
+      if (/pricing\.html(?:$|[?#])/.test(path) || path === '/pricing.html') {
+        posthog.capture('nav_to_pricing', { from_path: location.pathname, link: href })
+      }
+      if (/login(?:Og)?\.html(?:$|[?#])/.test(path)) {
+        posthog.capture('nav_to_login', { from_path: location.pathname, link: href })
+      }
+      if (/bookDetails\.html(?:$|[?#])/.test(path)) {
+        posthog.capture('nav_to_book_details', { from_path: location.pathname, link: href })
+      }
+      if (/readBook\.html(?:$|[?#])/.test(path)) {
+        posthog.capture('nav_to_read_book', { from_path: location.pathname, link: href })
+      }
+      if (/createBook\.html(?:$|[?#])/.test(path)) {
+        posthog.capture('nav_to_create_book', { from_path: location.pathname, link: href })
+      }
+      if (/credits\.html(?:$|[?#])/.test(path)) {
+        posthog.capture('nav_to_credits', { from_path: location.pathname, link: href })
+      }
     } catch {}
+  }, { capture: true })
+
+  // ---- Canvas interactions (landing; books later) ----
+  window.addEventListener('drawing:start', () => {
+    try { posthog.capture('canvas_draw_start', { path: location.pathname }) } catch {}
   })
-  // bump last active periodically while on page
-  setInterval(() => { try { localStorage.setItem('reading_last_active', String(now())) } catch {} }, 30000)
-})()
+  window.addEventListener('drawing:end', () => {
+    try { posthog.capture('canvas_draw_end', { path: location.pathname }) } catch {}
+  })
+
+  document.addEventListener('click', (e) => {
+    try {
+      const tool = e.target?.closest?.('.w-control')
+      if (!tool) return
+      const toolName = ['cursor','highlighter','pencil','text','line','arrow','eraser','rectangle','circle'].find(c => tool.classList?.contains?.(c)) || 'unknown'
+      posthog.capture('canvas_tool_select', { tool: toolName, path: location.pathname })
+      // if on reading page, tally tool usage for session summary
+      if (/\/readBook\.html$/.test(location.pathname)) {
+        const s = window.__readingSession
+        if (s) s.toolCounts[toolName] = (s.toolCounts[toolName] || 0) + 1
+      }
+    } catch {}
+  }, { capture: true })
+
+  // ---- Reading session (10 min inactivity == new) ----
+  ;(function initReadingSession() {
+    if (!/\/readBook\.html$/.test(location.pathname)) return
+    const TEN_MIN = 10 * 60 * 1000
+    let last = 0
+    try { last = Number(localStorage.getItem('reading_last_active') || '0') || 0 } catch {}
+    const isFresh = !last || (now() - last) > TEN_MIN
+    const id = isFresh ? (Math.random().toString(36).slice(2) + Date.now().toString(36)) : (localStorage.getItem('reading_last_session_id') || (Math.random().toString(36).slice(2)))
+    const sess = { id, started_at: now(), pages: new Set(), toolCounts: {} }
+    window.__readingSession = sess
+    try { posthog.capture('reading_session_start', { session_id: id }) } catch {}
+    window.addEventListener('reader:active_page', (e) => {
+      try {
+        const pn = e?.detail?.page_number
+        if (pn != null) sess.pages.add(Number(pn))
+      } catch {}
+    })
+    // bump last active periodically while on page
+    setInterval(() => { try { localStorage.setItem('reading_last_active', String(now())) } catch {} }, 30000)
+  })()
+}
