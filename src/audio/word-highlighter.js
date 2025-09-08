@@ -14,6 +14,7 @@ export class WordHighlighter {
     this.lookaheadMs = 50;
     this.processedTimingIndices = new Set();
     this.currentHighlightedWord = null;
+    this._lastTokenReadIndex = -1; // for coloring separators upto current word
 
     // probability threshold to accept a bestMatch
     this.minProbability = 0.8;
@@ -64,6 +65,35 @@ export class WordHighlighter {
     if (!el) return false;
     try { el.classList.remove('highlight'); } catch {}
     return true;
+  }
+
+  // ----- token helpers (words + separators) -----
+  _tokens() {
+    try {
+      const c = this.textProcessor?.container;
+      if (!c || !c.isConnected) return [];
+      return Array.from(c.querySelectorAll('span.word, span.sep'));
+    } catch { return []; }
+  }
+
+  _clearReadTokens() {
+    const tokens = this._tokens();
+    for (const el of tokens) { try { el.classList.remove('read'); } catch {} }
+    this._lastTokenReadIndex = -1;
+  }
+
+  _applyReadUpToCurrentWord() {
+    const wordEl = this.getCurrentWordEl();
+    if (!wordEl) return;
+    const tokens = this._tokens();
+    if (!tokens.length) return;
+    const idx = tokens.indexOf(wordEl);
+    if (idx === -1) return;
+    const start = Math.max(0, this._lastTokenReadIndex + 1);
+    for (let i = start; i <= idx && i < tokens.length; i++) {
+      try { tokens[i].classList.add('read'); } catch {}
+    }
+    this._lastTokenReadIndex = Math.max(this._lastTokenReadIndex, idx);
   }
 
   /* ---------------- DOM rehydration ---------------- */
@@ -141,6 +171,7 @@ export class WordHighlighter {
     this.highlightedIndices.clear();
     this.lastHighlightedIndex = 0;
     this._setCurrentWordEl(null);
+    this._clearReadTokens();
   }
 
   highlightWordsInRange(startIndex, endIndex, reason = '') {
@@ -160,6 +191,8 @@ export class WordHighlighter {
       }
     }
     this.lastHighlightedIndex = Math.max(this.lastHighlightedIndex, actualEndIndex + 1);
+    // After moving the current word, mark all tokens up to it as read (black)
+    this._applyReadUpToCurrentWord();
   }
 
   fillGapsToTarget(targetIndex, reason = '') {

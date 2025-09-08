@@ -125,7 +125,11 @@ export class TextProcessor {
           this.wordSpans.push(span);
           frag.appendChild(span);
         } else {
-          frag.appendChild(document.createTextNode(part));
+          // Wrap punctuation/whitespace so we can color it as "read" too
+          const sep = document.createElement("span");
+          sep.className = "sep";
+          sep.textContent = part;
+          frag.appendChild(sep);
         }
       });
 

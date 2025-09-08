@@ -191,6 +191,11 @@ nav a{
   cursor: text;
 }
 
+/* Punctuation/whitespace tokens get wrapped as .sep so we can color them too */
+.mainContent .sep { transition: color 0.2s; }
+/* Mark any tokens (words or seps) as already read */
+.mainContent .read { color: #000; }
+
 
 .bottomControl{
   position: fixed;
