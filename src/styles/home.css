@@ -151,6 +151,11 @@
     cursor: pointer;
 }
 
+/* Hide covers until images finish loading */
+.book-cover .book-image.img-hidden {
+  opacity: 0;
+}
+
 .book-image img {
     grid-row: 1 / -1;
     grid-column: 1;

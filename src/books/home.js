@@ -41,8 +41,8 @@ window.addEventListener("DOMContentLoaded", () => {
                data-name="${book.title.toLowerCase()}"
                data-author="${book.authors.join(", ").toLowerCase()}">
             <div class="book-inside"></div>
-            <div class="book-image">
-              <img src="${book.coverUrl}"
+            <div class="book-image img-hidden">
+              <img src="${book.coverUrl}" loading="lazy"
                    alt="Cover of ${book.title}">
               <div class="effect"></div>
               <div class="light"></div>
@@ -51,6 +51,26 @@ window.addEventListener("DOMContentLoaded", () => {
         </a>
       `;
       bookWrapper.appendChild(item);
+
+      // Reveal cover only after the image fully loads (or errors)
+      const img = item.querySelector("img");
+      const wrapper = item.querySelector(".book-image");
+      if (img && wrapper) {
+        const reveal = () => { wrapper.classList.remove("img-hidden"); };
+        if (img.complete) {
+          // If cached and already loaded, show immediately
+          // naturalWidth === 0 can indicate an error; still reveal to avoid infinite hidden state
+          reveal();
+        } else {
+          const done = () => {
+            reveal();
+            img.removeEventListener('load', done);
+            img.removeEventListener('error', done);
+          };
+          img.addEventListener('load', done, { once: true });
+          img.addEventListener('error', done, { once: true });
+        }
+      }
     });
   }
 
