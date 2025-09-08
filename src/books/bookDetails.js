@@ -34,15 +34,80 @@ function countWords(text) {
   return normalized ? normalized.split(" ").length : 0;
 }
 
-// Auto-resize a textarea to fit its content height
+// Auto-resize a textarea to fit its content height *without moving the viewport*
+// Auto-resize a textarea to fit its content height *without causing scroll jumps*
 function autoResizeTextarea(el) {
   if (!el) return;
   try {
-    el.style.height = 'auto';
-    el.style.overflowY = 'hidden';
+    const doc = document.documentElement;
+    const body = document.body;
+
+    // Save current scroll position
+    const prevScrollY = window.scrollY || doc.scrollTop || body.scrollTop || 0;
+
+    // Save caret position relative to viewport
+    let caretY = null;
+    if (document.activeElement === el) {
+      const selStart = el.selectionStart;
+      const dummy = document.createElement("span");
+      dummy.textContent = "\u200b"; // zero-width char
+      const range = el.value.substring(0, selStart);
+      const mirror = document.createElement("div");
+
+      // Mirror styles that affect layout
+      const style = getComputedStyle(el);
+      for (const prop of [
+        "font", "fontSize", "fontFamily", "lineHeight", "padding", "border",
+        "whiteSpace", "overflowWrap", "letterSpacing"
+      ]) {
+        mirror.style[prop] = style[prop];
+      }
+      mirror.style.position = "absolute";
+      mirror.style.visibility = "hidden";
+      mirror.style.whiteSpace = "pre-wrap";
+      mirror.style.wordWrap = "break-word";
+      mirror.style.width = el.offsetWidth + "px";
+
+      mirror.textContent = range;
+      mirror.appendChild(dummy);
+      document.body.appendChild(mirror);
+
+      const rect = dummy.getBoundingClientRect();
+      caretY = rect.top;
+      document.body.removeChild(mirror);
+    }
+
+    // Resize
+    el.style.height = "auto";
+    el.style.overflowY = "hidden";
     const h = el.scrollHeight;
     if (h && Number.isFinite(h)) el.style.height = `${h}px`;
+
+    // Restore scroll
+    if (caretY !== null) {
+      // Keep caret roughly in same viewport spot
+      const newCaretY = el.getBoundingClientRect().top + el.selectionEnd;
+      const diff = newCaretY - caretY;
+      window.scrollBy(0, diff);
+    } else {
+      // Fallback: restore page scroll
+      window.scrollTo(0, prevScrollY);
+    }
   } catch {}
+}
+
+
+// Optional: belt-and-suspenders—neutralize incidental jumps during the input frame
+function lockViewportDuringInput(el) {
+  if (!el) return;
+  let rafId = null;
+  el.addEventListener('input', () => {
+    const y = window.scrollY || document.documentElement.scrollTop || 0;
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      window.scrollTo(0, y);
+    });
+  });
 }
 
 // === Timezone Setup ===
@@ -512,11 +577,19 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       updateThoughtWordCount();
       thoughtsInput.addEventListener('input', updateThoughtWordCount);
 
-      // Ensure textarea height fits full content on load and on changes
-      const doResize = () => autoResizeTextarea(thoughtsInput);
-      // Run after autosaver sets initial value and layout settles
-      requestAnimationFrame(() => requestAnimationFrame(doResize));
-      thoughtsInput.addEventListener('input', doResize);
+      // Auto-grow: prefer global attachAutoGrow from HTML if available to avoid double wiring
+      if (typeof window.attachAutoGrow === 'function') {
+        try { window.attachAutoGrow(thoughtsInput); } catch {}
+      } else {
+        // Fallback lightweight auto-resize if attachAutoGrow isn't present
+        const doResize = () => autoResizeTextarea(thoughtsInput);
+        // Run after autosaver sets initial value and layout settles
+        requestAnimationFrame(() => requestAnimationFrame(doResize));
+        thoughtsInput.addEventListener('input', doResize);
+      }
+
+      // Keep viewport stable during input (extra guard; does not block user scroll)
+      lockViewportDuringInput(thoughtsInput);
     }
 
     // === Edit Cover (pencil) → file select → upload → POST update → update UI ===
@@ -643,6 +716,14 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     }
 
     unskelton()
+
+    // Ensure autosize runs after skeleton classes are removed (element is visible)
+    try {
+      const ti = document.querySelector('.thoughtsInput');
+      if (ti) {
+        requestAnimationFrame(() => requestAnimationFrame(() => autoResizeTextarea(ti)));
+      }
+    } catch {}
 
   } catch (err) {
     printError("Error fetching book details:", err);
