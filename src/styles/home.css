@@ -102,7 +102,8 @@
 .book-wrapper {
     width: 700px;
     position: relative;
-    margin: 0 auto;
+    /* Align books to the left on the homepage */
+    margin: 0; /* remove centering */
     column-count: 3;
     column-gap: 12px;
     padding: 4px;

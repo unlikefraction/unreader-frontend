@@ -11,7 +11,7 @@ export class WordHighlighter {
     this.loggedWords = new Set();
     this.lastHighlightedIndex = 0;
     this.isInitialHighlightDone = false;
-    this.lookaheadMs = 50;
+    this.lookaheadMs = 100;
     this.processedTimingIndices = new Set();
     this.currentHighlightedWord = null;
     this._lastTokenReadIndex = -1; // for coloring separators upto current word
@@ -23,6 +23,10 @@ export class WordHighlighter {
     this.highlightInterval = null;
     this._rafId = null;
     this.nextTimingToConsider = 0; // rolling pointer for perf
+
+    // At any given tick, the maximum text-index we are allowed to highlight
+    // based on the current audio time. Updated per highlightWord() call.
+    this._maxAllowedTextIndexForTime = Infinity;
   }
 
   /* ---------------- helpers & safety ---------------- */
@@ -178,8 +182,16 @@ export class WordHighlighter {
     const spans = this._spans();
     if (!spans.length) return;
 
+    // Clamp to conservative bound so we never run ahead of the audio time
+    let boundedEnd = endIndex;
+    if (Number.isFinite(this._maxAllowedTextIndexForTime)) {
+      boundedEnd = Math.min(endIndex, this._maxAllowedTextIndexForTime);
+    }
+
     const actualStartIndex = Math.max(startIndex, this.lastHighlightedIndex);
-    const actualEndIndex = Math.max(endIndex, actualStartIndex);
+    const actualEndIndex = Math.max(boundedEnd, actualStartIndex - 1);
+
+    if (actualEndIndex < actualStartIndex) return; // nothing to add under current bound
 
     for (let i = actualStartIndex; i <= actualEndIndex && i < spans.length; i++) {
       if (!this.highlightedIndices.has(i)) {
@@ -375,10 +387,11 @@ export class WordHighlighter {
       if (currentTime >= wordData.time_start && currentTime <= wordData.time_end) {
         try { printl?.(`🎯 Current word "${wordData.word}" @ ${currentTime.toFixed(3)}s`); } catch {}
 
+        const centerGuess = this._approxTextIndexForTimingIndex(i);
         const bestMatch = this.textProcessor.findBestWordMatch(
           wordData.word,
           i,
-          null,
+          centerGuess,
           this.lastHighlightedIndex
         );
 
@@ -390,20 +403,19 @@ export class WordHighlighter {
             Math.min(bestMatch.index, spans.length - 1),
             `(seek target p=${p.toFixed(3)})`
           );
-
           return { wordData, textIndex: Math.min(bestMatch.index, spans.length - 1) };
         }
 
-        // Fallback: try a quick forward exact search before bailing
-        const forwardIndex = this._forwardExactSearch(wordData.word, this.lastHighlightedIndex);
+        // Fallback: try a quick forward exact search near the guess before bailing
+        const startFrom = Number.isFinite(centerGuess) ? Math.max(0, centerGuess - 5) : this.lastHighlightedIndex;
+        const forwardIndex = this._forwardExactSearch(wordData.word, startFrom);
         if (forwardIndex !== -1) {
           this.clearAllHighlights();
           this.highlightWordsInRange(0, Math.min(forwardIndex, spans.length - 1), '(seek forward exact)');
           return { wordData, textIndex: Math.min(forwardIndex, spans.length - 1) };
         }
-
-        // Gate: no highlight if below threshold
-        return { wordData, textIndex: -1 };
+        // Gate: no highlight if below threshold — return null so caller can estimate
+        return null;
       }
     }
 
@@ -423,11 +435,11 @@ export class WordHighlighter {
 
     if (closestWord) {
       try { printl?.(`🎯 Closest previous "${closestWord.word}" @ ${currentTime.toFixed(3)}s`); } catch {}
-
+      const centerGuess = this._approxTextIndexForTimingIndex(closestIndex);
       const bestMatch = this.textProcessor.findBestWordMatch(
         closestWord.word,
         closestIndex,
-        null,
+        centerGuess,
         this.lastHighlightedIndex
       );
 
@@ -442,8 +454,9 @@ export class WordHighlighter {
 
         return { wordData: closestWord, textIndex: Math.min(bestMatch.index, spans.length - 1) };
       }
-      // Fallback: forward exact search
-      const forwardIndex = this._forwardExactSearch(closestWord.word, this.lastHighlightedIndex);
+      // Fallback: forward exact search near guess
+      const startFrom = Number.isFinite(centerGuess) ? Math.max(0, centerGuess - 5) : this.lastHighlightedIndex;
+      const forwardIndex = this._forwardExactSearch(closestWord.word, startFrom);
       if (forwardIndex !== -1) {
         this.clearAllHighlights();
         this.highlightWordsInRange(0, Math.min(forwardIndex, spans.length - 1), '(seek closest forward exact)');
@@ -520,6 +533,9 @@ export class WordHighlighter {
     this.lastHighlightedIndex = 0;
     this.nextTimingToConsider = 0;
 
+    // During seek resolution, allow initial highlight without time clamp
+    this._maxAllowedTextIndexForTime = Infinity;
+
     const currentWord = this.findCurrentWordAndHighlight(currentTime);
 
     if (currentWord) {
@@ -537,6 +553,9 @@ export class WordHighlighter {
         `📊 Highlighted ${this.highlightedIndices.size}/${this._spans().length}`
       );
     } catch {}
+
+    // At end, allow painting the remainder without time-bound clamping
+    this._maxAllowedTextIndexForTime = Infinity;
 
     const remaining = this._spans().length - this.highlightedIndices.size;
     if (remaining > 0) {
@@ -556,6 +575,9 @@ export class WordHighlighter {
     try { printl?.(`Audio time: ${time.toFixed(5)}s`); } catch {}
 
     try {
+      // Set a conservative upper bound for highlighting based on current time
+      this._maxAllowedTextIndexForTime = this._computeMaxAllowedIndexForTime(time);
+
       // Repair span references if the DOM was re-rendered
       this._rehydrateSpansIfDetached();
 
@@ -629,5 +651,90 @@ export class WordHighlighter {
       if (ow && ow === cleanTarget) return i;
     }
     return -1;
+  }
+
+  _approxTextIndexForTimingIndex(timingIndex) {
+    const spans = this._spans();
+    const timings = this.textProcessor?.wordTimings;
+    if (!spans.length || !Array.isArray(timings) || timings.length === 0) return NaN;
+    const ratio = Math.max(0, Math.min(1, timingIndex / Math.max(1, timings.length - 1)));
+    return Math.floor(ratio * (spans.length - 1));
+  }
+
+  /* ---------------- util: time-bound guard ---------------- */
+  _computeMaxAllowedIndexForTime(currentTime) {
+    const spans = this._spans();
+    if (!spans.length) return -1;
+
+    const timings = this.textProcessor?.wordTimings;
+    if (!Array.isArray(timings) || timings.length === 0) {
+      // Fallback: coarse estimate by words/second (conservative)
+      const wps = 2.5;
+      return Math.min(spans.length - 1, Math.max(-1, Math.floor(currentTime * wps) - 1));
+    }
+
+    // Find the last timing whose start is <= current time (no lookahead)
+    let idx = -1;
+    for (let i = 0; i < timings.length; i++) {
+      if (timings[i].time_start <= currentTime) idx = i; else break;
+    }
+
+    if (idx < 0) {
+      // Before first word starts: do not allow any highlight yet
+      return -1;
+    }
+
+    // Map current timing to text index conservatively
+    const curWord = timings[idx];
+    let match = this.textProcessor.findBestWordMatch(
+      curWord.word,
+      idx,
+      null,
+      this.lastHighlightedIndex
+    );
+
+    let curTextIndex = (match && match.index !== -1) ? match.index : -1;
+    if (curTextIndex === -1) {
+      // Try a forward exact search near the last highlighted index
+      const fwd = this._forwardExactSearch(curWord.word, this.lastHighlightedIndex);
+      if (fwd !== -1) curTextIndex = fwd;
+    }
+    if (curTextIndex === -1) {
+      // If we cannot confidently map, do not allow further progress
+      return Math.max(-1, this.lastHighlightedIndex - 1);
+    }
+
+    // If we are still within the current timed word, allow only this word index
+    if (currentTime <= curWord.time_end) return Math.min(curTextIndex, spans.length - 1);
+
+    // We are in the gap to the next word (if any). Allow gradual progress through
+    // the inter-word text based on elapsed fraction of the time gap.
+    if (idx + 1 < timings.length) {
+      const nextWord = timings[idx + 1];
+      const gap = nextWord.time_start - curWord.time_end;
+      if (gap > 0) {
+        let nextMatch = this.textProcessor.findBestWordMatch(
+          nextWord.word,
+          idx + 1,
+          null,
+          this.lastHighlightedIndex
+        );
+        let nextTextIndex = (nextMatch && nextMatch.index !== -1) ? nextMatch.index : -1;
+        if (nextTextIndex === -1) {
+          const fwd2 = this._forwardExactSearch(nextWord.word, curTextIndex + 1);
+          if (fwd2 !== -1) nextTextIndex = fwd2;
+        }
+        if (nextTextIndex > curTextIndex) {
+          const between = Math.max(0, nextTextIndex - curTextIndex - 1);
+          if (between > 0) {
+            const frac = Math.max(0, Math.min(1, (currentTime - curWord.time_end) / gap));
+            const allowExtra = Math.floor(between * frac);
+            return Math.min(spans.length - 1, curTextIndex + allowExtra);
+          }
+        }
+      }
+    }
+
+    return Math.min(spans.length - 1, curTextIndex);
   }
 }
