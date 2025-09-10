@@ -401,9 +401,13 @@ export class ParagraphSeeker {
   }
 
   hideHoverDiv(hoverDiv) {
+    // Use the paired hover area (same paragraph index) instead of closest()
+    // because the hover div is a sibling, not a descendant, of the area.
+    const idx = Number(hoverDiv.dataset.paragraphIndex);
+    const area = Array.isArray(this._hoverAreas) ? this._hoverAreas[idx] : null;
     setTimeout(() => {
-      const area = hoverDiv.closest('.paragraph-hover-area');
-      if (!hoverDiv.matches(':hover') && !(area && area.matches(':hover'))) {
+      const stillHovering = hoverDiv.matches(':hover') || (area && area.matches?.(':hover'));
+      if (!stillHovering) {
         hoverDiv.style.display = 'none';
       }
     }, 50);
