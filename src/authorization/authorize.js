@@ -1,19 +1,10 @@
 import { printError } from '../utils.js';
+import { setItem as storageSet } from '../storage.js';
 
 window.onload = function () {
-  /**
-   * Sets an authentication cookie.
-   * @param {string} tokenValue
-   * @param {number} daysToExpire
-   */
-  function setAuthCookie(tokenValue, daysToExpire) {
-    let expires = "";
-    if (daysToExpire) {
-      const date = new Date();
-      date.setTime(date.getTime() + daysToExpire * 24 * 60 * 60 * 1000);
-      expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = `authToken=${tokenValue || ""}${expires}; path=/; SameSite=Lax; Secure`;
+  // Store auth in localStorage (30-day TTL)
+  function setAuthToken(tokenValue, daysToExpire = 30) {
+    storageSet('authToken', tokenValue || '', daysToExpire);
   }
 
   async function redeemWelcomeCoupon(token) {
@@ -77,11 +68,11 @@ window.onload = function () {
       }
 
       const { token: apiToken, user, is_new_user } = await res.json();
-      setAuthCookie(apiToken, 30);
+      setAuthToken(apiToken, 30);
 
-      // 🍪 Set onboardingComplete cookie based on user status
+      // Persist onboardingComplete in localStorage
       const onboardingValue = is_new_user ? 'false' : 'true';
-      document.cookie = `onboardingComplete=${onboardingValue}; path=/; SameSite=Lax; Secure`;
+      storageSet('onboardingComplete', onboardingValue);
 
       document.body.textContent = "✅ Login successful! Redirecting…";
 

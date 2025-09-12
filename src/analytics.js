@@ -1,4 +1,5 @@
 import posthog from 'posthog-js'
+import { getItem as storageGet } from './storage.js'
 
 // Global kill-switch: hard-disable all analytics.
 // When true, nothing initializes, no events are captured,
@@ -28,10 +29,7 @@ if (!ANALYTICS_DISABLED) {
 
 // ---- helpers ----
 function now() { return Date.now() }
-function getCookie(name) {
-  const m = document.cookie.match(new RegExp('(?:^|; )' + name.replace(/([.$?*|{}()\[\]\\/+^])/g, '\\$1') + '=([^;]*)'))
-  return m ? decodeURIComponent(m[1]) : null
-}
+// no cookies — use localStorage via storage util
 function onReady(fn) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn, { once: true })
   else fn()
@@ -165,7 +163,7 @@ function setupEngagementMeters() {
 // ---- Identify (post-login, using email as distinct_id) ----
 async function identifyOnAuthIfPossible() {
   try {
-    const hasAuth = !!getCookie('authToken')
+    const hasAuth = !!storageGet('authToken')
     if (!hasAuth) return
 
     // await API_URLS presence (apiUrls.js is loaded after analytics.js on pages)
@@ -182,7 +180,7 @@ async function identifyOnAuthIfPossible() {
     const res = await fetch(`${api.USER}info/`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${getCookie('authToken')}`,
+        'Authorization': `Bearer ${storageGet('authToken')}`,
         'Accept': 'application/json'
       }
     })
@@ -198,7 +196,7 @@ async function identifyOnAuthIfPossible() {
       posthog.register({ user_email: email, user_name: name, user_credits: credits })
       posthog.capture('login_identified', {
         path: location.pathname,
-        onboarding_cookie: (getCookie('onboardingComplete') || null),
+        onboarding_cookie: (storageGet('onboardingComplete') || null),
       })
     }
   } catch {}

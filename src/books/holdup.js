@@ -1,9 +1,5 @@
 // holdup.js
-
-function getCookie(name) {
-  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return m ? decodeURIComponent(m[2]) : null;
-}
+import { getItem as storageGet } from '../storage.js';
 function slugify(s) {
   return String(s || '')
     .toLowerCase()
@@ -154,7 +150,7 @@ export class HoldupManager {
   }
   
   async _generateToken({ roomName, metadata }) {
-    const token = getCookie('authToken');
+    const token = storageGet('authToken');
     if (!token) throw new Error('Missing auth token');
     const base = window.API_URLS?.BASE;
     if (!base) throw new Error('Missing window.API_URLS.BASE');

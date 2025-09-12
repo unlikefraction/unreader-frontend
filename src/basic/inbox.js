@@ -1,3 +1,5 @@
+import { getItem as storageGet } from '../storage.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const inboxIcon   = document.querySelector('.inbox');
   const inboxPopup  = document.querySelector('.inboxPopup');
@@ -16,16 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let sending = false;
 
   // ---- helpers -------------------------------------------------------------
-  function getCookie(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop().split(';').shift();
-    return null;
-  }
-
   function authHeaders() {
-    const token = getCookie('authToken');
-    if (!token) printWarning('[Inbox] Missing auth token cookie: authToken');
+    const token = storageGet('authToken');
+    if (!token) printWarning('[Inbox] Missing auth token: authToken');
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json'

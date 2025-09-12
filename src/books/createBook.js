@@ -1,3 +1,5 @@
+import { getItem as storageGet } from '../storage.js';
+
 /*******************************
  * Unreader — Add a Book (createBook.js)
  *******************************/
@@ -7,12 +9,6 @@
 ===================================*/
 // Use API_URLS from global (populated by src/apiUrls.js)
 const API_URLS = (typeof window !== 'undefined' && window.API_URLS) ? window.API_URLS : {};
-function getCookie(name) {
-  // Escape special regex characters in the cookie name
-  const escaped = name.replace(/([.*+?^${}()|[\]\\])/g, "\\$1");
-  const match = document.cookie.match(new RegExp("(?:^|; )" + escaped + "=([^;]*)"));
-  return match ? decodeURIComponent(match[1]) : null;
-}
 
 function debounce(fn, delay) {
   let t;
@@ -178,7 +174,7 @@ function deriveSearchTextFromMetadata(meta, fallbackNameNoExt) {
 }
 
 async function handleUpload(file) {
-  const token = getCookie("authToken");
+  const token = storageGet("authToken");
   if (!token) {
     alert("You're not logged in. Please log in first.");
     return;
@@ -258,7 +254,7 @@ const ACCEPTED_IMAGE_TYPES = [
 const MAX_COVER_BYTES = 10 * 1024 * 1024; // 10MB
 
 async function uploadCoverImage(file) {
-  const token = getCookie("authToken");
+  const token = storageGet("authToken");
   if (!token) {
     alert("You're not logged in. Please log in first.");
     return null;
@@ -602,7 +598,7 @@ function selectBook(book, el) {
 /* Check if the selected Google Books ID already exists; if so, use its title & cover */
 async function checkAndApplyExistingBook(googleBooksId) {
   try {
-    const token = getCookie("authToken");
+    const token = storageGet("authToken");
     const headers = {};
     if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -800,7 +796,7 @@ function renderOathCopy() {
 takeOathBtn.addEventListener("click", createBookOnBackend);
 
 async function createBookOnBackend() {
-  const token = getCookie("authToken");
+  const token = storageGet("authToken");
   if (!token) {
     alert("Please log in to continue.");
     return;

@@ -1,11 +1,9 @@
+import { getItem as storageGet } from '../storage.js';
+
 document.addEventListener("DOMContentLoaded", () => {
   /* ===========================
      Helpers
      =========================== */
-  function getCookie(name) {
-    const match = document.cookie.match(new RegExp("(^|;\\s*)" + name + "=([^;]*)"));
-    return match ? decodeURIComponent(match[2]) : null;
-  }
 
   async function postJSON(url, payload, token) {
     const res = await fetch(url, {
@@ -456,7 +454,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       clearInlineError();
 
-      const token = getCookie("authToken");
+      const token = storageGet("authToken");
       if (!token) {
         openStatusModal({ status: "unauthorized", message: "Please sign in to continue.", mode: "payment" });
         return;

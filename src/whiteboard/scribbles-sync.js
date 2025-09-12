@@ -2,28 +2,13 @@
 // Handles syncing whiteboard scribbles to backend while keeping localStorage fast.
 
 import { saveShapesData, loadShapesData, defaultShapesData } from './storage.js';
-
-function getCookie(name) {
-  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return m ? decodeURIComponent(m[2]) : null;
-}
-function setCookie(name, value, { days = 365, path = '/' } = {}) {
-  try {
-    const maxAge = days ? days * 24 * 60 * 60 : undefined;
-    const parts = [
-      `${name}=${encodeURIComponent(String(value))}`,
-      path ? `Path=${path}` : null,
-      maxAge ? `Max-Age=${maxAge}` : null,
-    ].filter(Boolean);
-    document.cookie = parts.join('; ');
-  } catch {}
-}
+import { getItem as storageGet } from '../storage.js';
 function getBookIdFromUrl() {
   try { return new URL(window.location.href).searchParams.get('id'); } catch { return null; }
 }
 function cookieKeyForUpdatedAt(bookId) { return `scribbles_updated_at_${bookId}`; }
-function getLocalUpdatedAt(bookId) { return bookId ? getCookie(cookieKeyForUpdatedAt(bookId)) : null; }
-function setLocalUpdatedAt(bookId, iso) { if (bookId && iso) setCookie(cookieKeyForUpdatedAt(bookId), iso, { days: 365 }); }
+function getLocalUpdatedAt(bookId) { try { return bookId ? localStorage.getItem(cookieKeyForUpdatedAt(bookId)) : null; } catch { return null; } }
+function setLocalUpdatedAt(bookId, iso) { try { if (bookId && iso) localStorage.setItem(cookieKeyForUpdatedAt(bookId), iso); } catch {} }
 function isNonEmptyObject(v) {
   return !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0;
 }
@@ -33,7 +18,7 @@ function withDefaults(shapes) {
 }
 
 async function fetchRemoteScribbles(userBookId) {
-  const token = getCookie('authToken');
+  const token = storageGet('authToken');
   if (!token) return null;
   const base = window.API_URLS?.BOOK;
   if (!base || !userBookId) return null;
@@ -51,7 +36,7 @@ async function fetchRemoteScribbles(userBookId) {
 }
 
 async function pushRemoteScribbles(userBookId, scribbles) {
-  const token = getCookie('authToken');
+  const token = storageGet('authToken');
   if (!token) return false;
   const base = window.API_URLS?.BOOK;
   if (!base || !userBookId) return false;
@@ -73,7 +58,7 @@ async function pushRemoteScribbles(userBookId, scribbles) {
 
 function beaconPushScribbles(userBookId, scribbles) {
   try {
-    const token = getCookie('authToken');
+    const token = storageGet('authToken');
     const base = window.API_URLS?.BOOK;
     if (!navigator.sendBeacon || !token || !base || !userBookId) return false;
     const url = `${base}update/${encodeURIComponent(userBookId)}/`;
@@ -106,7 +91,7 @@ export function initScribblesSync({ getData, setData, debounceMs = 0 } = {}) {
   // Debug polling: fetch scribbles JSON every 5s and log
   try {
     const pollBase = window.API_URLS?.BOOK;
-    const token = getCookie('authToken');
+    const token = storageGet('authToken');
     // Explicit opt-in to avoid background churn in production
     const debugEnabled = window.__SCRIBBLES_DEBUG_POLL === true;
     // Avoid stacking debug pollers if init is called again (dev/HMR)
@@ -169,7 +154,7 @@ export function initScribblesSync({ getData, setData, debounceMs = 0 } = {}) {
   // Try to flush on page hide
   async function pushWithKeepalive() {
     try {
-      const token = getCookie('authToken');
+      const token = storageGet('authToken');
       const base = window.API_URLS?.BOOK;
       const id = getBookIdFromUrl();
       if (!token || !base || !id) return false;

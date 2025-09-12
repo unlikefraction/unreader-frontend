@@ -1,4 +1,5 @@
 import { unskelton, printError } from '../utils.js';
+import { getItem as storageGet } from '../storage.js';
 
 window.addEventListener("DOMContentLoaded", () => {
   // DOM refs
@@ -10,7 +11,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // our books array (will be filled via fetch)
   let books = [];
 
-  function getCookie(name) { const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)')); return m ? decodeURIComponent(m[2]) : null; }
+  // no cookies — use localStorage via storage util
 
 
   // ----- Greeting text -----
@@ -91,7 +92,7 @@ window.addEventListener("DOMContentLoaded", () => {
   searchInput?.addEventListener("input", handleSearch);
 
   // fetch your books from the API
-  const token = getCookie("authToken");
+  const token = storageGet("authToken");
   fetch(`${window.API_URLS.BOOK}my-books/`, {
     headers: {
       "Authorization": `Bearer ${token}`,

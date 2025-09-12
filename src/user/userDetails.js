@@ -1,30 +1,13 @@
-/**
- * Read a cookie value by name.
- * @param {string} name
- * @returns {string|null}
- */
-function getCookie(name) {
-  const match = document.cookie.match(new RegExp('(?:^|; )' +
-    name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') + '=([^;]*)'));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-/**
- * Delete a cookie by name.
- * @param {string} name
- */
-function deleteCookie(name) {
-  document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
-}
+import { getItem as storageGet, removeItem as storageRemove } from '../storage.js';
 
 /**
  * Fetch the current user’s info from the backend using a Bearer token from cookies.
  * @returns {Promise<Object>} Resolves to the user info JSON.
  */
 async function fetchUserInfo() {
-  const token = getCookie('authToken');
+  const token = storageGet('authToken');
   if (!token) {
-    throw new Error('No authToken cookie found – you need to be logged in.');
+    throw new Error('No auth token found – you need to be logged in.');
   }
 
   const url = `${window.API_URLS.USER}info/`;
@@ -39,7 +22,7 @@ async function fetchUserInfo() {
 
   if (res.status === 401) {
     // Token is invalid or expired
-    deleteCookie('authToken');
+    storageRemove('authToken');
     throw new Error('Unauthorized. authToken deleted. Please log in again.');
   }
 

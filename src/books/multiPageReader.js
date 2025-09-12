@@ -1,5 +1,6 @@
 import { AudioSystem } from './audioAndTextGen.js';
 import { ReadAlong } from '../audio/read-along.js';
+import { setItem as storageSet, getItem as storageGet } from '../storage.js';
 
 function slugify(s) {
   return String(s).toLowerCase()
@@ -12,11 +13,7 @@ function rIC(fn, timeout = 50) {
   const ric = window.requestIdleCallback || ((cb) => setTimeout(() => cb({ timeRemaining: () => 0, didTimeout: true }), timeout));
   return ric(fn, { timeout });
 }
-function getCookie(name) { const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)')); return m ? decodeURIComponent(m[2]) : null; }
-function setCookie(name, value, days = 365) {
-  const d = new Date(); d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${d.toUTCString()}; path=/; SameSite=Lax`;
-}
+// no cookies — use localStorage via storage util
 function qs(name, url = window.location.href) { try { return new URL(url).searchParams.get(name); } catch { return null; } }
 
 /* ---------- transcript normalizer ---------- */
@@ -100,15 +97,15 @@ export default class MultiPageReader {
     };
   }
 
-  /* ---------- cookies ---------- */
+  /* ---------- persisted progress ---------- */
   _cookieKey() { const id = this.userBookId || 'book'; return `mpr_last_played_${id}`; }
   _saveLastPlayedCookie(pageIndex, seconds) {
     if (pageIndex < 0 || pageIndex >= this.pageMeta.length) return;
     const pn = this.pageMeta[pageIndex]?.page_number ?? pageIndex;
     const payload = { page_number: pn, seconds: Math.max(0, Number(seconds) || 0), at: Date.now() };
-    setCookie(this._cookieKey(), JSON.stringify(payload), 365);
+    storageSet(this._cookieKey(), JSON.stringify(payload), 365);
   }
-  _readLastPlayedCookie() { const raw = getCookie(this._cookieKey()); if (!raw) return null; try { return JSON.parse(raw); } catch { return null; } }
+  _readLastPlayedCookie() { const raw = storageGet(this._cookieKey()); if (!raw) return null; try { return JSON.parse(raw); } catch { return null; } }
   _mapPageNumberToIndex(pn) { const idx = this.pageMeta.findIndex(p => p.page_number === pn); return idx === -1 ? 0 : idx; }
   _stopProgressTimer() { if (this._progressTimer) { clearInterval(this._progressTimer); this._progressTimer = null; } }
   _startProgressTimer() {
@@ -287,7 +284,7 @@ export default class MultiPageReader {
 
   async _regeneratePageAudio(pageIndex) {
     const meta = this.pageMeta[pageIndex]; if (!meta) return;
-    const token = getCookie('authToken');
+    const token = storageGet('authToken');
     const pageId = slugify(meta.pageKey || `page-${meta.page_number}-${pageIndex}`);
     const header = document.getElementById(`pageHeader-${pageId}`);
     const regenEl = header?.querySelector?.('.regenerateAudio');
@@ -707,7 +704,7 @@ export default class MultiPageReader {
     if (meta._polling) return null;
     meta._polling = true;
 
-    const token = getCookie('authToken');
+    const token = storageGet('authToken');
     const url = `${this.audioApiBase}book/${encodeURIComponent(this.userBookId)}/page/${encodeURIComponent(meta.page_number)}/`;
 
     const fetchOnce = async () => {

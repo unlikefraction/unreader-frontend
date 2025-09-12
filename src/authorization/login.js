@@ -1,5 +1,6 @@
 // login.js
 import { printError } from '../utils.js';
+import { setItem as storageSet } from '../storage.js';
 
 // ---------- CONFIG ----------
 const GOOGLE_CLIENT_ID     = "814413323140-tmvrg2ad3bhe7j35h1v58v5hrkl311tg.apps.googleusercontent.com";
@@ -49,15 +50,9 @@ function generateUUID() {
   });
 }
 
-/** Set the authToken cookie */
-function setAuthCookie(tokenValue, daysToExpire) {
-  let expires = "";
-  if (daysToExpire) {
-    const date = new Date();
-    date.setTime(date.getTime() + daysToExpire * 24 * 60 * 60 * 1000);
-    expires = "; expires=" + date.toUTCString();
-  }
-  document.cookie = `authToken=${tokenValue || ""}${expires}; path=/; SameSite=Lax; Secure`;
+/** Persist auth token in localStorage (default 30d TTL) */
+function setAuthToken(tokenValue, daysToExpire = 30) {
+  storageSet('authToken', tokenValue || '', daysToExpire);
 }
 
 
@@ -103,20 +98,20 @@ function loginWithApple() {
 
       if (res.status === 200) {
         const { token, is_new_user, user } = await res.json();
-        setAuthCookie(token, 30);
+        setAuthToken(token, 30);
         clearInterval(intervalId);
         if (popup && !popup.closed) popup.close();
 
         if (is_new_user) {
           // First-time login — onboarding incomplete
-          document.cookie = `onboardingComplete=false; path=/; SameSite=Lax; Secure`;
+          storageSet('onboardingComplete', 'false');
 
           // Redeem welcome coupon for new users, then go to setup
           await redeemWelcomeCoupon(token);
           window.location.href = "accountSetup.html";
         } else {
           // Returning user — assume onboarding already complete
-          document.cookie = `onboardingComplete=true; path=/; SameSite=Lax; Secure`;
+          storageSet('onboardingComplete', 'true');
           window.location.href = "home.html";
         }
 

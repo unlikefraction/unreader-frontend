@@ -2,6 +2,7 @@
 import MultiPageReader from './multiPageReader.js';
 import { HoldupManager } from './holdup.js';
 import { unskelton } from '../utils.js';
+import { getItem as storageGet } from '../storage.js';
 
 /** tiny silent WAV as a stub until real audio arrives */
 function createSilentWavDataUrl(durationSec = 0.2, sampleRate = 16000) {
@@ -20,10 +21,6 @@ const DEFAULT_AUDIO_FILE  = createSilentWavDataUrl(0.2, 16000);
 const DEFAULT_TIMING_FILE = '/order/word_timings_ordered_1.json';
 const DEFAULT_OFFSET_MS   = 100;
 
-function getCookie(name) {
-  const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return m ? decodeURIComponent(m[2]) : null;
-}
 function getQueryParam(name, url = window.location.href) {
   try { return new URL(url).searchParams.get(name); } catch { return null; }
 }
@@ -32,7 +29,7 @@ function blobUrlForHtml(html) {
   return URL.createObjectURL(blob);
 }
 async function fetchBook(userBookId) {
-  const token = getCookie('authToken');
+  const token = storageGet('authToken');
   if (!token) throw new Error('Missing auth token');
   if (!window.API_URLS?.BOOK) throw new Error('Missing window.API_URLS.BOOK');
   const url = `${window.API_URLS.BOOK}get-details/${encodeURIComponent(userBookId)}/`;

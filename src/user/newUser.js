@@ -1,26 +1,4 @@
-// ----------------------------
-// Cookie helpers
-// ----------------------------
-function setCookie(name, value, days = 365) {
-    const expires = new Date(Date.now() + days*24*60*60*1000).toUTCString();
-    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-  }
-  
-  function getCookie(name) {
-    const pairs = document.cookie ? document.cookie.split(/;\s*/) : [];
-    for (const p of pairs) {
-      const idx = p.indexOf("=");
-      if (idx === -1) continue;
-      const k = decodeURIComponent(p.slice(0, idx));
-      if (k === name) return decodeURIComponent(p.slice(idx + 1));
-    }
-    return null;
-  }
-  
-  
-  function deleteCookie(name) {
-    document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`;
-  }
+import { getItem as storageGet, setItem as storageSet, removeItem as storageRemove } from '../storage.js';
   
   // ----------------------------
   // Utilities
@@ -53,7 +31,7 @@ function setCookie(name, value, days = 365) {
   // API calls
   // ----------------------------
   async function loadUserInfo() {
-    const token = getCookie('authToken');
+    const token = storageGet('authToken');
     const url = `${window.API_URLS.USER}info/`;
   
     // If logged-out, just wire up the UI
@@ -90,7 +68,7 @@ function setCookie(name, value, days = 365) {
   }
   
   async function updateUserInfo(name) {
-    const token = getCookie('authToken');
+    const token = storageGet('authToken');
     const url = `${window.API_URLS.USER}update/`;
   
     // If not logged in, we still allow anonymous update (per your earlier flow)
@@ -105,7 +83,7 @@ function setCookie(name, value, days = 365) {
   
     if (res.status === 401 && token) {
       printError('⚠️ Token unauthorized. Deleting credentials and retrying anonymously.');
-      deleteCookie('authToken');
+      storageRemove('authToken');
   
       res = await fetch(url, {
         method: 'POST',
@@ -120,11 +98,11 @@ function setCookie(name, value, days = 365) {
   
     const data = await res.json();
   
-    // Set onboarding cookie if not set
-    const onboardingStatus = getCookie('onboardingComplete');
+    // Persist onboardingComplete in localStorage if not set
+    const onboardingStatus = storageGet('onboardingComplete');
     if (onboardingStatus !== 'true') {
-      setCookie('onboardingComplete', 'true');
-      printl('🎉 onboardingComplete cookie set.');
+      storageSet('onboardingComplete', 'true');
+      printl('🎉 onboardingComplete stored.');
     }
   
     return data;

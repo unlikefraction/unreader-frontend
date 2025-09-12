@@ -1,18 +1,8 @@
 // bookDetails.js
 import { unskelton } from '../utils.js';
+import { getItem as storageGet } from '../storage.js';
 
 // === Utility ===
-function getCookie(name) {
-  const cookie = document.cookie
-    .split('; ')
-    .find(row => row.startsWith(name + '='));
-  return cookie ? decodeURIComponent(cookie.split('=')[1]) : null;
-}
-function setCookie(name, value, days = 30) {
-  const d = new Date();
-  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
-  document.cookie = `${name}=${encodeURIComponent(value)};expires=${d.toUTCString()};path=/`;
-}
 function debounce(fn, delay) {
   let t;
   return (...args) => {
@@ -282,32 +272,24 @@ function wireInlineTitleEditing({ container, initialTitle, onCommit }) {
   };
 }
 
-// === Thoughts autosave (cookie ~2s, backend ~10s, and on any click) ===
+// === Thoughts autosave (localStorage ~2s, backend ~10s, and on any click) ===
 function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText = "" }) {
   const cookieKey = `ub_thoughts_${userBookId}`;
 
-  // Prefer cookie/localStorage if exists; else server text
-  let cacheVal = getCookie(cookieKey);
-  if (cacheVal === null || cacheVal === undefined) {
-    cacheVal = localStorage.getItem(cookieKey);
-  }
+  // Prefer localStorage if exists; else server text
+  let cacheVal = localStorage.getItem(cookieKey);
   textarea.value = (cacheVal !== null && cacheVal !== undefined) ? cacheVal : (initialServerText || "");
 
   let dirty = false;
   let lastSent = textarea.value;
   let syncing = false;
 
-  const saveCookie = () => {
+  const saveLocal = () => {
     try {
-      if (textarea.value.length > 3000) {
-        localStorage.setItem(cookieKey, textarea.value);
-      } else {
-        setCookie(cookieKey, textarea.value, 30);
-        localStorage.removeItem(cookieKey); // keep one source
-      }
+      localStorage.setItem(cookieKey, textarea.value);
     } catch {/* ignore */}
   };
-  const debouncedCookie = debounce(saveCookie, 2000);
+  const debouncedCookie = debounce(saveLocal, 2000);
 
   textarea.addEventListener("input", () => {
     dirty = true;
@@ -336,7 +318,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
   document.addEventListener("click", clickHandler, true);
 
   window.addEventListener("beforeunload", () => {
-    saveCookie();
+    saveLocal();
     if (token) {
       const payload = JSON.stringify({ thoughts: textarea.value });
       navigator.sendBeacon?.(
@@ -359,7 +341,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
 (async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const userBookId = urlParams.get('id');
-  const token = getCookie("authToken");
+  const token = storageGet("authToken");
 
   if (!userBookId || !token) {
     printError("Missing userBookId or authToken");

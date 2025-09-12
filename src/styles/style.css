@@ -667,7 +667,8 @@ nav a{
   display: flex;
   border-radius: 50%;
   background: #fff;
-  margin-left: -1.6rem;
+  margin-left: 0.5rem;
+  margin-top: 1.1rem;
   text-align: center;
   cursor: pointer;
 }
