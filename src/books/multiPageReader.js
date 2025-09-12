@@ -701,7 +701,19 @@ export default class MultiPageReader {
     if (!meta) return null;
     if (!this.audioApiBase || !this.userBookId) { printWarning('⚠️ Missing audio API base or userBookId.'); return null; }
     if (meta._audioSettled && meta._readyAudioUrl) return meta._readyAudioUrl;
-    if (meta._polling) return null;
+
+    // If a poll is already in-flight (e.g., due to prefetch), reuse it so we can still
+    // surface the generating notice for the active page rather than bailing out.
+    if (meta._pollPromise) {
+      if (showNotice && i === this.active) {
+        const pageNo = this.pageMeta[i]?.page_number ?? (i + 1);
+        this._showGeneratingNotice(pageNo);
+        // Ensure the notice hides when the in-flight poll resolves
+        try { meta._pollPromise.finally(() => this._hideGeneratingNotice()); } catch {}
+      }
+      try { return await meta._pollPromise; } catch { return null; }
+    }
+
     meta._polling = true;
 
     const token = storageGet('authToken');
@@ -718,6 +730,9 @@ export default class MultiPageReader {
     };    
 
     let noticeShown = false;
+    // Create a single shared promise per page to dedupe polling and allow callers to await
+    // the same result (and attach UI like generating notice).
+    meta._pollPromise = (async () => {
     try {
       while (true) {
         if (this._destroyed) return null;
@@ -753,8 +768,11 @@ export default class MultiPageReader {
       return null;
     } finally {
       meta._polling = false;
-      if (noticeShown) this._hideGeneratingNotice();
+      try { if (noticeShown) this._hideGeneratingNotice(); } catch {}
     }
+    })();
+
+    try { return await meta._pollPromise; } finally { meta._pollPromise = null; }
   }
 
   _swapAudioUrl(i, audioUrl) {
