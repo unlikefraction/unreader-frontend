@@ -663,13 +663,13 @@ nav a{
 }
 
 .paragraph-hover-nav {
+  position: relative;
   display: flex;
   border-radius: 50%;
   background: #fff;
   margin-left: -1.6rem;
   text-align: center;
   cursor: pointer;
-  margin-top: 1.2rem;
 }
 
 .paragraph-hover-nav i{
@@ -976,6 +976,8 @@ mark{
 /* paragraph spacing */
 .mainContent p {
   margin: 16px 0;
+  padding: 4px 0px 4px 30px; /* bigger hover area without moving icon */
+  margin-left: -30px;
 }
 
 /* if the source uses <br> for paragraphs, give them vertical gap */

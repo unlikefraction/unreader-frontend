@@ -259,190 +259,114 @@ export class ParagraphSeeker {
     return this.findParagraphBoundaries().map(p => p.text.trim()).filter(Boolean);
   }
 
-  // ---------- paragraph hover UI (container-scoped, multi-page safe) ----------
+  // ---------- paragraph hover UI: shared play icon on <p> ----------
 
   setupParagraphHoverNavigation() {
     const main = this.textProcessor?.container;
     if (!main) return;
 
-    // ensure relative positioning so our absolute children are local to this page only
+    // Ensure local positioning for absolute children
     if (getComputedStyle(main).position === 'static') {
       main.style.position = 'relative';
     }
 
-    // remove only *this page's* hover UI
+    // Remove page-scoped UI
     main.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
 
-    // cache paragraphs and corresponding hover elements for rAF-throttled updates
-    this._paragraphs = this.findParagraphBoundaries();
-    this._hoverAreas = [];
-    this._hoverDivs = [];
-    this._posUpdateScheduled = false;
-
-    this._paragraphs.forEach((p, i) => this.setupParagraphHover(p, i));
-
-    this.setupDynamicUpdates();
-
-    // Observe DOM changes to rebuild paragraph map lazily
-    try {
-      this._mo?.disconnect?.();
-      this._mo = new MutationObserver(() => this._scheduleRefresh());
-      this._mo.observe(main, { subtree: true, childList: true, characterData: true });
-    } catch {}
-  }
-
-  setupParagraphHover(paragraph, index) {
-    const main = this.textProcessor?.container;
-    if (!main || !paragraph.elements.length) return;
-
-    const first = paragraph.elements[0];
-
-    // Invisible hit area spanning the paragraph block (within this page only)
-    const hoverArea = document.createElement('div');
-    Object.assign(hoverArea.style, {
-      position: 'absolute',
-      zIndex: 1,
-      background: 'transparent',
-      // make it hoverable immediately unless actively editing
-      pointerEvents: commonVars.beingEdited ? 'none' : 'auto',
-      cursor: commonVars.toolActive ? 'crosshair' : 'text'
-    });
-    hoverArea.className = 'paragraph-hover-area';
-    hoverArea.dataset.pageId = this.textProcessor.pageId; // scope tagging
-
-    main.appendChild(hoverArea);
-    this._hoverAreas[index] = hoverArea;
-    this.updateHoverAreaPosition(hoverArea, paragraph);
-
-    // When user presses to select text, let the real content take the events.
-    // We flip pointer events OFF on down; global mouseup/touchend flips it back ON.
-    const dropThrough = () => { hoverArea.style.pointerEvents = 'none'; };
-    hoverArea.addEventListener('mousedown', dropThrough);
-    hoverArea.addEventListener('touchstart', dropThrough, { passive: true });
-
-    // Visible “play” chip
-    const hoverDiv = document.createElement('div');
-    hoverDiv.className = 'paragraph-hover-nav';
-    Object.assign(hoverDiv.style, {
+    // Create single shared play icon element
+    this._playIcon = document.createElement('div');
+    this._playIcon.className = 'paragraph-hover-nav';
+    Object.assign(this._playIcon.style, {
       display: 'none',
       position: 'absolute',
       zIndex: 2,
       cursor: commonVars.toolActive ? 'crosshair' : 'pointer',
       pointerEvents: commonVars.beingEdited ? 'none' : 'auto'
     });
-    if (commonVars.toolActive) hoverDiv.style.visibility = 'hidden';
+    if (commonVars.toolActive) this._playIcon.style.visibility = 'hidden';
+    this._playIcon.innerHTML = '<i class="ph ph-play"></i>';
+    this._playIcon.dataset.pageId = this.textProcessor.pageId;
 
-    hoverDiv.innerHTML = '<i class="ph ph-play"></i>';
-    hoverDiv.dataset.paragraphIndex = index;
-
-    // 🔑 carry page + full paragraph text for the orchestrator
-    hoverDiv.dataset.pageId = this.textProcessor.pageId;
-    hoverDiv.dataset.paragraphText = paragraph.text.trim();
-
-    // hover show/hide
-    hoverArea.addEventListener('mouseenter', () => this.showHoverDiv(hoverDiv, first, paragraph));
-    hoverArea.addEventListener('mouseleave', e => {
-      if (!hoverDiv.contains(e.relatedTarget)) this.hideHoverDiv(hoverDiv);
-    });
-    hoverDiv.addEventListener('mouseenter', () => this.showHoverDiv(hoverDiv, first, paragraph));
-    hoverDiv.addEventListener('mouseleave', e => {
-      if (!hoverArea.contains(e.relatedTarget)) this.hideHoverDiv(hoverDiv);
-    });
-
-    // local click (still works single-page); reader will also intercept globally
-    hoverDiv.addEventListener('click', async e => {
+    // Handle icon click -> play paragraph
+    this._playIcon.addEventListener('click', async e => {
       e.preventDefault();
-      if (commonVars.beingEdited) return;
-      const result = await this.seekToParagraph(paragraph.text);
+      e.stopPropagation();
+      if (commonVars.beingEdited || commonVars.toolActive) return;
+      const text = this._currentParagraphText?.trim();
+      if (!text) return;
+      // Ensure timings and audio exist when not under MultiPageReader
+      try { if (!this.textProcessor?.wordTimings?.length && typeof this.textProcessor?.loadWordTimings === 'function') await this.textProcessor.loadWordTimings(); } catch {}
+      try { if (!this.audioCore?.sound && this.audioCore?.setupAudio) this.audioCore.setupAudio(); } catch {}
+      const result = await this.seekToParagraph(text);
       if (result.success && this.audioCore && !this.audioCore.isPlaying) {
         await this.audioCore.playAudio();
       }
     });
 
-    main.appendChild(hoverDiv);
-    this._hoverDivs[index] = hoverDiv;
+    // Keep visible while hovering icon
+    this._playIcon.addEventListener('mouseenter', () => { this._iconHovering = true; });
+    this._playIcon.addEventListener('mouseleave', () => { this._iconHovering = false; this._scheduleHideIcon(); });
+
+    main.appendChild(this._playIcon);
+
+    // Bind events to <p> elements
+    this._bindParagraphEvents();
+
+    // Observe DOM changes to rebind efficiently
+    try {
+      this._mo?.disconnect?.();
+      this._mo = new MutationObserver(() => this._scheduleRebind());
+      this._mo.observe(main, { subtree: true, childList: true, characterData: true });
+    } catch {}
   }
 
-  updateHoverAreaPosition(hoverArea, paragraph) {
+  _bindParagraphEvents() {
     const main = this.textProcessor?.container;
     if (!main) return;
 
-    const firstRect = paragraph.elements[0].getBoundingClientRect();
-    const lastRect = paragraph.elements[paragraph.elements.length - 1].getBoundingClientRect();
-    const containerRect = main.getBoundingClientRect();
-
-    // position relative to the page container
-    const left = Math.min(firstRect.left, lastRect.left) - containerRect.left - 25;
-    const top = Math.min(firstRect.top, lastRect.top) - containerRect.top;
-    const height = Math.max(firstRect.bottom, lastRect.bottom) - Math.min(firstRect.top, lastRect.top);
-    const rightMost = Math.max(firstRect.right, lastRect.right);
-    const width = Math.min(700, Math.max(200, rightMost - containerRect.left + 50));
-
-    hoverArea.style.left = `${left}px`;
-    hoverArea.style.top = `${top}px`;
-    hoverArea.style.width = `${width}px`;
-    hoverArea.style.height = `${height}px`;
-  }
-
-  showHoverDiv(hoverDiv, firstElement, paragraph) {
-    const main = this.textProcessor?.container;
-    if (!main) return;
-
-    const rect = firstElement.getBoundingClientRect();
-    const containerRect = main.getBoundingClientRect();
-
-    hoverDiv.style.left = `${rect.left - containerRect.left - 10}px`;
-    hoverDiv.style.top = `${rect.top - containerRect.top}px`;
-    hoverDiv.style.display = 'block';
-    hoverDiv.style.visibility = commonVars.toolActive ? 'hidden' : 'visible';
-    hoverDiv.style.cursor = commonVars.toolActive ? 'crosshair' : 'pointer';
-    hoverDiv.dataset.paragraphLength = paragraph.elements.length;
-    hoverDiv.dataset.paragraphPreview = paragraph.text.substring(0, 100);
-  }
-
-  hideHoverDiv(hoverDiv) {
-    // Use the paired hover area (same paragraph index) instead of closest()
-    // because the hover div is a sibling, not a descendant, of the area.
-    const idx = Number(hoverDiv.dataset.paragraphIndex);
-    const area = Array.isArray(this._hoverAreas) ? this._hoverAreas[idx] : null;
-    setTimeout(() => {
-      const stillHovering = hoverDiv.matches(':hover') || (area && area.matches?.(':hover'));
-      if (!stillHovering) {
-        hoverDiv.style.display = 'none';
-      }
-    }, 50);
-  }
-
-  enableParagraphNavigation() {
-    this.setupParagraphHoverNavigation();
-    printl?.('✅ Paragraph hover navigation enabled (scoped to page)');
-  }
-
-  disableParagraphNavigation() {
-    const main = this.textProcessor?.container;
-    if (main) main.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
-    if (this.scrollListener) window.removeEventListener('scroll', this.scrollListener);
-    if (this.resizeListener) window.removeEventListener('resize', this.resizeListener);
-    try { this._mo?.disconnect?.(); } catch {}
-    printl?.('❌ Paragraph hover navigation disabled (page-scoped)');
-  }
-
-  setupDynamicUpdates() {
-    this.scrollListener = () => this._schedulePositionsUpdate();
-    this.resizeListener = () => this._schedulePositionsUpdate();
-    window.addEventListener('scroll', this.scrollListener, { passive: true });
-    window.addEventListener('resize', this.resizeListener, { passive: true });
-  }
-
-  updateAllHoverAreas() {
-    const main = this.textProcessor?.container;
-    if (!main) return;
-
-    if (!Array.isArray(this._paragraphs) || !this._paragraphs.length) return;
-    this._hoverAreas?.forEach((area, idx) => {
-      const p = this._paragraphs[idx];
-      if (area && p) this.updateHoverAreaPosition(area, p);
+    // Cleanup previous listeners
+    this._paragraphListeners?.forEach(({ el, enter, leave }) => {
+      try { el.removeEventListener('mouseenter', enter); } catch {}
+      try { el.removeEventListener('mouseleave', leave); } catch {}
     });
+    this._paragraphListeners = [];
+
+    const paras = Array.from(main.querySelectorAll('p'));
+    paras.forEach(p => {
+      const enter = () => this._showIconForParagraph(p);
+      const leave = () => this._scheduleHideIcon();
+      p.addEventListener('mouseenter', enter);
+      p.addEventListener('mouseleave', leave);
+      this._paragraphListeners.push({ el: p, enter, leave });
+    });
+
+    printl?.(`🧭 ParagraphSeeker: bound to ${paras.length} <p> elements`);
+  }
+
+  _showIconForParagraph(pEl) {
+    const main = this.textProcessor?.container;
+    if (!main || !this._playIcon) return;
+    const rect = pEl.getBoundingClientRect();
+    const cr = main.getBoundingClientRect();
+  this._currentParagraphEl = pEl;
+  this._currentParagraphText = pEl.textContent || '';
+  this._playIcon.style.left = `${rect.left - cr.left - 14}px`;
+  this._playIcon.style.top = `${rect.top - cr.top + 6}px`;
+  this._playIcon.style.visibility = commonVars.toolActive ? 'hidden' : 'visible';
+  this._playIcon.style.cursor = commonVars.toolActive ? 'crosshair' : 'pointer';
+  this._playIcon.style.pointerEvents = commonVars.beingEdited ? 'none' : 'auto';
+  this._playIcon.style.display = 'block';
+  // Expose paragraph text for global delegator in MultiPageReader
+  this._playIcon.dataset.paragraphText = this._currentParagraphText.trim();
+  }
+
+  _scheduleHideIcon() {
+    clearTimeout(this._hideTO);
+    this._hideTO = setTimeout(() => {
+      if (this._iconHovering) return;
+      const overP = this._currentParagraphEl?.matches?.(':hover');
+      if (!overP && this._playIcon) this._playIcon.style.display = 'none';
+    }, 60);
   }
 
   refreshParagraphNavigation() {
@@ -450,17 +374,32 @@ export class ParagraphSeeker {
     this.enableParagraphNavigation();
   }
 
-  _schedulePositionsUpdate() {
-    if (this._posUpdateScheduled) return;
-    this._posUpdateScheduled = true;
-    requestAnimationFrame(() => {
-      try { this.updateAllHoverAreas(); } finally { this._posUpdateScheduled = false; }
-    });
+  _scheduleRebind() {
+    clearTimeout(this._rebindTO);
+    this._rebindTO = setTimeout(() => this._bindParagraphEvents(), 80);
   }
 
-  _scheduleRefresh() {
-    clearTimeout(this._refreshTO);
-    this._refreshTO = setTimeout(() => this.refreshParagraphNavigation(), 60);
+  enableParagraphNavigation() {
+    this.setupParagraphHoverNavigation();
+    printl?.('✅ Paragraph hover navigation enabled (p-hover, shared icon)');
+  }
+
+  disableParagraphNavigation() {
+    const main = this.textProcessor?.container;
+    if (main) main.querySelectorAll('.paragraph-hover-nav, .paragraph-hover-area').forEach(el => el.remove());
+    try { this._mo?.disconnect?.(); } catch {}
+    // remove paragraph listeners
+    this._paragraphListeners?.forEach(({ el, enter, leave }) => {
+      try { el.removeEventListener('mouseenter', enter); } catch {}
+      try { el.removeEventListener('mouseleave', leave); } catch {}
+    });
+    this._paragraphListeners = [];
+    this._currentParagraphEl = null;
+    this._currentParagraphText = '';
+    this._iconHovering = false;
+    clearTimeout(this._hideTO);
+    clearTimeout(this._rebindTO);
+    printl?.('❌ Paragraph hover navigation disabled');
   }
 
   // ---------- tuning ----------
