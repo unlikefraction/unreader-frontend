@@ -1,7 +1,17 @@
 // apiUrls.js
 
 // Base URL for all API requests
-const API_BASE_URL = 'https://unreaderdev.unlikefraction.com';
+let API_BASE_URL = 'https://unreaderdev.unlikefraction.com';
+
+// Allow overriding to prod via localStorage flag
+try {
+  const useProd = localStorage.getItem('useProd');
+  if (useProd === 'true') {
+    API_BASE_URL = 'https://unreaderprod.unlikefraction.com';
+  }
+} catch (e) {
+  // Ignore storage access errors and keep default
+}
 
 // Expose endpoints on a global object
 window.API_URLS = {
