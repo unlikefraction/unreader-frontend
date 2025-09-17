@@ -32,20 +32,25 @@ export function createTextEditor(drawingTools, e) {
     transform: 'none', // anchor start exactly at click (adjusted to baseline below)
     transformOrigin: 'left top',
     display: 'block',
-    padding: '4px 6px',
-    border: '1px dashed rgba(0,0,0,0.3)',
-    outline: 'none',
-    background: 'rgba(255,255,255,0.9)',
+    // Use outline so visuals don't affect layout/positioning
+    padding: '0',
+    border: 'none',
+    outline: '1px dashed rgba(0,0,0,0.3)',
+    outlineOffset: '2px',
+    background: 'transparent',
     zIndex: '1000',
     fontSize: '24px',
-    lineHeight: '1.2',
+    // Match renderer line-height to avoid vertical shift on save
+    lineHeight: 'normal',
     color: drawingTools.selectedColor,
     whiteSpace: 'pre',
     overflow: 'visible',
     minWidth: '40px',
     minHeight: '1em',
     textAlign: 'left',
-    borderRadius: '6px'
+    borderRadius: '0px',
+    boxSizing: 'content-box',
+    margin: '0'
   });
 
   document.body.appendChild(el);
