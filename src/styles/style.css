@@ -580,7 +580,7 @@ nav a{
 
 .playBack{
   padding: 6px;
-  display: none; /* uncomment when needed */
+  display: flex; /* show playback speed control in Settings */
 }
 
 .slider {

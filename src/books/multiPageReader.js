@@ -440,6 +440,17 @@ export default class MultiPageReader {
       meta.offsetMs ?? 0,
       { disableWordHighlighting: !this.allowWordHighlighting }
     );
+    // Carry over persisted playback speed to this page's audio instance
+    try {
+      const saved = localStorage.getItem('ui:playbackSpeed');
+      if (saved != null) {
+        const v = parseFloat(saved);
+        if (!isNaN(v)) {
+          const clamped = Math.max(0.5, Math.min(2.0, v));
+          sys.setSpeed?.(clamped);
+        }
+      }
+    } catch {}
     sys.textProcessor.pageId = slugify(meta.pageKey || `page-${meta.page_number}-${i}`);
 
     // keep the call name the same; TextProcessor.separateText() now preserves markup internally
@@ -501,6 +512,14 @@ export default class MultiPageReader {
       sys.audioCore.setupAudio();
       // Do not (re)wire paragraph navigation here; handled in setActive()
     }
+    // Apply the current/persisted speed every time we ensure readiness
+    try {
+      const saved = localStorage.getItem('ui:playbackSpeed');
+      if (saved != null) {
+        const v = parseFloat(saved);
+        if (!isNaN(v)) sys.setSpeed?.(Math.max(0.5, Math.min(2.0, v)));
+      }
+    } catch {}
     return sys;
   }
 
@@ -1082,23 +1101,39 @@ export default class MultiPageReader {
     if (playBack) {
       const slider = playBack.querySelector('.slider');
       const thumb  = playBack.querySelector('.thumb');
-      const value  = playBack.querySelector('.thumb .value');
       const cleanThumb  = cloneForCleanHandlers(thumb);
       const cleanSlider = cloneForCleanHandlers(slider);
 
       const getRect = () => cleanSlider.getBoundingClientRect();
       function widthToSpeed(widthPercent) { const s = 0.5 + ((widthPercent - 40) / 60) * 1.5; return Math.round(s * 10) / 10; }
       function speedToWidth(speed) { return 40 + ((speed - 0.5) / 1.5) * 60; }
-      const setSpeedUI = (s) => { const width = speedToWidth(Math.max(0.5, Math.min(2.0, s))); cleanThumb.style.width = width + '%'; if (value) value.textContent = s.toFixed(1); };
-      setSpeedUI(1.0);
+      const setSpeedUI = (s) => {
+        const width = speedToWidth(Math.max(0.5, Math.min(2.0, s)));
+        cleanThumb.style.width = width + '%';
+        const valEl = cleanThumb.querySelector('.value') || playBack.querySelector('.thumb .value');
+        if (valEl) valEl.textContent = s.toFixed(1);
+      };
+      // Initialize from persisted preference (falls back to 1.0x)
+      let initialSpeed = 1.0;
+      try { const saved = localStorage.getItem('ui:playbackSpeed'); if (saved != null) { const v = parseFloat(saved); if (!isNaN(v)) initialSpeed = Math.max(0.5, Math.min(2.0, v)); } } catch {}
+      setSpeedUI(initialSpeed);
+      try { this.setSpeed(initialSpeed); } catch {}
 
       const onPoint = (clientX) => {
         const rect = getRect();
-        const pctRaw = ((clientX - rect.left) / rect.width) * 100;
-        const pct = Math.max(40, Math.min(100, pctRaw - 7));
-        const spd = widthToSpeed(pct);
+        const px = clientX - rect.left;
+        const valEl = cleanThumb.querySelector('.value') || playBack.querySelector('.thumb .value');
+        // Fallback estimate if value element isn't measurable yet
+        const vWidth = Math.max(1, (valEl?.getBoundingClientRect?.().width) || 36);
+        const padRight = parseFloat(getComputedStyle(cleanThumb).paddingRight || '6') || 6;
+        // Desired thumb width so that VALUE CENTER aligns to pointer X
+        const desiredWidthPx = px + padRight + (vWidth / 2);
+        let widthPct = (desiredWidthPx / rect.width) * 100;
+        widthPct = Math.max(40, Math.min(100, widthPct));
+        const spd = widthToSpeed(widthPct);
         setSpeedUI(spd);
         this.setSpeed(spd);
+        try { localStorage.setItem('ui:playbackSpeed', String(spd)); } catch {}
       };
 
       let dragging = false;

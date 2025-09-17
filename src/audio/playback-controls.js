@@ -6,10 +6,12 @@
 // until they manually enable and reload.
 
 export class PlaybackControls {
-  constructor() {
+  constructor(audioCore = null) {
     this._currentStream = null;
     this._currentInputId = null;
     this._holdupStarted = false;
+    this._audioCore = audioCore || null;
+    this._speed = 1.0;
 
     this._micPermissionBlocked = false; // sticky after explicit deny
     this._onDeviceChange = this._refreshDevices.bind(this);
@@ -18,6 +20,7 @@ export class PlaybackControls {
       this._setupInitialInputUI();  // placeholder only
       this._bindSettingsDialog();   // dialog only, no device work
       this._bindHoldUpTrigger();    // permission unlock + list + mic on click
+      this._bindPlaybackSpeedUI();  // speed slider (only if MultiPageReader doesn't bind it)
     };
 
     if (document.readyState === 'loading') {
@@ -26,6 +29,77 @@ export class PlaybackControls {
       boot();
     }
   }
+
+  // ----- Playback speed UI (for single-page/landing flows) -----
+  _bindPlaybackSpeedUI() {
+    const root = document.querySelector('.playBack');
+    if (!root) return;
+    if (root.dataset.bound === 'true') return;
+
+    // If MultiPageReader exists, it owns the binding; skip here.
+    if (window.reader) return;
+
+    const slider = root.querySelector('.slider');
+    const thumb  = root.querySelector('.thumb');
+    if (!slider || !thumb) return;
+
+    // mapping helpers (0.5x → 2.0x across 40%..100% width)
+    const widthToSpeed = (w) => { const s = 0.5 + ((w - 40) / 60) * 1.5; return Math.round(s * 10) / 10; };
+    const speedToWidth = (s) => 40 + ((s - 0.5) / 1.5) * 60;
+    const clampSpeed   = (s) => Math.max(0.5, Math.min(2.0, s));
+
+    const applyUI = (s) => {
+      const width = speedToWidth(clampSpeed(s));
+      thumb.style.width = width + '%';
+      const vEl = root.querySelector('.thumb .value');
+      if (vEl) vEl.textContent = s.toFixed(1);
+    };
+
+    // Load saved speed and apply immediately
+    try { const saved = localStorage.getItem('ui:playbackSpeed'); if (saved != null) this._speed = clampSpeed(parseFloat(saved) || 1.0); } catch {}
+    applyUI(this._speed);
+    this.setSpeed(this._speed);
+
+    const onPoint = (clientX, e) => {
+      const rect = slider.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const vEl = root.querySelector('.thumb .value');
+      const vWidth = Math.max(1, (vEl?.getBoundingClientRect?.().width) || 36);
+      const padRight = parseFloat(getComputedStyle(thumb).paddingRight || '6') || 6;
+      const desiredWidthPx = px + padRight + (vWidth / 2);
+      let widthPct = (desiredWidthPx / rect.width) * 100;
+      widthPct = Math.max(40, Math.min(100, widthPct));
+      const spd = widthToSpeed(widthPct);
+      this.setSpeed(spd);
+      applyUI(spd);
+      try { localStorage.setItem('ui:playbackSpeed', String(spd)); } catch {}
+      e?.preventDefault?.();
+    };
+
+    let dragging = false;
+    const onDown = (x, e) => { dragging = true; onPoint(x, e); };
+    const onMove = (x, e) => { if (!dragging) return; onPoint(x, e); };
+    const onUp   = () => { dragging = false; };
+
+    thumb.addEventListener('mousedown',  (e) => onDown(e.clientX, e));
+    slider.addEventListener('mousedown', (e) => onDown(e.clientX, e));
+    document.addEventListener('mousemove', (e) => onMove(e.clientX, e));
+    document.addEventListener('mouseup', onUp);
+
+    thumb.addEventListener('touchstart',  (e) => onDown(e.touches[0].clientX, e), { passive: false });
+    slider.addEventListener('touchstart', (e) => onDown(e.touches[0].clientX, e), { passive: false });
+    document.addEventListener('touchmove', (e) => onMove(e.touches[0].clientX, e), { passive: false });
+    document.addEventListener('touchend', onUp);
+
+    root.dataset.bound = 'true';
+  }
+
+  setSpeed(speed) {
+    const s = Math.max(0.5, Math.min(2.0, Number(speed) || 1.0));
+    this._speed = s;
+    try { if (this._audioCore && typeof this._audioCore.setPlaybackSpeed === 'function') this._audioCore.setPlaybackSpeed(s); } catch {}
+  }
+  getCurrentSpeed() { return this._speed; }
 
   // ----- UI: placeholder text in the input select -----
   _setupInitialInputUI() {

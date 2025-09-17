@@ -27,7 +27,7 @@ export class AudioCore {
     if (!this.sound) {
       this.sound = new Howl({
         src: [this.audioFile],
-        html5: false,
+        html5: true,
         preload: true,
         rate: this.playbackSpeed,
         onend: () => {
@@ -74,6 +74,17 @@ export class AudioCore {
           if (this.onPauseCallback) this.onPauseCallback(pauseTime);
         }
       });
+      // Ensure pitch is preserved when changing playbackRate on HTML5 media element
+      try {
+        const nodes = (this.sound && this.sound._sounds) ? this.sound._sounds : [];
+        for (const s of nodes) {
+          const el = s && s._node; if (!el) continue;
+          // cross-browser flags
+          el.preservesPitch = true;
+          el.mozPreservesPitch = true;
+          el.webkitPreservesPitch = true;
+        }
+      } catch {}
     }
   }
 
@@ -81,6 +92,13 @@ export class AudioCore {
     this.playbackSpeed = speed;
     if (this.sound) {
       this.sound.rate(speed);
+      try {
+        const nodes = (this.sound && this.sound._sounds) ? this.sound._sounds : [];
+        for (const s of nodes) {
+          const el = s && s._node; if (!el) continue;
+          el.preservesPitch = true; el.mozPreservesPitch = true; el.webkitPreservesPitch = true;
+        }
+      } catch {}
       printl?.(`⚡ Playback speed set to ${speed.toFixed(1)}x (pitch preserved)`);
     }
   }
