@@ -335,7 +335,10 @@ export class DrawingTools {
     commonVars.toolActive = !tool.classList.contains('cursor');
     this.textClickArmed = false;
     this.erasedShapeIds.clear();
-    document.body.style.cursor = isDraw ? 'crosshair' : 'default';
+    const isCursor = tool.classList.contains('cursor');
+    document.body.classList.toggle('drawing-mode', !isCursor);
+    // Remove any inline cursor set previously
+    try { document.body.style.removeProperty('cursor'); } catch {}
   }
 
   _isClickOnTool(e) {

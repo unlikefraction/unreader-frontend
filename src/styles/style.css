@@ -1139,3 +1139,7 @@ canvas{
     line-height: 1.5;
   }
 }
+
+/* Crosshair cursor during drawing tools (all except normal cursor tool) */
+body.drawing-mode { cursor: crosshair !important; }
+body.drawing-mode * { cursor: crosshair !important; }
