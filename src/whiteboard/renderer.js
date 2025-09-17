@@ -7,13 +7,12 @@ import { getStroke } from 'perfect-freehand';
  * We always compare against ABSOLUTE top via mgr._absTop.
  * Contexts are pre-translated in CanvasManager so we can draw in page-space.
  */
-export function redrawAll(drawingTools) {
-  // Remove completed text editors
-  document.querySelectorAll('.annotation-text-editor.completed').forEach(el => el.remove());
+export function redrawAll(drawingTools, opts = {}) {
+  const { skipSizing = false } = opts || {};
 
-  // Resize & clear all draw canvases
+  // Resize (unless skipped) & clear all draw canvases
   drawingTools.canvasManagers.forEach(mgr => {
-    mgr.sizeCanvases();
+    if (!skipSizing) mgr.sizeCanvases();
     if (mgr.drawCtx && mgr.drawCanvas) mgr.clearDraw();
     if (mgr.previewCtx && mgr.previewCanvas) mgr.clearPreview();
   });
@@ -208,22 +207,25 @@ export function redrawAll(drawingTools) {
     });
   });
 
-  // TEXT overlay divs anchored at the click baseline; no viewport shifts
+  // TEXT overlay divs anchored at the click baseline; reuse DOM nodes for performance
+  const expected = new Set();
+  // reuse a single measuring ctx
+  const measureCtx = document.createElement('canvas').getContext('2d');
   drawingTools.shapesData.text.forEach((t, i) => {
     const id = `text-${i}`;
+    expected.add(id);
     const rotDeg = t.rotation || 0;
 
     const fontSize = t.fontSize || 24;
     const fontFamily = t.fontFamily || 'sans-serif';
-    const ctx = document.createElement('canvas').getContext('2d');
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    const m = ctx.measureText('Mg');
+    measureCtx.font = `${fontSize}px ${fontFamily}`;
+    const m = measureCtx.measureText('Mg');
     const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
     const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
     const lines = String(t.text ?? '').split(/\n/);
     let textWidth = 0;
     for (const line of lines) {
-      const w = ctx.measureText(line).width;
+      const w = measureCtx.measureText(line).width;
       if (w > textWidth) textWidth = w;
     }
     const height = ascent + descent + Math.max(0, lines.length - 1) * fontSize;
@@ -240,30 +242,40 @@ export function redrawAll(drawingTools) {
     const mgr = pickManagerByY(centerY);
     if (!mgr) return;
 
-    const div = document.createElement('div');
-    div.innerText = t.text;
-    div.classList.add('annotation-text-editor', 'completed');
-    div.setAttribute('data-text-id', id);
-    Object.assign(div.style, {
-      position: 'absolute',
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${textWidth}px`,
-      height: `${height}px`,
-      transform: `rotate(${rotDeg}deg)`,
-      transformOrigin: 'center center',
-      display: 'block',
-      pointerEvents: 'none',
-      textAlign: 'left',
-      fontSize: `${fontSize}px`,
-      fontFamily,
-      lineHeight: 'normal',
-      whiteSpace: 'pre',
-      background: 'transparent',
-      color: t.color,
-      zIndex: '1',
-      opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
-    });
-    document.body.appendChild(div);
+    let div = document.querySelector(`[data-text-id="${id}"]`);
+    if (!div) {
+      div = document.createElement('div');
+      div.classList.add('annotation-text-editor', 'completed');
+      div.setAttribute('data-text-id', id);
+      document.body.appendChild(div);
+    }
+    // Update content only if changed to avoid layout work
+    if (div.innerText !== String(t.text ?? '')) div.innerText = String(t.text ?? '');
+    const opacity = (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1';
+    const style = div.style;
+    style.position = 'absolute';
+    style.left = `${left}px`;
+    style.top = `${top}px`;
+    style.width = `${textWidth}px`;
+    style.height = `${height}px`;
+    style.transform = `rotate(${rotDeg}deg)`;
+    style.transformOrigin = 'center center';
+    style.display = 'block';
+    style.pointerEvents = 'none';
+    style.textAlign = 'left';
+    style.fontSize = `${fontSize}px`;
+    style.fontFamily = fontFamily;
+    style.lineHeight = 'normal';
+    style.whiteSpace = 'pre';
+    style.background = 'transparent';
+    style.color = t.color;
+    style.zIndex = '1';
+    style.opacity = opacity;
+  });
+
+  // Remove any stale text nodes (e.g., deleted shapes)
+  document.querySelectorAll('.annotation-text-editor.completed').forEach(el => {
+    const id = el.getAttribute('data-text-id');
+    if (!expected.has(id)) el.remove();
   });
 }

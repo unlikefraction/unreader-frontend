@@ -449,7 +449,7 @@ export class DrawingTools {
   }
 
   _hideColorPicker() { this.colorPicker.style.display = 'none'; }
-  redrawAll() { redrawAll(this); }
+  redrawAll(opts) { redrawAll(this, opts); }
   save() { saveShapesData(this.shapesData); try { this._scheduleScribblesPush?.(); } catch {} }
 
   setActiveTool(tool) {

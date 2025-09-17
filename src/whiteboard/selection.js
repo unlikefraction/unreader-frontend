@@ -3,6 +3,8 @@ import { commonVars } from '../common-vars.js';
 
 export function initSelectionHandler(drawingTools) {
   let dragInfo = null;
+  let rafScheduled = false;
+  let lastEvent = null;
 
   // helpers for multi-canvas bands
   function pickManagerByY(dt, y) {
@@ -190,6 +192,7 @@ export function initSelectionHandler(drawingTools) {
     if (hit || dragInfo) {
       commonVars.beingEdited = true;
       drawingTools.selectedShape = hit || drawingTools.selectedShape;
+      drawingTools.isDraggingShape = true;
     } else if (drawingTools.selectedShape) {
       drawingTools.selectedShape = null;
       commonVars.beingEdited = false;
@@ -202,51 +205,60 @@ export function initSelectionHandler(drawingTools) {
 
   document.addEventListener('mousemove', e => {
     if (!dragInfo) return;
+    lastEvent = e;
+    if (rafScheduled) return;
+    rafScheduled = true;
+    requestAnimationFrame(() => {
+      const ev = lastEvent; // use latest
+      rafScheduled = false;
+      if (!ev || !dragInfo) return;
 
-    // keep manager selection in sync while dragging
-    drawingTools._bindManagerForEvent?.(e);
+      // keep manager selection in sync while dragging
+      drawingTools._bindManagerForEvent?.(ev);
 
-    const { x, y } = getPageCoords(e);
-    const { mode, type: moveType, index } = dragInfo;
-    const shape = drawingTools.shapesData[moveType][index];
+      const { x, y } = getPageCoords(ev);
+      const { mode, type: moveType, index } = dragInfo;
+      const shape = drawingTools.shapesData[moveType][index];
 
-    if (mode === 'move') {
-      const dx = x - dragInfo.startX;
-      const dy = y - dragInfo.startY;
-      if (dragInfo.origPoints) {
-        shape.points.forEach((pt, i) => {
-          pt.xRel = dragInfo.origPoints[i].x + dx;
-          pt.y    = dragInfo.origPoints[i].y + dy;
-        });
-      } else if (dragInfo.origEnds) {
-        shape.x1Rel = dragInfo.origEnds.x1Rel + dx;
-        shape.y1    = dragInfo.origEnds.y1    + dy;
-        shape.x2Rel = dragInfo.origEnds.x2Rel + dx;
-        shape.y2    = dragInfo.origEnds.y2    + dy;
-      } else {
-        shape.xRel = dragInfo.origX + dx;
-        shape.y    = dragInfo.origY + dy;
+      if (mode === 'move') {
+        const dx = x - dragInfo.startX;
+        const dy = y - dragInfo.startY;
+        if (dragInfo.origPoints) {
+          shape.points.forEach((pt, i) => {
+            pt.xRel = dragInfo.origPoints[i].x + dx;
+            pt.y    = dragInfo.origPoints[i].y + dy;
+          });
+        } else if (dragInfo.origEnds) {
+          shape.x1Rel = dragInfo.origEnds.x1Rel + dx;
+          shape.y1    = dragInfo.origEnds.y1    + dy;
+          shape.x2Rel = dragInfo.origEnds.x2Rel + dx;
+          shape.y2    = dragInfo.origEnds.y2    + dy;
+        } else {
+          shape.xRel = dragInfo.origX + dx;
+          shape.y    = dragInfo.origY + dy;
+        }
+      } else if (mode === 'rotate') {
+        const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
+        let deltaDeg = (ang - dragInfo.startAng) * 180 / Math.PI;
+        if (ev.shiftKey) {
+          const snap = 15; // degrees
+          deltaDeg = Math.round(deltaDeg / snap) * snap;
+        }
+        shape.rotation = dragInfo.origRot + deltaDeg;
       }
-    } else if (mode === 'rotate') {
-      const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
-      let deltaDeg = (ang - dragInfo.startAng) * 180 / Math.PI;
-      // Hold Shift to snap to 15-degree increments for precise angles
-      if (e.shiftKey) {
-        const snap = 15; // degrees
-        deltaDeg = Math.round(deltaDeg / snap) * snap;
-      }
-      shape.rotation = dragInfo.origRot + deltaDeg;
-    }
 
-    clearAllPreviews(drawingTools);
-    drawingTools.redrawAll();
-    drawPersistentHighlight();
+      clearAllPreviews(drawingTools);
+      // Skip expensive size recompute while dragging
+      drawingTools.redrawAll({ skipSizing: true });
+      drawPersistentHighlight();
+    });
   });
 
   document.addEventListener('mouseup', () => {
     if (!dragInfo) return;
     drawingTools.save();
     dragInfo = null;
+    drawingTools.isDraggingShape = false;
     clearAllPreviews(drawingTools);
     drawingTools.redrawAll();
     drawPersistentHighlight();

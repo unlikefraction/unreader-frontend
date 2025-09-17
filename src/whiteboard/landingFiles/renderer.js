@@ -7,12 +7,11 @@ import { getStroke } from 'perfect-freehand';
 /**
  * Renderer for drawing all shapes and their bounding borders, now supporting per-shape rotation
  */
-export function redrawAll(drawingTools) {
-  // Remove completed text editors
-  document.querySelectorAll('.annotation-text-editor.completed').forEach(el => el.remove());
+export function redrawAll(drawingTools, opts = {}) {
+  const { skipSizing = false } = opts || {};
 
   // Resize & clear the draw canvas
-  drawingTools.canvasManager.sizeCanvases();
+  if (!skipSizing) drawingTools.canvasManager.sizeCanvases();
   const drawCtx = drawingTools.canvasManager.drawCtx;
   drawCtx.clearRect(0, 0, drawingTools.canvasManager.drawCanvas.width, drawingTools.canvasManager.drawCanvas.height);
 
@@ -199,57 +198,64 @@ export function redrawAll(drawingTools) {
     });
   });
 
-  // TEXT: anchor at click baseline; never affect viewport
+  // TEXT: anchor at click baseline; reuse DOM nodes to avoid churn
+  const expected = new Set();
+  const measureCtx = document.createElement('canvas').getContext('2d');
   drawingTools.shapesData.text.forEach((t, i) => {
     const id = `text-${i}`;
+    expected.add(id);
     const rotDeg = t.rotation || 0;
     const fontSize = t.fontSize || 24;
     const fontFamily = t.fontFamily || 'sans-serif';
-    const ctx = document.createElement('canvas').getContext('2d');
-    ctx.font = `${fontSize}px ${fontFamily}`;
-    const m = ctx.measureText('Mg');
+    measureCtx.font = `${fontSize}px ${fontFamily}`;
+    const m = measureCtx.measureText('Mg');
     const ascent = m.actualBoundingBoxAscent ?? fontSize * 0.8;
     const descent = m.actualBoundingBoxDescent ?? fontSize * 0.2;
     const lines = String(t.text ?? '').split(/\n/);
     let textWidth = 0;
     for (const line of lines) {
-      const w = ctx.measureText(line).width;
+      const w = measureCtx.measureText(line).width;
       if (w > textWidth) textWidth = w;
     }
     const height = ascent + descent + Math.max(0, lines.length - 1) * fontSize;
-    // Compute axis-aligned top-left based on baseline anchor
     const leftTopX = zeroX + t.xRel;
     const leftTopY = (t.y - ascent);
-    // Compute center so DOM rotates around true center (matches selection math)
     const centerX = leftTopX + textWidth / 2;
     const centerY = leftTopY + height / 2;
     const left = centerX - textWidth / 2;
     const top = centerY - height / 2;
 
-    const div = document.createElement('div');
-    div.innerText = t.text;
-    div.classList.add('annotation-text-editor', 'completed');
-    div.setAttribute('data-text-id', id);
-    Object.assign(div.style, {
-      position: 'absolute',
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${textWidth}px`,
-      height: `${height}px`,
-      transform: `rotate(${rotDeg}deg)`,
-      transformOrigin: 'center center',
-      display: 'block',
-      pointerEvents: 'none',
-      textAlign: 'left',
-      fontSize: `${fontSize}px`,
-      fontFamily,
-      lineHeight: 'normal',
-      whiteSpace: 'pre',
-      background: 'transparent',
-      color: t.color,
-      zIndex: '-1',
-      opacity: (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1'
-    });
-    document.body.appendChild(div);
+    let div = document.querySelector(`[data-text-id="${id}"]`);
+    if (!div) {
+      div = document.createElement('div');
+      div.classList.add('annotation-text-editor', 'completed');
+      div.setAttribute('data-text-id', id);
+      document.body.appendChild(div);
+    }
+    if (div.innerText !== String(t.text ?? '')) div.innerText = String(t.text ?? '');
+    const opacity = (drawingTools.isErasing && drawingTools.erasedShapeIds.has(id)) ? '0.2' : '1';
+    const style = div.style;
+    style.position = 'absolute';
+    style.left = `${left}px`;
+    style.top = `${top}px`;
+    style.width = `${textWidth}px`;
+    style.height = `${height}px`;
+    style.transform = `rotate(${rotDeg}deg)`;
+    style.transformOrigin = 'center center';
+    style.display = 'block';
+    style.pointerEvents = 'none';
+    style.textAlign = 'left';
+    style.fontSize = `${fontSize}px`;
+    style.fontFamily = fontFamily;
+    style.lineHeight = 'normal';
+    style.whiteSpace = 'pre';
+    style.background = 'transparent';
+    style.color = t.color;
+    style.zIndex = '-1';
+    style.opacity = opacity;
+  });
+  document.querySelectorAll('.annotation-text-editor.completed').forEach(el => {
+    const id = el.getAttribute('data-text-id');
+    if (!expected.has(id)) el.remove();
   });
 }

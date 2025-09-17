@@ -6,6 +6,8 @@ import { commonVars } from '../../common-vars.js';
 
 export function initSelectionHandler(drawingTools) {
   let dragInfo = null;
+  let rafScheduled = false;
+  let lastEvent = null;
 
   // Preload SVG handle
   const svgMarkup = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><rect width="256" height="256" fill="none"/><polyline points="80 104 32 152 80 200" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/><path d="M224,56a96,96,0,0,1-96,96H32" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="16"/></svg>`;
@@ -162,6 +164,7 @@ export function initSelectionHandler(drawingTools) {
     if (hit || dragInfo) {
       commonVars.beingEdited = true;
       drawingTools.selectedShape = hit || drawingTools.selectedShape;
+      drawingTools.isDraggingShape = true;
     } else if (drawingTools.selectedShape) {
       drawingTools.selectedShape = null;
       commonVars.beingEdited = false;
@@ -174,46 +177,55 @@ export function initSelectionHandler(drawingTools) {
 
   document.addEventListener('mousemove', e => {
     if (!dragInfo) return;
-    const { x, y } = getLocalCoords(e);
-    const { mode, type: moveType, index } = dragInfo;
-    const shape = drawingTools.shapesData[moveType][index];
+    lastEvent = e;
+    if (rafScheduled) return;
+    rafScheduled = true;
+    requestAnimationFrame(() => {
+      const ev = lastEvent;
+      rafScheduled = false;
+      if (!ev || !dragInfo) return;
+      const { x, y } = getLocalCoords(ev);
+      const { mode, type: moveType, index } = dragInfo;
+      const shape = drawingTools.shapesData[moveType][index];
 
-    if (mode === 'move') {
-      const dx = x - dragInfo.startX;
-      const dy = y - dragInfo.startY;
-      if (dragInfo.origPoints) {
-        shape.points.forEach((pt, i) => {
-          pt.xRel = dragInfo.origPoints[i].x + dx;
-          pt.y    = dragInfo.origPoints[i].y + dy;
-        });
-      } else if (dragInfo.origEnds) {
-        shape.x1Rel = dragInfo.origEnds.x1Rel + dx;
-        shape.y1    = dragInfo.origEnds.y1    + dy;
-        shape.x2Rel = dragInfo.origEnds.x2Rel + dx;
-        shape.y2    = dragInfo.origEnds.y2    + dy;
-      } else {
-        shape.xRel = dragInfo.origX + dx;
-        shape.y    = dragInfo.origY + dy;
+      if (mode === 'move') {
+        const dx = x - dragInfo.startX;
+        const dy = y - dragInfo.startY;
+        if (dragInfo.origPoints) {
+          shape.points.forEach((pt, i) => {
+            pt.xRel = dragInfo.origPoints[i].x + dx;
+            pt.y    = dragInfo.origPoints[i].y + dy;
+          });
+        } else if (dragInfo.origEnds) {
+          shape.x1Rel = dragInfo.origEnds.x1Rel + dx;
+          shape.y1    = dragInfo.origEnds.y1    + dy;
+          shape.x2Rel = dragInfo.origEnds.x2Rel + dx;
+          shape.y2    = dragInfo.origEnds.y2    + dy;
+        } else {
+          shape.xRel = dragInfo.origX + dx;
+          shape.y    = dragInfo.origY + dy;
+        }
+      } else if (mode === 'rotate') {
+        const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
+        let deltaDeg = (ang - dragInfo.startAng) * 180 / Math.PI;
+        if (ev.shiftKey) {
+          const snap = 15;
+          deltaDeg = Math.round(deltaDeg / snap) * snap;
+        }
+        shape.rotation = dragInfo.origRot + deltaDeg;
       }
-    } else if (mode === 'rotate') {
-      const ang = Math.atan2(y - dragInfo.cy, x - dragInfo.cx);
-      let deltaDeg = (ang - dragInfo.startAng) * 180 / Math.PI;
-      if (e.shiftKey) {
-        const snap = 15;
-        deltaDeg = Math.round(deltaDeg / snap) * snap;
-      }
-      shape.rotation = dragInfo.origRot + deltaDeg;
-    }
 
-    drawingTools.canvasManager.clearPreview();
-    drawingTools.redrawAll();
-    drawPersistentHighlight();
+      drawingTools.canvasManager.clearPreview();
+      drawingTools.redrawAll({ skipSizing: true });
+      drawPersistentHighlight();
+    });
   });
 
   document.addEventListener('mouseup', () => {
     if (!dragInfo) return;
     drawingTools.save();
     dragInfo = null;
+    drawingTools.isDraggingShape = false;
     drawingTools.canvasManager.clearPreview();
     drawingTools.redrawAll();
     drawPersistentHighlight();

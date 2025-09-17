@@ -312,8 +312,8 @@ export class DrawingTools {
     this.colorPicker.style.display = 'none';
   }
 
-  redrawAll() {
-    redrawAll(this);
+  redrawAll(opts) {
+    redrawAll(this, opts);
   }
 
   save() {
