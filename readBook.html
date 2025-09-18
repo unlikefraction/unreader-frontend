@@ -208,6 +208,24 @@
       </div>
     </div>
 
+    <!-- Floating Thoughts button (bottom-right) -->
+    <div class="thoughtsFab" title="Thoughts">
+      <div class="thoughtsIcon">
+        <i class="ph ph-note-pencil"></i>
+      </div>
+    </div>
+
+    <!-- Thoughts popup (right side, similar to Inbox) -->
+    <div class="thoughtsPopup" aria-hidden="true">
+      <div class="topSectionThoughts">
+        <h4 class="headingThoughts">Thoughts</h4>
+        <div class="wordsThoughts"><span class="wordAmountThought">0</span> words</div>
+      </div>
+      <div class="thoughtsBody">
+        <textarea class="thoughtsInput" placeholder="this book made me think..."></textarea>
+      </div>
+    </div>
+
     <div class="inboxPopup">
       <div class="topSectionInbox">
         <h4 class="headingInbox">Talk with the team at Unreader</h4>
@@ -251,5 +269,6 @@
     <script type="module" src="./src/authorization/loggedOutRedirect.js"></script>    
     <script type="module" src="./src/basic/logo-animation.js"></script>
     <script type="module" src="./src/basic/tooltips.js"></script>
+    <script type="module" src="./src/basic/thoughts.js"></script>
   </body>
 </html>

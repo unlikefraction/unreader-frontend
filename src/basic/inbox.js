@@ -257,6 +257,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // On open, mark as read once per open session
       if (inboxPopup.classList.contains('visible')) {
+        // Close Thoughts if open (mutually exclusive)
+        try {
+          const tPopup = document.querySelector('.thoughtsPopup');
+          const tFab   = document.querySelector('.thoughtsFab');
+          if (tPopup && tPopup.classList.contains('visible')) tPopup.classList.remove('visible');
+          if (tFab) tFab.classList.remove('active');
+        } catch {}
+
         if (!hasMarkedReadThisOpen) {
           hasMarkedReadThisOpen = true;
           await markThreadRead();

@@ -84,7 +84,11 @@ body.initialising #heightSetter,
 body.initializing .inbox,
 body.initialising .inbox,
 body.initializing .inboxPopup,
-body.initialising .inboxPopup {
+body.initialising .inboxPopup,
+body.initializing .thoughtsFab,
+body.initialising .thoughtsFab,
+body.initializing .thoughtsPopup,
+body.initialising .thoughtsPopup {
   visibility: hidden !important;
 }
 /* Optionally hide the top nav during initial load to avoid flicker */

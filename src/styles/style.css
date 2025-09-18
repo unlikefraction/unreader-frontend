@@ -947,6 +947,86 @@ mark{
   font-size: 1.4rem;
 }
 
+/* Thoughts floating button (bottom-right) */
+.thoughtsFab{
+  position: fixed;
+  /* place directly above Inbox (60px tall) with ~14px gap */
+  bottom: 105px;
+  left: 31px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  border: 1px solid #B7B7B7;
+  background: #fff;
+  cursor: pointer;
+  z-index: 1000000;
+}
+.thoughtsFab:hover{ background: #dddddd; }
+.thoughtsIcon{ display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 50%; }
+.thoughtsFab.active .thoughtsIcon{ background:#373737; color:#fff; }
+.thoughtsFab i{ font-size: 1.4rem; }
+
+/* Thoughts popup (mirror of inboxPopup, but on right) */
+.thoughtsPopup{
+  display: none;
+  flex-direction: column;
+  gap: 0; /* no vertical gap between sections */
+  position: fixed;
+  left: 120px;
+  height: auto;
+  width: 420px;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(25px);
+  border: 1px solid #AEAEAE;
+  border-bottom: none !important;
+  border-top-left-radius: 25px;
+  border-top-right-radius: 25px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+  z-index: 1000000;
+}
+.thoughtsPopup.visible{ display: flex; }
+
+.thoughtsPopup .topSectionThoughts{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px;
+  background: #F2F2F2;
+  border-top-left-radius: 25px;
+  border-top-right-radius: 25px;
+  border-bottom: 1px solid #AEAEAE;
+}
+.thoughtsPopup .topSectionThoughts .headingThoughts{
+  font-size: 18px;
+  font-weight: 500;
+  color: #373737;
+}
+.thoughtsPopup .topSectionThoughts .wordsThoughts{
+  font-size: 14px;
+  color: #373737;
+}
+
+.thoughtsPopup .thoughtsBody{ padding: 0; }
+.thoughtsPopup .thoughtsInput{
+  width: 100%;
+  height: 400px; /* fixed height */
+  padding: 12px 14px; /* keep comfortable typing area */
+  font-size: 16px;
+  color: #373737;
+  background: transparent;
+  border: none;
+  outline: none;
+  border-radius: 0;
+  resize: none;
+  line-height: 24px;
+}
+.thoughtsPopup .thoughtsInput:focus{ background: rgba(0,0,0,0.02); }
+
 .pageHeader{
   display: flex;
   flex-direction: row-reverse;
@@ -1143,6 +1223,9 @@ canvas{
   /* Hide inbox/chat on phones */
   .inbox,
   .inboxPopup { display: none !important; }
+  /* Hide thoughts on phones */
+  .thoughtsFab,
+  .thoughtsPopup { display: none !important; }
 }
 
 @media (max-width: 480px) {
