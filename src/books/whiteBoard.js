@@ -21,7 +21,7 @@ import { handleLine } from '../whiteboard/tools/line-tool.js';
 import { handleArrow, drawArrowHead, previewArrowHead } from '../whiteboard/tools/arrow-tool.js';
 import { handlePencil, handleFreehand } from '../whiteboard/tools/pencil-tool.js';
 import { handleHighlight } from '../whiteboard/tools/highlighter-tool.js';
-import { handleText, createTextEditor } from '../whiteboard/tools/text-tool.js';
+import { handleText, createTextEditor, setupTextEditingShortcuts } from '../whiteboard/tools/text-tool.js';
 import { handleEraser } from '../whiteboard/tools/eraser-tool.js';
 import { isClickOnTool, hexToRgba } from '../whiteboard/utils.js';
 import { initSelectionHandler } from '../whiteboard/selection.js';
@@ -92,6 +92,9 @@ export class DrawingTools {
     this._bandsBaseTop = 0;
 
     initSelectionHandler(this);
+
+    // Enable double-click to edit existing text blocks
+    try { setupTextEditingShortcuts(this); } catch {}
 
     this.eraserCursor = document.createElement('div');
     this.eraserCursor.classList.add('eraser-mouse');

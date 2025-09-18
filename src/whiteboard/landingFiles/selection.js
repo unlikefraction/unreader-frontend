@@ -19,6 +19,8 @@ export function initSelectionHandler(drawingTools) {
   const EXTRA_ROT = -25 * Math.PI / 180; // extra 30deg
 
   function drawPersistentHighlight() {
+    // Hide selection overlay while editing text
+    if (drawingTools._isEditingText) return;
     const sel = drawingTools.selectedShape;
     if (!sel) return;
     const { type, index } = sel;

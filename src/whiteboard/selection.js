@@ -38,6 +38,8 @@ export function initSelectionHandler(drawingTools) {
   const EXTRA_ROT = -25 * Math.PI / 180; // extra rotation
 
   function drawPersistentHighlight() {
+    // Hide selection overlay while editing text
+    if (drawingTools._isEditingText) return;
     const sel = drawingTools.selectedShape;
     if (!sel) return;
     const { type, index } = sel;
@@ -193,6 +195,10 @@ export function initSelectionHandler(drawingTools) {
       commonVars.beingEdited = true;
       drawingTools.selectedShape = hit || drawingTools.selectedShape;
       drawingTools.isDraggingShape = true;
+      // Disable text selection only when dragging (move/rotate), not mere selection
+      if (dragInfo) {
+        try { document.body.style.userSelect = 'none'; } catch {}
+      }
     } else if (drawingTools.selectedShape) {
       drawingTools.selectedShape = null;
       commonVars.beingEdited = false;
@@ -259,10 +265,26 @@ export function initSelectionHandler(drawingTools) {
     drawingTools.save();
     dragInfo = null;
     drawingTools.isDraggingShape = false;
+    // Re-enable text selection after finishing drag/move
+    try { document.body.style.userSelect = 'auto'; } catch {}
     clearAllPreviews(drawingTools);
     drawingTools.redrawAll();
     drawPersistentHighlight();
   });
+
+  // Ensure selection is re-enabled if pointer leaves the window mid-drag
+  const cancelDrag = () => {
+    if (!dragInfo) return;
+    drawingTools.save();
+    dragInfo = null;
+    drawingTools.isDraggingShape = false;
+    try { document.body.style.userSelect = 'auto'; } catch {}
+    clearAllPreviews(drawingTools);
+    drawingTools.redrawAll();
+    drawPersistentHighlight();
+  };
+  document.addEventListener('mouseleave', cancelDrag);
+  window.addEventListener('blur', cancelDrag);
 
   document.addEventListener('keydown', e => {
     if (!drawingTools.selectedShape) return;

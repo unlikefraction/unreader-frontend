@@ -10,7 +10,7 @@ import { handleLine } from './tools/line-tool.js';
 import { handleArrow, drawArrowHead, previewArrowHead } from './tools/arrow-tool.js';
 import { handlePencil, handleFreehand } from './tools/pencil-tool.js';
 import { handleHighlight } from './tools/highlighter-tool.js';
-import { handleText, createTextEditor } from './tools/text-tool.js';
+import { handleText, createTextEditor, setupTextEditingShortcuts } from './tools/text-tool.js';
 import { handleEraser } from './tools/eraser-tool.js';
 import { isClickOnTool, hexToRgba } from './utils.js';
 import { initSelectionHandler } from './landingFiles/selection.js';
@@ -91,6 +91,9 @@ export class DrawingTools {
     this.canvasManager = new CanvasManager();
 
     initSelectionHandler(this);
+
+    // Enable double-click to edit existing text blocks
+    try { setupTextEditingShortcuts(this); } catch {}
 
     // Eraser-following cursor
     this.eraserCursor = document.createElement('div');
