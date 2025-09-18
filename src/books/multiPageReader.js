@@ -512,6 +512,26 @@ export default class MultiPageReader {
       sys.audioCore.setupAudio();
       // Do not (re)wire paragraph navigation here; handled in setActive()
     }
+    // Bind UI sync to audio events once per page instance
+    if (!sys._mprUiBound) {
+      try {
+        sys.audioCore.onPlay(() => {
+          if (this.active === i) {
+            this._isLoadingActiveAudio = false;
+            this._autoplayOnReady = false;
+            this._syncPlayButton(true);
+            this._startProgressTimer();
+          }
+        });
+        sys.audioCore.onPause(() => {
+          if (this.active === i) {
+            this._syncPlayButton(false);
+            this._stopProgressTimer();
+          }
+        });
+      } catch {}
+      sys._mprUiBound = true;
+    }
     // Apply the current/persisted speed every time we ensure readiness
     try {
       const saved = localStorage.getItem('ui:playbackSpeed');

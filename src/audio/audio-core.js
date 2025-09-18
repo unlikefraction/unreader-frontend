@@ -15,12 +15,12 @@ export class AudioCore {
     this.isPlaying = false;
     this.playbackSpeed = 1.0;
 
-    // Event callbacks
-    this.onPlayCallback = null;
-    this.onPauseCallback = null;
-    this.onEndCallback = null;
-    this.onSeekCallback = null;
-    this.onErrorCallback = null;
+    // Event callbacks (multi-listener)
+    this._onPlayCbs = [];
+    this._onPauseCbs = [];
+    this._onEndCbs = [];
+    this._onSeekCbs = [];
+    this._onErrorCbs = [];
   }
 
   setupAudio() {
@@ -39,24 +39,24 @@ export class AudioCore {
               window.Analytics.capture('audio_end', { path: location.pathname, duration_s: dur });
             }
           } catch {}
-          if (this.onEndCallback) this.onEndCallback();
+          try { this._onEndCbs.forEach(fn => { try { fn(); } catch {} }); } catch {}
         },
         onloaderror: (id, error) => {
           printError?.('Audio loading error:', error);
           this.isPlaying = false;
           try { if (window.Analytics) window.Analytics.isAudioPlaying = () => false; } catch {}
-          if (this.onErrorCallback) this.onErrorCallback(error);
+          try { this._onErrorCbs.forEach(fn => { try { fn(error); } catch {} }); } catch {}
         },
         onplayerror: (id, error) => {
           printError?.('Audio play error:', error);
           this.isPlaying = false;
           try { if (window.Analytics) window.Analytics.isAudioPlaying = () => false; } catch {}
-          if (this.onErrorCallback) this.onErrorCallback(error);
+          try { this._onErrorCbs.forEach(fn => { try { fn(error); } catch {} }); } catch {}
         },
         onseek: () => {
           const currentTime = this.getCurrentTime();
           printl?.(`🔄 Audio seeked to: ${currentTime.toFixed(5)}s`);
-          if (this.onSeekCallback) this.onSeekCallback(currentTime);
+          try { this._onSeekCbs.forEach(fn => { try { fn(currentTime); } catch {} }); } catch {}
         },
         onplay: () => {
           const startTime = this.getCurrentTime();
@@ -64,14 +64,14 @@ export class AudioCore {
           printl?.(`▶️ Audio started playing from: ${startTime.toFixed(5)}s`);
           try { if (window.Analytics) window.Analytics.isAudioPlaying = () => true; } catch {}
           try { if (window.Analytics) window.Analytics.capture('audio_play', { path: location.pathname, at_s: startTime }); } catch {}
-          if (this.onPlayCallback) this.onPlayCallback(startTime);
+          try { this._onPlayCbs.forEach(fn => { try { fn(startTime); } catch {} }); } catch {}
         },
         onpause: () => {
           const pauseTime = this.getCurrentTime();
           this.isPlaying = false;
           printl?.(`⏸️ Audio paused at: ${pauseTime.toFixed(5)}s`);
           try { if (window.Analytics) window.Analytics.isAudioPlaying = () => false; } catch {}
-          if (this.onPauseCallback) this.onPauseCallback(pauseTime);
+          try { this._onPauseCbs.forEach(fn => { try { fn(pauseTime); } catch {} }); } catch {}
         }
       });
       // Ensure pitch is preserved when changing playbackRate on HTML5 media element
@@ -83,6 +83,23 @@ export class AudioCore {
           el.preservesPitch = true;
           el.mozPreservesPitch = true;
           el.webkitPreservesPitch = true;
+          // Belt-and-suspenders: reflect native play/pause (e.g., hardware keys)
+          if (!el.__uiSyncBound) {
+            el.addEventListener('play', () => {
+              this.isPlaying = true;
+              try { this._onPlayCbs.forEach(fn => { try { fn(this.getCurrentTime()); } catch {} }); } catch {}
+            });
+            el.addEventListener('pause', () => {
+              this.isPlaying = false;
+              try { this._onPauseCbs.forEach(fn => { try { fn(this.getCurrentTime()); } catch {} }); } catch {}
+            });
+            // Native ended also flows through Howler's onend, but keep UI consistent if it fires directly
+            el.addEventListener('ended', () => {
+              this.isPlaying = false;
+              try { this._onEndCbs.forEach(fn => { try { fn(); } catch {} }); } catch {}
+            });
+            el.__uiSyncBound = true;
+          }
         }
       } catch {}
     }
@@ -157,12 +174,12 @@ export class AudioCore {
     return this.sound ? this.sound.duration() : 0;
   }
 
-  // Event callback setters
-  onPlay(callback) { this.onPlayCallback = callback; }
-  onPause(callback) { this.onPauseCallback = callback; }
-  onEnd(callback) { this.onEndCallback = callback; }
-  onSeek(callback) { this.onSeekCallback = callback; }
-  onError(callback) { this.onErrorCallback = callback; }
+  // Event callback registration (additive)
+  onPlay(callback)  { if (typeof callback === 'function') this._onPlayCbs.push(callback); }
+  onPause(callback) { if (typeof callback === 'function') this._onPauseCbs.push(callback); }
+  onEnd(callback)   { if (typeof callback === 'function') this._onEndCbs.push(callback); }
+  onSeek(callback)  { if (typeof callback === 'function') this._onSeekCbs.push(callback); }
+  onError(callback) { if (typeof callback === 'function') this._onErrorCbs.push(callback); }
 
   // Optional: if you really want these global controls here, keep them headless
   setupEventListeners() {
