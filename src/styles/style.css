@@ -207,6 +207,18 @@ nav a{
   z-index: 1000;
 }
 
+/* Small banner/thumbnail for current audio (book cover) */
+.audioBanner{
+  width: 96px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
+  backdrop-filter: blur(10px);
+}
+
 .controls{
   display: flex;
   gap: 0.5rem;

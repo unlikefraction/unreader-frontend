@@ -1,4 +1,5 @@
 import { AudioSystem } from './audioAndTextGen.js';
+import { updatePositionState, setPlaybackState } from '../audio/media-session.js';
 import { ReadAlong } from '../audio/read-along.js';
 import { setItem as storageSet, getItem as storageGet } from '../storage.js';
 
@@ -114,6 +115,13 @@ export default class MultiPageReader {
       if (this.active < 0) return;
       const t = this.getCurrentTime();
       this._saveLastPlayedCookie(this.active, t);
+      // Push position to Media Session so OS/external UI shows progress
+      try {
+        const dur = this.getDuration();
+        const sys = this.instances[this.active];
+        const rate = sys?.audioCore?.playbackSpeed || 1;
+        updatePositionState({ duration: dur, position: t, playbackRate: rate });
+      } catch {}
     }, 2000);
   }
 
@@ -875,6 +883,7 @@ export default class MultiPageReader {
 
     for (let k = 0; k < this.instances.length; k++) { if (k !== this.active) this.instances[k]?.audioCore?.pauseAudio?.(); }
     await sys.play();
+    try { setPlaybackState('playing'); } catch {}
     this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(true);
     this._startProgressTimer();
     this._saveLastPlayedCookie(this.active, this.getCurrentTime());
@@ -891,6 +900,7 @@ export default class MultiPageReader {
     const suppressUI = this._autoplayOnReady || this._isLoadingActiveAudio;
 
     this.instances[this.active]?.pause?.();
+    try { setPlaybackState('paused'); } catch {}
 
     // Now reset the flags
     this._isLoadingActiveAudio = false;

@@ -1,5 +1,6 @@
 // -----appController.js-----
 import MultiPageReader from './multiPageReader.js';
+import { updateMediaSessionMetadata } from '../audio/media-session.js';
 import { HoldupManager } from './holdup.js';
 import { unskelton } from '../utils.js';
 import { getItem as storageGet } from '../storage.js';
@@ -116,13 +117,19 @@ export default class AppController {
       if (!userBookId) throw new Error('Missing ?id=');
 
       const book = await fetchBook(userBookId);
+      // Persist book meta for other modules
+      this.bookMeta = {
+        title: String(book?.title || '').trim() || 'book',
+        authors: Array.isArray(book?.authors) ? book.authors.filter(Boolean) : [],
+        coverUrl: String(book?.cover_image_url || '').trim() || ''
+      };
       // Determine if we should allow word-level highlighting
       const rawLang = String(book?.language || '').trim().toLowerCase();
       const isEnglish = !!rawLang && (
         rawLang === 'en' || rawLang.startsWith('en-') || rawLang.startsWith('en_')
       );
       const allowWordHighlighting = !!isEnglish;
-      const bookTitle = String(book?.title || '').trim() || 'book';
+      const bookTitle = this.bookMeta.title;
       try { if (bookTitle) document.title = `${bookTitle} | Unreader`; } catch {}
 
       const pages = Array.isArray(book.pages) ? [...book.pages] : [];
@@ -174,6 +181,17 @@ export default class AppController {
               const ctx = { pageNumber: pageNo, metadata: this._metadataForIndex(index) };
               // Switch LiveKit room on page change, show loading in holdup status
               await this.holdup.switchToPage(ctx);
+
+              // Update Media Session metadata with cover so external UIs show a banner
+              try {
+                const artist = this.bookMeta.authors.join(', ');
+                updateMediaSessionMetadata({
+                  title: `${this.bookMeta.title} — Page ${pageNo}`,
+                  artist,
+                  album: 'Unreader',
+                  coverUrl: this.bookMeta.coverUrl
+                });
+              } catch {}
             } catch (e) { printWarning('Holdup switchToPage error:', e); }
           },
           onDestroyed: () => this.holdup?.disconnect()
@@ -188,6 +206,18 @@ export default class AppController {
 
       // Seed the Page X of Y UI immediately on load
       updatePageDetails(startPageNo, this.pageDescriptors.length);
+
+      // Seed Media Session metadata + show in-app banner image
+      try {
+        const artist = this.bookMeta.authors.join(', ');
+        updateMediaSessionMetadata({
+          title: `${this.bookMeta.title} — Page ${startPageNo}`,
+          artist,
+          album: 'Unreader',
+          coverUrl: this.bookMeta.coverUrl
+        });
+      } catch {}
+      // Note: we no longer show the inline banner; external UIs handle artwork.
 
       // Align the start of the active page so its top sits at the height-setter line
       const alignToHeightSetter = (pageIndex) => {
