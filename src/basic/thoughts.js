@@ -70,6 +70,23 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   fab.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
 
+  // Keyboard shortcut: Alt/Option+T to toggle Thoughts (ignore when typing)
+  function isTypingTarget(el) {
+    const tag = (el?.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || el?.isContentEditable;
+  }
+  document.addEventListener('keydown', (e) => {
+    const isAltT = e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.code === 'KeyT' || (e.key && e.key.toLowerCase() === 't'));
+    if (isAltT) {
+      // Force toggle even if typing inside the thoughts textarea/input
+      e.preventDefault();
+      toggle();
+      return;
+    }
+    // Otherwise ignore when typing
+    if (isTypingTarget(e.target)) return;
+  });
+
   // Click-away to close
   document.addEventListener('click', (e) => {
     if (!popup.classList.contains('visible')) return;

@@ -217,9 +217,9 @@ function initializeShortcuts() {
       return;
     }
 
-    // Drawing tool shortcuts
+    // Drawing tool shortcuts (only when NO modifiers are held)
     const toolClass = DRAWING_SHORTCUTS[e.code];
-    if (toolClass) {
+    if (toolClass && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       handleDrawingShortcut(toolClass);
       return;

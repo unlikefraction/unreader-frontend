@@ -1,5 +1,9 @@
 // /src/basic/tooltips.js
 
+// Detect platform for proper modifier glyph/label
+const __isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || '');
+const __THOUGHTS_SHORTCUT = __isMac ? '⌥+T' : 'Alt+T';
+
 // className → [Tool Name, Shortcut, Position]
 const tools = {
   ".cursor": ["Cursor", "V", "right"],
@@ -12,6 +16,7 @@ const tools = {
   ".rectangle": ["Rectangle", "R", "right"],
   ".circle": ["Circle", "O", "right"],
   ".inbox": ["Inbox", null, "right"],
+  ".thoughtsFab": ["Thoughts", __THOUGHTS_SHORTCUT, "right"],
   ".hold-up": ["Holdup", "/", "top"],
   ".holdup": ["Holdup", "/", "top"],
 
