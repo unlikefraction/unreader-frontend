@@ -24,81 +24,56 @@ function countWords(text) {
   return normalized ? normalized.split(" ").length : 0;
 }
 
-// Auto-resize a textarea to fit its content height *without moving the viewport*
-// Auto-resize a textarea to fit its content height *without causing scroll jumps*
+// Auto-resize a textarea. If the height grows and the user was already
+// at the bottom, keep them pinned — but never on the very first run.
 function autoResizeTextarea(el) {
   if (!el) return;
   try {
-    const doc = document.documentElement;
-    const body = document.body;
+    // Detect if the viewport is currently near the bottom (before any changes)
+    const root = document.scrollingElement || document.documentElement || document.body;
+    const wasAtBottom = (root.scrollTop + root.clientHeight) >= (root.scrollHeight - 8);
 
-    // Save current scroll position
-    const prevScrollY = window.scrollY || doc.scrollTop || body.scrollTop || 0;
+    // Current visual height and desired content height
+    const styleH = parseFloat(el.style.height);
+    const prevRemembered = Number.isFinite(el.__autoSizePrevH) ? el.__autoSizePrevH : null;
+    const prevHeight = Number.isFinite(styleH)
+      ? styleH
+      : (prevRemembered !== null ? prevRemembered : (el.offsetHeight || 0));
+    const desiredHeight = el.scrollHeight; // content height regardless of CSS height
 
-    // Save caret position relative to viewport
-    let caretY = null;
-    if (document.activeElement === el) {
-      const selStart = el.selectionStart;
-      const dummy = document.createElement("span");
-      dummy.textContent = "\u200b"; // zero-width char
-      const range = el.value.substring(0, selStart);
-      const mirror = document.createElement("div");
+    const EPS = 2; // px, ignore minor jitter
+    const heightChanged = Number.isFinite(desiredHeight) && Math.abs(desiredHeight - prevHeight) > EPS;
+    const grew = heightChanged && desiredHeight > prevHeight + EPS;
 
-      // Mirror styles that affect layout
-      const style = getComputedStyle(el);
-      for (const prop of [
-        "font", "fontSize", "fontFamily", "lineHeight", "padding", "border",
-        "whiteSpace", "overflowWrap", "letterSpacing"
-      ]) {
-        mirror.style[prop] = style[prop];
+    // Only touch styles when the height actually changes
+    if (heightChanged) {
+      el.style.overflowY = "hidden";
+      el.style.height = `${desiredHeight}px`;
+      el.__autoSizePrevH = desiredHeight;
+
+      // If height grew and the user was already at bottom, keep them pinned
+      // Only after user has interacted with the textarea (avoid initial-load jumps)
+      const userInteracted = !!el.__autoSizeUserInteracted;
+      if (userInteracted && grew && wasAtBottom) {
+        const scrollToBottom = () => {
+          const maxH = root.scrollHeight;
+          try { window.scrollTo({ top: maxH, behavior: "smooth" }); }
+          catch { window.scrollTo(0, maxH); }
+        };
+        scrollToBottom();
+        requestAnimationFrame(scrollToBottom);
+        setTimeout(scrollToBottom, 180);
       }
-      mirror.style.position = "absolute";
-      mirror.style.visibility = "hidden";
-      mirror.style.whiteSpace = "pre-wrap";
-      mirror.style.wordWrap = "break-word";
-      mirror.style.width = el.offsetWidth + "px";
 
-      mirror.textContent = range;
-      mirror.appendChild(dummy);
-      document.body.appendChild(mirror);
-
-      const rect = dummy.getBoundingClientRect();
-      caretY = rect.top;
-      document.body.removeChild(mirror);
-    }
-
-    // Resize
-    el.style.height = "auto";
-    el.style.overflowY = "hidden";
-    const h = el.scrollHeight;
-    if (h && Number.isFinite(h)) el.style.height = `${h}px`;
-
-    // Restore scroll
-    if (caretY !== null) {
-      // Keep caret roughly in same viewport spot
-      const newCaretY = el.getBoundingClientRect().top + el.selectionEnd;
-      const diff = newCaretY - caretY;
-      window.scrollBy(0, diff);
-    } else {
-      // Fallback: restore page scroll
-      window.scrollTo(0, prevScrollY);
+      // mark that we've completed an autosize at least once
+      el.__autoSizeHasRun = true;
     }
   } catch {}
 }
 
 
 // Optional: belt-and-suspenders—neutralize incidental jumps during the input frame
-function lockViewportDuringInput(el) {
-  if (!el) return;
-  let rafId = null;
-  el.addEventListener('input', () => {
-    const y = window.scrollY || document.documentElement.scrollTop || 0;
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(() => {
-      window.scrollTo(0, y);
-    });
-  });
-}
+function lockViewportDuringInput(el) { /* no-op: viewport is allowed to move with growth */ }
 
 // === Timezone Setup ===
 const userTimezoneOffset = new Date().getTimezoneOffset() * 60000; // in ms
@@ -293,6 +268,8 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
 
   textarea.addEventListener("input", () => {
     dirty = true;
+    // Note user interaction so autosize can allow pin-to-bottom thereafter
+    try { textarea.__autoSizeUserInteracted = true; } catch {}
     debouncedCookie();
   });
 
@@ -559,19 +536,11 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
       updateThoughtWordCount();
       thoughtsInput.addEventListener('input', updateThoughtWordCount);
 
-      // Auto-grow: prefer global attachAutoGrow from HTML if available to avoid double wiring
-      if (typeof window.attachAutoGrow === 'function') {
-        try { window.attachAutoGrow(thoughtsInput); } catch {}
-      } else {
-        // Fallback lightweight auto-resize if attachAutoGrow isn't present
-        const doResize = () => autoResizeTextarea(thoughtsInput);
-        // Run after autosaver sets initial value and layout settles
-        requestAnimationFrame(() => requestAnimationFrame(doResize));
-        thoughtsInput.addEventListener('input', doResize);
-      }
-
-      // Keep viewport stable during input (extra guard; does not block user scroll)
-      lockViewportDuringInput(thoughtsInput);
+      // Always use custom auto-resize that also scrolls to bottom on growth
+      const doResize = () => autoResizeTextarea(thoughtsInput);
+      // Run after autosaver sets initial value and layout settles
+      requestAnimationFrame(() => requestAnimationFrame(doResize));
+      thoughtsInput.addEventListener('input', doResize);
     }
 
     // === Edit Cover (pencil) → file select → upload → POST update → update UI ===
