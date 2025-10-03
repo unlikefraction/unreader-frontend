@@ -4,7 +4,7 @@ import { getItem as storageGet } from './storage.js'
 // Global kill-switch: hard-disable all analytics.
 // When true, nothing initializes, no events are captured,
 // and the public API becomes a no-op.
-const ANALYTICS_DISABLED = true
+const ANALYTICS_DISABLED = false
 
 // module-scoped handle to clear background timers on navigation/HMR
 let __readingBumpTimer = null;
