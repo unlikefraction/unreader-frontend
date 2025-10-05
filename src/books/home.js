@@ -1,5 +1,6 @@
 import { unskelton, printError } from '../utils.js';
 import { getItem as storageGet } from '../storage.js';
+import { seedDefaultBooks, getDefaultBooks } from './defaultBooks.js';
 
 window.addEventListener("DOMContentLoaded", () => {
   // DOM refs
@@ -29,8 +30,62 @@ window.addEventListener("DOMContentLoaded", () => {
     if (++count >= 20) clearInterval(intervalId);
   }, 100);
 
-  // render function
-  function renderBooks(list) {
+  // helper: create a DOM card for a default template
+  function normKey(title = '', authors = []) {
+    const t = String(title || '').trim().toLowerCase();
+    const a = Array.isArray(authors) ? authors.map(x => String(x||'').trim().toLowerCase()).join('|') : '';
+    return `${t}|${a}`;
+  }
+
+  function renderDefaultTemplates(container, options = {}) {
+    const { existingGoogleIds = new Set(), existingTitleKeys = new Set() } = options;
+    try {
+      const defaults = getDefaultBooks().filter(b => {
+        const gid = (b.google_books_id || '').trim();
+        if (gid && existingGoogleIds.has(gid)) return false;
+        const key = normKey(b.details?.title, b.details?.authors || []);
+        if (key && existingTitleKeys.has(key)) return false;
+        return true;
+      });
+      defaults.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'book-items';
+        item.innerHTML = `
+          <a href="/createBook.html?template=${encodeURIComponent(t.id)}" class="main-book-wrap" title="Add ${t.details?.title || ''}">
+            <div class="book-cover" data-name="${(t.details?.title || '').toLowerCase()}" data-author="${(t.details?.authors||[]).join(', ').toLowerCase()}">
+              <div class="book-inside"></div>
+              <div class="book-image img-hidden">
+                <img src="${t.bookCover}" loading="lazy" alt="Cover of ${t.details?.title || 'book'}">
+                <div class="effect"></div>
+                <div class="light"></div>
+              </div>
+            </div>
+          </a>
+        `;
+        container.appendChild(item);
+
+        const img = item.querySelector('img');
+        const wrapper = item.querySelector('.book-image');
+        if (img && wrapper) {
+          const reveal = () => { wrapper.classList.remove('img-hidden'); };
+          if (img.complete) {
+            reveal();
+          } else {
+            const done = () => {
+              reveal();
+              img.removeEventListener('load', done);
+              img.removeEventListener('error', done);
+            };
+            img.addEventListener('load', done, { once: true });
+            img.addEventListener('error', done, { once: true });
+          }
+        }
+      });
+    } catch {}
+  }
+
+  // render function for user books, and prepend default templates if available
+  function renderBooks(list, { includeDefaults = true } = {}) {
     if (!bookWrapper) return;
     bookWrapper.innerHTML = "";
     list.forEach(book => {
@@ -73,13 +128,18 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       }
     });
+    if (includeDefaults) {
+      const ids = new Set(list.map(b => b.googleBooksId).filter(Boolean));
+      const titleKeys = new Set(list.map(b => normKey(b.title, b.authors || [])).filter(Boolean));
+      renderDefaultTemplates(bookWrapper, { existingGoogleIds: ids, existingTitleKeys: titleKeys });
+    }
   }
 
   // search handler: title, subtitle or any author
   function handleSearch() {
     const q = (searchInput?.value || "").trim().toLowerCase();
     if (!q) {
-      renderBooks(books);
+      renderBooks(books, { includeDefaults: true });
       return;
     }
     const filtered = books.filter(book => {
@@ -87,11 +147,14 @@ window.addEventListener("DOMContentLoaded", () => {
           || (book.subtitle && book.subtitle.toLowerCase().includes(q))
           || book.authors.some(a => a.toLowerCase().includes(q));
     });
-    renderBooks(filtered);
+    // On search, show only real books
+    renderBooks(filtered, { includeDefaults: false });
   }
   searchInput?.addEventListener("input", handleSearch);
 
-  // fetch your books from the API
+  // Seed defaults once, then fetch your books from the API
+  seedDefaultBooks().finally(() => {});
+
   const token = storageGet("authToken");
   fetch(`${window.API_URLS.BOOK}my-books/`, {
     headers: {
@@ -110,11 +173,12 @@ window.addEventListener("DOMContentLoaded", () => {
         subtitle:   b.subtitle,
         coverUrl:   b.cover_image_url,
         authors:    b.authors,
+        googleBooksId: b.google_books_id,
         oath:       b.oath,
         publisher:  b.publisher,
         language:   b.language
       }));
-      renderBooks(books);
+      renderBooks(books, { includeDefaults: true });
       unskelton();
     })
     .catch(err => {

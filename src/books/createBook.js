@@ -1,4 +1,5 @@
 import { getItem as storageGet } from '../storage.js';
+import { seedDefaultBooks, getDefaultBookById } from './defaultBooks.js';
 
 /*******************************
  * Unreader — Add a Book (createBook.js)
@@ -55,6 +56,7 @@ let uploadedFilename  = "";
 let pickedDetails     = null;
 let selectedOath      = "fire_oath";
 let lastClickedItemEl = null;
+let activeTemplateId  = null; // when launched from a default template
 
 /* NEW: Step 2 overrides */
 let customCoverUrl = "";   // uploaded cover image URL (if any)
@@ -236,6 +238,108 @@ async function handleUpload(file) {
     hideOverlay();
     printError(err);
     uploadStatus.textContent = "Unexpected error while uploading.";
+  }
+}
+
+/* ================================
+   DEFAULT TEMPLATE FLOW (auto-upload epub+cover from /public/epub)
+===================================*/
+async function startTemplateFlow(templateId) {
+  try {
+    await seedDefaultBooks();
+    const t = getDefaultBookById(templateId);
+    if (!t) return;
+    activeTemplateId = templateId;
+
+    const token = storageGet("authToken");
+    if (!token) {
+      alert("You're not logged in. Please log in first.");
+      return;
+    }
+
+    // --- Upload EPUB from local public asset ---
+    const epubUrl = t.epubFile;
+    const epubName = (epubUrl.split('/').pop() || 'book.epub');
+    uploadStatus.innerHTML = `<span class="spinner"></span> Uploading ${epubName}…`;
+    dzHint.textContent = epubName;
+
+    try {
+      const epubResp = await fetch(epubUrl, { cache: 'no-store' });
+      if (!epubResp.ok) throw new Error(`Failed to fetch local epub (${epubResp.status})`);
+      const epubBlob = await epubResp.blob();
+      // Construct a File from the blob so backend associates name
+      const epubFile = new File([epubBlob], epubName, { type: epubBlob.type || 'application/epub+zip' });
+
+      const form = new FormData();
+      form.append('book_file', epubFile);
+
+      showOverlay("Uploading EPUB…");
+      const res = await fetch(`${API_URLS.BOOK}assets/upload/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: form
+      });
+      const data = await res.json().catch(() => ({}));
+      hideOverlay();
+      if (!res.ok) {
+        uploadStatus.textContent = `Upload failed (${res.status}).`;
+        printError('Upload error (template):', data);
+        return;
+      }
+      uploadedFileUrl = data.files?.[epubName] || '';
+      uploadedFilename = (t.details?.searchText || t.details?.title || epubName.replace(/\.epub$/i, ''));
+      uploadStatus.textContent = '✅ Uploaded.';
+
+      // Try EPUB metadata — helps with auto-pick quality
+      const meta = await fetchEpubMetadata(uploadedFileUrl, token);
+      const derivedText = deriveSearchTextFromMetadata(meta, uploadedFilename);
+      uploadedFilename = derivedText;
+
+      // Proceed to Step 2
+      initStep2();
+      setStep(2);
+
+      // Auto-pick via Google Books using derived or provided search text
+      if (uploadedFilename.trim()) {
+        autoPickArmed = true;
+        toggleSearchArea(false);
+        await doSearch(uploadedFilename.trim());
+      } else {
+        toggleSearchArea(true);
+      }
+
+    } catch (e) {
+      hideOverlay();
+      printError('Template EPUB upload failed:', e);
+      uploadStatus.textContent = 'Unexpected error while uploading template.';
+      return;
+    }
+
+    // --- Upload cover image from local public asset (sets customCoverUrl) ---
+    try {
+      const coverUrl = t.bookCover;
+      const coverName = (coverUrl.split('/').pop() || 'cover.png');
+      const coverResp = await fetch(coverUrl, { cache: 'no-store' });
+      if (coverResp.ok) {
+        const coverBlob = await coverResp.blob();
+        const coverFile = new File([coverBlob], coverName, { type: coverBlob.type || 'image/png' });
+        const uploadedCover = await uploadCoverImage(coverFile);
+        if (uploadedCover) {
+          customCoverUrl = uploadedCover;
+          // If Step 2 already selected a book and user hasn't changed cover, reflect uploaded
+          const imgEl = document.getElementById('pickedCoverImg');
+          if (imgEl && !imgEl.dataset.userEdited) {
+            imgEl.src = customCoverUrl;
+          }
+        }
+      }
+    } catch (e) {
+      // Non-fatal; user can still proceed with default cover
+      printWarning('Template cover upload failed:', e);
+    }
+
+  } catch (err) {
+    printError('Template flow error:', err);
   }
 }
 
@@ -842,6 +946,7 @@ async function createBookOnBackend() {
     }
 
     createStatus.textContent = "✅ Done. Redirecting…";
+    // No per-user template state needed anymore
     setTimeout(() => {
       window.location.href = `/bookDetails.html?id=${data.book_id}`;
     }, 600);
@@ -854,3 +959,15 @@ async function createBookOnBackend() {
     takeOathBtn.textContent = "I take the oath, continue →";
   }
 }
+
+/* ================================
+   BOOT: detect template param and auto-start
+===================================*/
+try {
+  const params = new URLSearchParams(location.search || '');
+  const templ = params.get('template');
+  if (templ) {
+    // Defer to ensure DOM refs above exist
+    window.addEventListener('DOMContentLoaded', () => startTemplateFlow(templ));
+  }
+} catch {}

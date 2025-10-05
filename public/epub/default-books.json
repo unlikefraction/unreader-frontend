@@ -1,0 +1,35 @@
+[
+  {
+    "id": "atomic",
+    "google_books_id": "mSiOEAAAQBAJ",
+    "details": {
+      "title": "Atomic Habits",
+      "authors": ["James Clear"],
+      "searchText": "Atomic Habits James Clear"
+    },
+    "bookCover": "/epub/atomicHabitsCover.png",
+    "epubFile": "/epub/atomic.epub"
+  },
+  {
+    "id": "tfas",
+    "google_books_id": "oV1tXT3HigoC",
+    "details": {
+      "title": "Thinking, Fast and Slow",
+      "authors": ["Daniel Kahneman"],
+      "searchText": "Thinking, Fast and Slow Daniel Kahneman"
+    },
+    "bookCover": "/epub/thinkingFastAndSlowCover.png",
+    "epubFile": "/epub/tfas.epub"
+  },
+  {
+    "id": "friends",
+    "google_books_id": "GZBOEAAAQBAJ",
+    "details": {
+      "title": "How to Win Friends and Influence People",
+      "authors": ["Dale Carnegie"],
+      "searchText": "How to Win Friends and Influence People Dale Carnegie"
+    },
+    "bookCover": "/epub/winFriends.png",
+    "epubFile": "/epub/friends.epub"
+  }
+]
