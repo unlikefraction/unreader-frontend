@@ -258,6 +258,9 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
   let dirty = false;
   let lastSent = textarea.value;
   let syncing = false;
+  let lastLocalChangeAt = null; // Date
+  let lastSentAt = null;        // Date
+  let lastServerSeenAt = null;  // Date
 
   const saveLocal = () => {
     try {
@@ -271,6 +274,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     // Note user interaction so autosize can allow pin-to-bottom thereafter
     try { textarea.__autoSizeUserInteracted = true; } catch {}
     debouncedCookie();
+    lastLocalChangeAt = new Date();
   });
 
   async function pushToServer() {
@@ -279,9 +283,13 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     if (txt === lastSent) { dirty = false; return; }
     try {
       syncing = true;
-      await updateUserBook(userBookId, { thoughts: txt }, token);
+      await updateUserBook(userBookId, {
+        thoughts: txt,
+        last_updated_at: (lastLocalChangeAt ? lastLocalChangeAt : new Date()).toISOString()
+      }, token);
       lastSent = txt;
       dirty = false;
+      lastSentAt = lastLocalChangeAt || new Date();
     } catch (err) {
       printError("Thoughts sync failed:", err);
       // keep dirty so we retry on next tick or click
@@ -297,7 +305,8 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
   window.addEventListener("beforeunload", () => {
     saveLocal();
     if (token) {
-      const payload = JSON.stringify({ thoughts: textarea.value });
+      const iso = (lastLocalChangeAt ? lastLocalChangeAt : new Date()).toISOString();
+      const payload = JSON.stringify({ thoughts: textarea.value, last_updated_at: iso });
       navigator.sendBeacon?.(
         `${window.API_URLS.BOOK}update/${userBookId}/`,
         new Blob([payload], { type: "application/json" })
@@ -305,10 +314,43 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     }
   });
 
+  // Poll server for latest every 5s and reconcile
+  async function fetchLatest() {
+    if (!token || !userBookId) return;
+    try {
+      const res = await fetch(`${window.API_URLS.BOOK}get-details/${userBookId}/?pages=false`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const serverTxt = data?.thoughts ?? '';
+      const serverTsStr = data?.thoughts_updated_at;
+      const serverTs = serverTsStr ? new Date(serverTsStr) : null;
+      if (serverTs && (!lastServerSeenAt || serverTs > lastServerSeenAt)) {
+        lastServerSeenAt = serverTs;
+      }
+      if (serverTs && (!lastLocalChangeAt || serverTs > lastLocalChangeAt)) {
+        if (textarea.value !== serverTxt) {
+          textarea.value = serverTxt || '';
+          lastSent = textarea.value;
+          dirty = false;
+          try { textarea.dispatchEvent(new Event('input')); } catch {}
+        }
+      }
+    } catch {}
+  }
+  const pollInterval = setInterval(fetchLatest, 5_000);
+  fetchLatest();
+
   return {
     stop: () => {
       clearInterval(intervalId);
       document.removeEventListener("click", clickHandler, true);
+      clearInterval(pollInterval);
     },
     forceSync: pushToServer
   };
@@ -525,6 +567,7 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
         token,
         initialServerText: book.thoughts || ''
       });
+      try { if (window.__thoughtsAutosaver && typeof window.__thoughtsAutosaver.stop === 'function') window.__thoughtsAutosaver.stop(); } catch {}
       window.__thoughtsAutosaver = autosaver; // optional: for debugging
 
       // Live word count

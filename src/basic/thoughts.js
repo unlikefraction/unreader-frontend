@@ -25,12 +25,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const userBookId = getUserBookId();
   const storageKey = userBookId ? `ub_thoughts_${userBookId}` : null;
+  const token = storageGet('authToken');
 
-  // Load cached thoughts (from bookDetails autosave or prior session)
+  // If a previous sync instance exists (HMR or re-entry), stop it first
+  try { if (window.__thoughtsSync && typeof window.__thoughtsSync.stop === 'function') window.__thoughtsSync.stop(); } catch {}
+
+  // Track timestamps for conflict resolution
+  let lastLocalChangeAt = null; // Date
+  let lastSentAt = null;        // Date
+  let lastServerSeenAt = null;  // Date
+
+  // Load cached thoughts (from prior session)
   if (storageKey) {
     try {
       const cached = localStorage.getItem(storageKey);
       if (cached != null) textarea.value = cached;
+      const tsStr = localStorage.getItem(`${storageKey}:ts`);
+      if (tsStr) { try { lastLocalChangeAt = new Date(tsStr); } catch {} }
     } catch {}
   }
 
@@ -44,12 +55,124 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
   const debouncedSave = debounce(saveLocal, 500);
+  // timestamps declared above
+
   textarea.addEventListener('input', () => {
     // live word count on each keystroke
     wordNumEl.textContent = String(countWords(textarea.value));
     // debounce local persistence
     debouncedSave();
+    // mark dirty for backend sync
+    try { dirty = true; } catch {}
+    lastLocalChangeAt = new Date();
+    // persist client ts for potential cross-reload hints
+    if (storageKey) {
+      try { localStorage.setItem(`${storageKey}:ts`, lastLocalChangeAt.toISOString()); } catch {}
+    }
   });
+
+  // Backend autosync (every ~10s, on any click, and on unload)
+  let lastSent = textarea.value;
+  let dirty = false;
+
+  async function pushToServer() {
+    // Require essentials
+    if (!token || !userBookId) return;
+    if (!dirty) return;
+    const txt = textarea.value;
+    if (txt === lastSent) { dirty = false; return; }
+    try {
+      const res = await fetch(`${window.API_URLS.BOOK}update/${userBookId}/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          thoughts: txt,
+          last_updated_at: (lastLocalChangeAt ? lastLocalChangeAt : new Date()).toISOString()
+        })
+      });
+      if (!res.ok) {
+        // keep dirty so we can retry later
+        return;
+      }
+      lastSent = txt;
+      dirty = false;
+      lastSentAt = lastLocalChangeAt || new Date();
+    } catch (err) {
+      try { console.error('Thoughts sync (readBook) failed:', err); } catch {}
+    }
+  }
+
+  // interval sync ~10s
+  const syncInterval = setInterval(pushToServer, 10_000);
+  // opportunistic sync on any click (capture)
+  const clickHandler = () => { pushToServer(); };
+  document.addEventListener('click', clickHandler, true);
+
+  // Poll server for latest every 5s and reconcile with local
+  async function fetchLatest() {
+    if (!token || !userBookId) return;
+    try {
+      const res = await fetch(`${window.API_URLS.BOOK}get-details/${userBookId}/?pages=false`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const serverTxt = data?.thoughts ?? '';
+      const serverTsStr = data?.thoughts_updated_at;
+      const serverTs = serverTsStr ? new Date(serverTsStr) : null;
+      if (serverTs && (!lastServerSeenAt || serverTs > lastServerSeenAt)) {
+        lastServerSeenAt = serverTs;
+      }
+      // Compare server timestamp vs last local change; adopt server if newer
+      if (serverTs && (!lastLocalChangeAt || serverTs > lastLocalChangeAt)) {
+        if (textarea.value !== serverTxt) {
+          textarea.value = serverTxt || '';
+          wordNumEl.textContent = String(countWords(textarea.value));
+          saveLocal();
+          lastSent = textarea.value;
+          dirty = false; // we just aligned to server
+        }
+      }
+    } catch {}
+  }
+  const pollInterval = setInterval(fetchLatest, 5_000);
+  // Prime once soon after load
+  fetchLatest();
+
+  // beacon on unload
+  window.addEventListener('beforeunload', () => {
+    saveLocal();
+    if (navigator.sendBeacon && token && userBookId) {
+      const iso = (lastLocalChangeAt ? lastLocalChangeAt : new Date()).toISOString();
+      const payload = JSON.stringify({ thoughts: textarea.value, last_updated_at: iso });
+      try {
+        navigator.sendBeacon(
+          `${window.API_URLS.BOOK}update/${userBookId}/`,
+          new Blob([payload], { type: 'application/json' })
+        );
+      } catch {}
+    }
+    try { clearInterval(syncInterval); } catch {}
+    try { clearInterval(pollInterval); } catch {}
+    try { document.removeEventListener('click', clickHandler, true); } catch {}
+  });
+
+  // Expose a stop hook to avoid duplicate intervals if re-initialized
+  window.__thoughtsSync = {
+    stop() {
+      try { clearInterval(syncInterval); } catch {}
+      try { clearInterval(pollInterval); } catch {}
+      try { document.removeEventListener('click', clickHandler, true); } catch {}
+    }
+  };
 
   // Toggle open/close
   const toggle = () => {
