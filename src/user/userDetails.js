@@ -42,6 +42,16 @@ async function fetchUserInfo() {
 async function updateUserDetails() {
   try {
     const data = await fetchUserInfo();
+
+    // If the backend indicates no access, redirect to bouncer page
+    try {
+      const path = (location.pathname || '').toLowerCase();
+      const onBouncer = /\/bouncer\.html(?:$|[?#])/.test(path);
+      if (data && data.has_access === false && !onBouncer) {
+        window.location.assign('/bouncer.html');
+        return; // stop further UI updates on this page
+      }
+    } catch {}
     if (data.credits != null) {
       const formattedCredits = `$ ${data.credits}`;
 
