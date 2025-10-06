@@ -6,6 +6,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
+        bouncer: resolve(__dirname, 'bouncer.html'),
         index: resolve(__dirname, 'index.html'),
         home: resolve(__dirname, 'home.html'),
         login: resolve(__dirname, 'login.html'),
