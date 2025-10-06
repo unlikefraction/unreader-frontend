@@ -33,6 +33,8 @@ function applyInitialButton() {
   buttonEl.textContent = 'check with bouncer';
   // Initial action submits the message
   buttonEl.onclick = handleSubmit;
+  // Re-enable input in default state
+  try { if (inputEl) inputEl.disabled = false; } catch {}
   updateButtonState();
 }
 
@@ -41,6 +43,8 @@ function applyAcceptedButton() {
   buttonEl.classList.add('accepted-state', 'iconified');
   buttonEl.innerHTML = 'access unreader <i class="ph ph-arrow-right"></i>';
   buttonEl.disabled = false;
+  // Disable input after acceptance
+  try { if (inputEl) inputEl.disabled = true; } catch {}
   buttonEl.onclick = () => { window.location.assign('/'); };
 }
 
@@ -49,11 +53,13 @@ function applyDeniedButton() {
   buttonEl.classList.add('denied-state', 'iconified');
   buttonEl.innerHTML = 'try again <i class="ph ph-arrows-clockwise"></i>';
   buttonEl.disabled = false;
+  // Disable input after denial
+  try { if (inputEl) inputEl.disabled = true; } catch {}
   buttonEl.onclick = () => {
     // Reset to initial state; hide access details until next response
     try { if (accessDetails) accessDetails.classList.remove('show'); } catch {}
     try { if (accessContainer) accessContainer.classList.remove('accepted', 'denied'); } catch {}
-    if (inputEl) { inputEl.value = ''; }
+    if (inputEl) { inputEl.value = ''; inputEl.disabled = false; }
     applyInitialButton();
     inputEl?.focus?.();
   };
