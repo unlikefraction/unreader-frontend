@@ -47,7 +47,9 @@ async function updateUserDetails() {
     try {
       const path = (location.pathname || '').toLowerCase();
       const onBouncer = /\/bouncer\.html(?:$|[?#])/.test(path);
-      if (data && data.has_access === false && !onBouncer) {
+      // Do NOT redirect away from the account setup (name) page
+      const onAccountSetup = /\/accountsetup\.html(?:$|[?#])/.test(path);
+      if (data && data.has_access === false && !onBouncer && !onAccountSetup) {
         window.location.assign('/bouncer.html');
         return; // stop further UI updates on this page
       }

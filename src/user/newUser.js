@@ -144,7 +144,8 @@ import { getItem as storageGet, setItem as storageSet, removeItem as storageRemo
   
       try {
         await updateUserInfo(name);
-        window.location.href = '/home.html';
+        // After completing name setup, go to bouncer for access
+        window.location.href = '/bouncer.html';
       } catch (err) {
         printError('❌ Error updating user:', err);
         alert('Something went wrong. Please try again.');
