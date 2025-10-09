@@ -59,6 +59,7 @@ export default class MultiPageReader {
     observeRadius = 0.75,
     userBookId = null,
     allowWordHighlighting = true,
+    pinFirstParagraphOnInit = false,
     callbacks = {}
   } = {}) {
     this.pageMeta = pages.slice();
@@ -69,6 +70,7 @@ export default class MultiPageReader {
     this.lazyHydration = !!lazyHydration;
     this.prefetchRadius = Math.max(0, prefetchRadius | 0);
     this.observeRadius = Math.max(0, Math.min(1, observeRadius ?? 0.75));
+    this._pinFirstParagraphOnInit = !!pinFirstParagraphOnInit;
     this._controlsBound = false;
     this._paragraphClicksBound = false;
     this._onEndHandlers = new WeakMap();
@@ -630,6 +632,11 @@ export default class MultiPageReader {
     // Seed paragraph navigation around the initial active page
     this._seedParagraphNavAround(pageIndex);
 
+    // If requested (first-time open with backend start_page), pin the play icon
+    if (this._pinFirstParagraphOnInit) {
+      try { this._pinFirstParagraphOnInitialPage(pageIndex); } catch {}
+    }
+
     // NOTE:
     // Audio (and any holdup notifications) only kick in when the user triggers:
     // - play()
@@ -726,6 +733,27 @@ export default class MultiPageReader {
   }
 
   getActive() { return this.active; }
+
+  // Pin the paragraph play icon to the first <p> of the initial active page
+  async _pinFirstParagraphOnInitialPage(pageIndex) {
+    try {
+      const sys = this.instances[pageIndex] || await this.hydratePage(pageIndex);
+      if (!sys) return;
+      // Ensure the paragraph hover UI exists so the icon can be positioned
+      try { sys.paragraphSeeker?.enableParagraphNavigation?.(); } catch {}
+
+      const meta = this.pageMeta[pageIndex]; if (!meta) return;
+      const pageId = slugify(meta.pageKey || `page-${meta.page_number}-${pageIndex}`);
+      const pageEl = document.getElementById(`mainContent-${pageId}`) || this.#pageEl(pageIndex);
+      if (!pageEl) return;
+      const firstP = pageEl.querySelector('p');
+      if (!firstP) return;
+      // Pin the shared icon to the first paragraph
+      if (typeof sys.paragraphSeeker?.pinIconToParagraph === 'function') {
+        sys.paragraphSeeker.pinIconToParagraph(firstP);
+      }
+    } catch {}
+  }
 
   /* ---------- helper: toggle spinner on paragraph chips ---------- */
   _setParagraphChipLoading(pageIndex, paragraphText, isLoading) {

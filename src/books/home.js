@@ -15,10 +15,68 @@ window.addEventListener("DOMContentLoaded", () => {
   // no cookies — use localStorage via storage util
 
 
-  // ----- Greeting text -----
+  // Create floating edit-name button (once)
+  const editBtn = document.createElement('button');
+  editBtn.className = 'editNameButton';
+  editBtn.textContent = 'edit name';
+  editBtn.style.display = 'none';
+  editBtn.addEventListener('click', () => {
+    window.location.href = '/accountSetup.html';
+  });
+  document.body.appendChild(editBtn);
+
+  let currentNameSpan = null;
+  let hideTimer = null;
+
+  function positionEditButton() {
+    if (!currentNameSpan) return;
+    const rect = currentNameSpan.getBoundingClientRect();
+    // Place centered above the name span
+    editBtn.style.position = 'fixed';
+    editBtn.style.left = `${rect.left + rect.width / 2}px`;
+    editBtn.style.top = `${rect.top}px`;
+    editBtn.style.transform = 'translate(-50%, calc(-100% - 4px)) rotate(-4deg)';
+    editBtn.style.zIndex = '1000';
+    editBtn.style.cursor = 'pointer';
+  }
+
+  function showEdit() {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    positionEditButton();
+    editBtn.style.display = 'block';
+  }
+
+  function scheduleHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      if (!editBtn.matches(':hover')) {
+        editBtn.style.display = 'none';
+      }
+    }, 150);
+  }
+
+  editBtn.addEventListener('mouseenter', () => {
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+  });
+  editBtn.addEventListener('mouseleave', scheduleHide);
+
+  // ----- Greeting text with name span -----
   const updateGreeting = () => {
     const name = localStorage.getItem("name") || "bro";
-    if (titleEl) titleEl.textContent = `what we reading today, ${name}?`;
+    if (!titleEl) return;
+    // Rebuild title content safely: text + span(name) + text
+    titleEl.innerHTML = '';
+    titleEl.append(document.createTextNode('what we reading today, '));
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'userNameSpan';
+    nameSpan.textContent = name;
+    titleEl.append(nameSpan);
+    titleEl.append(document.createTextNode('?'));
+
+    currentNameSpan = nameSpan;
+    // Hover interactions
+    nameSpan.addEventListener('mouseenter', showEdit);
+    nameSpan.addEventListener('mouseleave', scheduleHide);
   };
   updateGreeting();
   if (subEl) subEl.textContent = "or starting a new book?";
@@ -29,6 +87,14 @@ window.addEventListener("DOMContentLoaded", () => {
     updateGreeting();
     if (++count >= 20) clearInterval(intervalId);
   }, 100);
+
+  // Keep button positioned on viewport changes if visible
+  window.addEventListener('scroll', () => {
+    if (editBtn.style.display !== 'none') positionEditButton();
+  }, { passive: true });
+  window.addEventListener('resize', () => {
+    if (editBtn.style.display !== 'none') positionEditButton();
+  });
 
   // helper: create a DOM card for a default template
   function normKey(title = '', authors = []) {

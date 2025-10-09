@@ -100,6 +100,24 @@
     text-decoration-style: double !important;
 }
 
+/* Inline username wrapper to detect hover */
+.userNameSpan {
+    position: relative;
+    cursor: pointer;
+}
+
+/* Floating edit-name button: styled like account addCreditsButton */
+.editNameButton {
+    background: #F8F8F8;
+    border: 1px solid #B2B2B2;
+    box-shadow: 0px 2px 2.8px rgba(0, 0, 0, 0.15);
+    border-radius: 5px;
+    padding: 0.2rem 0.5rem;
+    width: fit-content;
+    font-size: 14px;
+    color: #373737;
+}
+
 .library{
     width: 90%;
     max-width: 750px;

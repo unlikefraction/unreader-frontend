@@ -20,6 +20,9 @@ export class ParagraphSeeker {
     this.contextWindow = contextWindow;
     this.cleanPattern = cleanPattern;
 
+    // Pinned icon state (when we want the play icon always visible on a target paragraph)
+    this._pinned = { active: false, paragraphEl: null, onScroll: null, onResize: null };
+
     // respect edit mode for selection
     document.body.style.userSelect = commonVars.beingEdited ? 'none' : '';
 
@@ -363,6 +366,8 @@ export class ParagraphSeeker {
   _scheduleHideIcon() {
     clearTimeout(this._hideTO);
     this._hideTO = setTimeout(() => {
+      // Do not auto-hide when pinned
+      if (this._pinned?.active) return;
       if (this._iconHovering) return;
       const overP = this._currentParagraphEl?.matches?.(':hover');
       if (!overP && this._playIcon) this._playIcon.style.display = 'none';
@@ -394,12 +399,65 @@ export class ParagraphSeeker {
       try { el.removeEventListener('mouseleave', leave); } catch {}
     });
     this._paragraphListeners = [];
+    // ensure pinned state is cleared and listeners removed
+    try { this.unpinIcon(); } catch {}
     this._currentParagraphEl = null;
     this._currentParagraphText = '';
     this._iconHovering = false;
     clearTimeout(this._hideTO);
     clearTimeout(this._rebindTO);
     printl?.('❌ Paragraph hover navigation disabled');
+  }
+
+  /**
+   * Pin the shared play icon to a given <p> element and keep it visible at all times.
+   * Also repositions it on scroll/resize so it stays aligned.
+   */
+  pinIconToParagraph(pEl) {
+    try {
+      const main = this.textProcessor?.container;
+      if (!main || !pEl) return;
+      // Ensure UI exists
+      if (!this._playIcon || !main.contains(this._playIcon)) {
+        this.setupParagraphHoverNavigation();
+      }
+      this._pinned = this._pinned || { active: false, paragraphEl: null, onScroll: null, onResize: null };
+      this._pinned.paragraphEl = pEl;
+      this._pinned.active = true;
+
+      const reposition = () => {
+        try { this._showIconForParagraph(this._pinned.paragraphEl); } catch {}
+      };
+      // Remove prior listeners if any
+      try { if (this._pinned.onScroll) window.removeEventListener('scroll', this._pinned.onScroll, { capture: false }); } catch {}
+      try { if (this._pinned.onResize) window.removeEventListener('resize', this._pinned.onResize, { capture: false }); } catch {}
+      // Throttle via rAF
+      let rafId = null;
+      const onScroll = () => { if (rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(reposition); };
+      const onResize = () => { if (rafId) cancelAnimationFrame(rafId); rafId = requestAnimationFrame(reposition); };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onResize);
+      this._pinned.onScroll = onScroll;
+      this._pinned.onResize = onResize;
+
+      // Show now
+      reposition();
+    } catch {}
+  }
+
+  /** Unpin the icon and restore normal hover behavior */
+  unpinIcon() {
+    try {
+      if (!this._pinned) return;
+      try { if (this._pinned.onScroll) window.removeEventListener('scroll', this._pinned.onScroll); } catch {}
+      try { if (this._pinned.onResize) window.removeEventListener('resize', this._pinned.onResize); } catch {}
+      this._pinned.onScroll = null;
+      this._pinned.onResize = null;
+      this._pinned.paragraphEl = null;
+      this._pinned.active = false;
+      // Hide if not hovering any paragraph
+      this._scheduleHideIcon();
+    } catch {}
   }
 
   // ---------- tuning ----------

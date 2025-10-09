@@ -134,8 +134,18 @@ export default class AppController {
 
       const pages = Array.isArray(book.pages) ? [...book.pages] : [];
       pages.sort((a, b) => (a.page_number || 0) - (b.page_number || 0));
-
-      const anchor = computeAnchorIndex(pages);
+      // Decide the initial anchor (page index)
+      // Default: next after last read (or first page if none read)
+      let anchor = computeAnchorIndex(pages);
+      // If user has no current progress and backend suggests a start_page, honor it
+      try {
+        const hasCurrent = !!(book && book.current_page && (typeof book.current_page.page_number !== 'undefined' && book.current_page.page_number !== null));
+        const startPn = (book && book.start_page && typeof book.start_page.page_number !== 'undefined') ? book.start_page.page_number : null;
+        if (!hasCurrent && startPn != null) {
+          const idx = pages.findIndex(p => p.page_number === startPn);
+          if (idx >= 0) anchor = idx;
+        }
+      } catch {}
       // Delay removing skeleton UI until after we’ve aligned the initial scroll
 
       this.pageDescriptors = pages.map(p => ({
@@ -162,6 +172,15 @@ export default class AppController {
       });
 
       // Reader
+      // If we're honoring a start page (first-time open), ask reader to pin the first paragraph icon
+      const isNewToBook = (() => {
+        try {
+          const hasCurrent = !!(book && book.current_page && (typeof book.current_page.page_number !== 'undefined' && book.current_page.page_number !== null));
+          const anyRead = Array.isArray(pages) && pages.some(p => !!p.is_read);
+          return !hasCurrent && !anyRead && !!book?.start_page;
+        } catch { return false; }
+      })();
+
       this.reader = new MultiPageReader(this.pageDescriptors, {
         autoPlayFirst: false,
         initialActiveIndex: anchor,
@@ -169,6 +188,7 @@ export default class AppController {
         prefetchRadius: 1,
         observeRadius: 0.75,
         userBookId,
+        pinFirstParagraphOnInit: isNewToBook,
         // Disable word-level highlighting for non-English content
         allowWordHighlighting,
         callbacks: {
