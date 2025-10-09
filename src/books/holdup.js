@@ -362,15 +362,16 @@ export class HoldupManager {
       if (this._cb.onEngageStart) { try { this._cb.onEngageStart(); } catch {} }
       try { if (window.Analytics) window.Analytics.capture('holdup_engage_start', { page_number: this._currentPage || null }); } catch {}
     } else {
-      // MUTE: slam remote output to 0 instantly, then mute mic if present
+      // MUTE (soft): keep the LiveKit room connected, but mute output and mic.
+      // Do NOT disconnect here. We only disconnect on page change, navigation,
+      // explicit teardown, inactivity timeout, or the 5-minute hard cap.
       this._outputMuted = true;
       this._applyOutputMuteState();
       try { await this.localMicTrack?.mute?.(); } catch {}
 
-      // Immediately drop the session when user stops engaging
-      this._setStatus('Disconnecting…');
-      await this.disconnect();
-      // After disconnect(), button is reset to neutral
+      // Reflect muted-but-connected state
+      this._setStatus('Muted (connected)');
+      this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
       if (this._cb.onEngageEnd) { try { this._cb.onEngageEnd(); } catch {} }
       try { if (window.Analytics) window.Analytics.capture('holdup_engage_end', { page_number: this._currentPage || null }); } catch {}
     }
