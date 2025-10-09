@@ -141,15 +141,37 @@ import { getItem as storageGet, setItem as storageSet, removeItem as storageRemo
     btn.addEventListener('click', async () => {
       const name = toTitleCase(input.value);
       if (!name) return;
-  
+
       try {
         await updateUserInfo(name);
-        // After completing name setup, go to bouncer for access
-        window.location.href = '/bouncer.html';
+
+        // After completing name setup, redirect based on access
+        try {
+          const token = storageGet('authToken');
+          const url = `${window.API_URLS.USER}info/`;
+
+          let hasAccess = false;
+          if (token) {
+            const res = await fetch(url, {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+              }
+            });
+            if (res.ok) {
+              const info = await res.json();
+              hasAccess = info?.has_access === true;
+            }
+          }
+
+          window.location.href = hasAccess ? '/home.html' : '/bouncer.html';
+        } catch (e) {
+          // On any error determining access, be safe and send to bouncer
+          window.location.href = '/bouncer.html';
+        }
       } catch (err) {
         printError('❌ Error updating user:', err);
         alert('Something went wrong. Please try again.');
       }
     });
-  });
-  
+});

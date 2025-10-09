@@ -45,7 +45,7 @@ function applyAcceptedButton() {
   buttonEl.disabled = false;
   // Disable input after acceptance
   try { if (inputEl) inputEl.disabled = true; } catch {}
-  buttonEl.onclick = () => { window.location.assign('/'); };
+  buttonEl.onclick = () => { window.location.assign('/home.html'); };
 }
 
 function applyDeniedButton() {
@@ -172,3 +172,25 @@ function stopThinkingButton() {
     __thinkingTimer = null;
   }
 }
+
+// --- Access gate on load ---
+async function checkAccessOnLoad() {
+  try {
+    const token = storageGet('authToken');
+    if (!token) return; // allow bouncer UI; userDetails.js will handle broader gating
+    const url = `${window.API_URLS.USER}info/`;
+    const res = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.has_access === true) {
+      window.location.replace('/home.html');
+    }
+  } catch {}
+}
+
+checkAccessOnLoad();
