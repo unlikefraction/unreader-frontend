@@ -8,6 +8,13 @@ body{
   overflow-x: hidden;
 }
 
+/* UI custom properties */
+:root {
+  /* Keep in sync with .heightSetter width */
+  --height-setter-width: 40px;
+  --height-setter-gap: 20px; /* desired gap between info and handle */
+}
+
 ::-moz-selection {
   color: rgb(255, 255, 255);
   background: rgb(0, 0, 0);
@@ -331,7 +338,7 @@ nav a{
 
 .heightSetter{
   display: flex;
-  width: 40px;
+  width: var(--height-setter-width);
   height: 80px;
   align-items: center;
   justify-content: right;
@@ -345,6 +352,14 @@ nav a{
 
 .heightSetter:hover{
   opacity: 1;
+}
+
+/* Position the helper info 20px to the left of the height setter */
+.heightSetterInfo {
+  position: fixed;
+  /* Place the info to the left of the handle with a 20px gap */
+  right: calc(var(--height-setter-width) + var(--height-setter-gap));
+  z-index: 10000;
 }
 
 .pageDetailsBottomRight{
@@ -1179,6 +1194,7 @@ canvas{
   /* Hide whiteboard/canvas/tooling */
   .leftControls,
   .heightSetter,
+  .heightSetterInfo,
   canvas,
   .paragraph-hover-nav,
   .paragraph-hover-area {
@@ -1236,3 +1252,100 @@ canvas{
 /* Crosshair cursor during drawing tools (all except normal cursor tool) */
 body.drawing-mode { cursor: crosshair !important; }
 body.drawing-mode * { cursor: crosshair !important; }
+
+.heightSetterInfo{
+  display: flex;
+  flex-direction: column;
+  justify-content: right;
+  align-items: flex-end;
+  margin-top: -5.5rem;
+}
+
+.heightSetterInfo .mainOnboardingContent{
+    display: flex;
+    flex-direction: column;
+    /* Align children (including button) to the right */
+    align-items: flex-end
+}
+
+.heightSetterInfo p{
+  font-family: 'excalifont', sans-serif !important;
+  font-size: 18px;
+  transform: rotate(-7.51deg);
+}
+
+.heightSetterInfo button{
+    background: #F8F8F8;
+    border: 1px solid #B2B2B2;
+    box-shadow: 0px 2px 2.8px rgba(0, 0, 0, 0.15);
+    border-radius: 5px;
+    padding: 0.2rem 0.5rem;
+    width: fit-content;
+    font-size: 16px;
+    color: #373737;
+    transform: rotate(-7.37deg);
+    /* Ensure right alignment even if container styles change */
+    align-self: flex-end;
+    cursor: pointer;
+    margin-top: -1.4rem;
+}
+
+
+.heightSetterInfo .arrow{
+    margin-top: 1.4rem;
+    margin-right: -1.5rem;
+}
+
+.holdupInfoContainer{
+  position: fixed;
+  bottom: 7.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  /* background: url('/assets/holdupBg.svg') no-repeat center/contain; */
+  background: #fff;
+  z-index: 100;
+}
+
+.holdupInfoContainer .mainOnboardingContent{
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.holdupInfoContainer p{
+  font-family: 'excalifont', sans-serif !important;
+  font-size: 18px;
+  transform: rotate(-4.23deg);
+  text-align: center;
+}
+
+.holdupInfoContainer button{
+  background: #F8F8F8;
+  border: 1px solid #B2B2B2;
+  box-shadow: 0px 2px 2.8px rgba(0, 0, 0, 0.15);
+  border-radius: 5px;
+  padding: 0.2rem 0.5rem;
+  width: fit-content;
+  font-size: 16px;
+  color: #373737;
+  transform: rotate(-5.25deg);
+  /* Ensure right alignment even if container styles change */
+  align-self: center;
+  cursor: pointer;
+}
+
+
+.holdupInfoContainer .arrow{
+  position: absolute;
+  right: 80px;
+  margin-right: -1.5rem;
+  margin-top: -1.5rem;
+}
+
+.holdupBg{
+  position: fixed;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99;
+}

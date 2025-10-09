@@ -89,12 +89,16 @@ export class ReadAlong {
         Object.assign(this.heightSetter.style, { position: 'absolute', right: '0' });
         try { this.scrollRoot.appendChild(this.heightSetter); } catch {}
       }
+      // keep info aligned and within the same positioning context
+      this._syncHeightSetterInfoParentAndPos();
       this.scrollRoot.addEventListener('scroll', this._boundOnScrollRoot, { passive: true });
     } else {
       if (this.heightSetter && this.heightSetter.parentElement !== document.body) {
         document.body.appendChild(this.heightSetter);
         Object.assign(this.heightSetter.style, { position: 'fixed', right: '0' });
       }
+      // keep info aligned and within the same positioning context
+      this._syncHeightSetterInfoParentAndPos();
     }
   }
   _detachScrollListeners() {
@@ -137,6 +141,8 @@ export class ReadAlong {
     } catch {
       if (!this.heightSetter.style.top) this.heightSetter.style.top = '50%';
     }
+    // Align the info UI with the current top and correct parent
+    this._syncHeightSetterInfoParentAndPos();
     this._setupHeightSetterDragging();
 
     let ctrl = document.querySelector('.read-along.control');
@@ -279,6 +285,11 @@ export class ReadAlong {
     if (!this.heightSetter) return;
     const clamped = Math.max(10, Math.min(90, pct));
     this.heightSetter.style.top = `${clamped}%`;
+    // Mirror top to the info bubble if present
+    try {
+      const info = document.querySelector('.heightSetterInfo');
+      if (info) info.style.top = this.heightSetter.style.top;
+    } catch {}
     try { localStorage.setItem('ui:heightSetterTopPercent', String(clamped)); } catch {}
     if (this.autoEnabled && this.isActive) this.updateTextPosition();
   }
@@ -411,5 +422,27 @@ export class ReadAlong {
     if (ctrl && this._onCtrlClick) ctrl.removeEventListener('click', this._onCtrlClick);
 
     if (this.heightSetter) { try { this.heightSetter.remove(); } catch {} }
+  }
+
+  // Ensure the helper info sits 20px left and matches the same positioning context and top
+  _syncHeightSetterInfoParentAndPos() {
+    let info;
+    try { info = document.querySelector('.heightSetterInfo'); } catch { info = null; }
+    if (!info) return;
+
+    const useWindow = this._isWindowRoot(this.scrollRoot);
+    const desiredParent = useWindow ? document.body : this.scrollRoot;
+    const desiredPos = useWindow ? 'fixed' : 'absolute';
+
+    try {
+      if (desiredParent && info.parentElement !== desiredParent) desiredParent.appendChild(info);
+    } catch {}
+
+    try {
+      info.style.position = desiredPos;
+      // Keep vertical position equal to the handle's current top
+      if (this.heightSetter?.style?.top) info.style.top = this.heightSetter.style.top;
+      // Right offset handled by CSS (uses variables for width + gap)
+    } catch {}
   }
 }
