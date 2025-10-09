@@ -1,35 +1,72 @@
 [
   {
-    "id": "atomic",
-    "google_books_id": "mSiOEAAAQBAJ",
+    "id": "thinking_fast_and_slow",
+    "google_books_id": "ZuKTvERuPG8C",
     "details": {
-      "title": "Atomic Habits",
-      "authors": ["James Clear"],
-      "searchText": "Atomic Habits James Clear"
-    },
-    "bookCover": "/epub/atomicHabitsCover.png",
-    "epubFile": "/epub/atomic.epub"
-  },
-  {
-    "id": "tfas",
-    "google_books_id": "oV1tXT3HigoC",
-    "details": {
-      "title": "Thinking, Fast and Slow",
+      "title": "Thinking Fast and Slow",
       "authors": ["Daniel Kahneman"],
-      "searchText": "Thinking, Fast and Slow Daniel Kahneman"
+      "publisher": "Farrar, Straus and Giroux",
+      "published_date": "2011-10-25",
+      "isbns": "1429969350",
+      "language": "en"
     },
-    "bookCover": "/epub/thinkingFastAndSlowCover.png",
-    "epubFile": "/epub/tfas.epub"
+    "bookCover": "https://cdn.unlikefraction.com/books/default/tfas.jpg",
+    "epubFile": "https://cdn.unlikefraction.com/books/default/thinking-fast-and-slow-daniel-kahneman.epub"
   },
   {
-    "id": "friends",
-    "google_books_id": "GZBOEAAAQBAJ",
+    "id": "cosmos",
+    "google_books_id": "jHfXqREPcrcC",
     "details": {
-      "title": "How to Win Friends and Influence People",
-      "authors": ["Dale Carnegie"],
-      "searchText": "How to Win Friends and Influence People Dale Carnegie"
+      "title": "Cosmos",
+      "authors": ["Carl Sagan"],
+      "publisher": "Macdonald Futura",
+      "published_date": "1981",
+      "isbns": "0354045318",
+      "language": "en"
     },
-    "bookCover": "/epub/winFriends.png",
-    "epubFile": "/epub/friends.epub"
+    "bookCover": "https://cdn.unlikefraction.com/books/default/cosmosByCarlSagan.jpeg",
+    "epubFile": "https://cdn.unlikefraction.com/books/default/cosmos-carl-sagan.epub"
+  },
+  {
+    "id": "never_split_the_difference",
+    "google_books_id": "RmdqCgAAQBAJ",
+    "details": {
+      "title": "Never Split the Difference",
+      "authors": ["Chris Voss", "Tahl Raz"],
+      "publisher": "HarperCollins",
+      "published_date": "2016-05-17",
+      "isbns": "0062407813",
+      "language": "en"
+    },
+    "bookCover": "https://cdn.unlikefraction.com/books/default/neverSplitTheDiff.jpg",
+    "epubFile": "https://cdn.unlikefraction.com/books/default/never-split-the-difference-chris-voss.epub"
+  },
+  {
+    "id": "steve_jobs",
+    "google_books_id": "zIZGEAAAQBAJ",
+    "details": {
+      "title": "Steve Jobs",
+      "authors": ["Walter Isaacson"],
+      "publisher": "Simon and Schuster",
+      "published_date": "2021-10-05",
+      "isbns": "1982176865",
+      "language": "en"
+    },
+    "bookCover": "https://cdn.unlikefraction.com/books/default/steveJobs.jpg",
+    "epubFile": "https://cdn.unlikefraction.com/books/default/steve-jobs-walter-isaacson.epub"
+  },
+  {
+    "id": "india_after_gandhi",
+    "google_books_id": "29lXtwoeA44C",
+    "details": {
+      "title": "India After Gandhi",
+      "authors": ["Ramchanda Guha"],
+      "publisher": "Macmillan",
+      "published_date": "2008",
+      "isbns": "0330396110",
+      "language": "en"
+    },
+    "bookCover": "https://cdn.unlikefraction.com/books/default/indiaAfterGandhi.jpg",
+    "epubFile": "https://cdn.unlikefraction.com/books/default/india-after-gandhi-ramachandra-guha.epub"
   }
 ]
