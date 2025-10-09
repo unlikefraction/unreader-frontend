@@ -81,6 +81,22 @@ window.addEventListener("DOMContentLoaded", () => {
   updateGreeting();
   if (subEl) subEl.textContent = "or starting a new book?";
 
+  // Trigger simple fade-ins for the header elements
+  if (titleEl) titleEl.classList.add('fade-in');
+  if (subEl) subEl.classList.add('fade-in-delayed');
+
+  function finishSkeleton() {
+    const skel = document.querySelector('.skeletonLoading');
+    if (skel) {
+      skel.classList.add('fade-out');
+      skel.addEventListener('animationend', () => {
+        skel.style.display = 'none';
+      }, { once: true });
+    }
+    const homePage = document.querySelector('.homePage');
+    if (homePage) homePage.classList.add('fade-in');
+  }
+
   // Poll for name changes (20× every 100 ms)
   let count = 0;
   const intervalId = setInterval(() => {
@@ -103,6 +119,19 @@ window.addEventListener("DOMContentLoaded", () => {
     return `${t}|${a}`;
   }
 
+  // IntersectionObserver to slide/fade book items on entry
+  const bookObserver = new IntersectionObserver((entries) => {
+    const visible = entries.filter(e => e.isIntersecting);
+    // Stagger within this batch in visual order
+    visible
+      .sort((a, b) => a.target.getBoundingClientRect().top - b.target.getBoundingClientRect().top)
+      .forEach((entry, idx) => {
+        entry.target.style.setProperty('--stagger', `${idx * 70}ms`);
+        entry.target.classList.add('appear');
+        bookObserver.unobserve(entry.target);
+      });
+  }, { root: null, threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
+
   function renderDefaultTemplates(container, options = {}) {
     const { existingGoogleIds = new Set(), existingTitleKeys = new Set() } = options;
     try {
@@ -113,9 +142,11 @@ window.addEventListener("DOMContentLoaded", () => {
         if (key && existingTitleKeys.has(key)) return false;
         return true;
       });
-      defaults.forEach(t => {
+      const baseIndex = container?.children?.length || 0;
+      defaults.forEach((t, i) => {
         const item = document.createElement('div');
-        item.className = 'book-items';
+        item.className = 'book-items book-animate';
+        item.style.setProperty('--stagger', `${(baseIndex + i) * 60}ms`);
         item.innerHTML = `
           <a href="/createBook.html?template=${encodeURIComponent(t.id)}" class="main-book-wrap" title="Add ${t.details?.title || ''}">
             <div class="book-cover" data-name="${(t.details?.title || '').toLowerCase()}" data-author="${(t.details?.authors||[]).join(', ').toLowerCase()}">
@@ -129,6 +160,8 @@ window.addEventListener("DOMContentLoaded", () => {
           </a>
         `;
         container.appendChild(item);
+        // Observe for reveal
+        bookObserver.observe(item);
 
         const img = item.querySelector('img');
         const wrapper = item.querySelector('.book-image');
@@ -154,9 +187,10 @@ window.addEventListener("DOMContentLoaded", () => {
   function renderBooks(list, { includeDefaults = true } = {}) {
     if (!bookWrapper) return;
     bookWrapper.innerHTML = "";
-    list.forEach(book => {
+    list.forEach((book, i) => {
       const item = document.createElement("div");
-      item.className = "book-items";
+      item.className = "book-items book-animate";
+      item.style.setProperty('--stagger', `${i * 60}ms`);
       item.innerHTML = `
         <a href="/bookDetails.html?id=${book.id}" class="main-book-wrap">
           <div class="book-cover"
@@ -173,6 +207,8 @@ window.addEventListener("DOMContentLoaded", () => {
         </a>
       `;
       bookWrapper.appendChild(item);
+      // Observe for reveal
+      bookObserver.observe(item);
 
       // Reveal cover only after the image fully loads (or errors)
       const img = item.querySelector("img");
@@ -245,6 +281,10 @@ window.addEventListener("DOMContentLoaded", () => {
         language:   b.language
       }));
       renderBooks(books, { includeDefaults: true });
+      // Ensure header fades once content is ready
+      if (titleEl) titleEl.classList.add('fade-in');
+      if (subEl) subEl.classList.add('fade-in-delayed');
+      finishSkeleton();
       unskelton();
     })
     .catch(err => {
@@ -252,6 +292,10 @@ window.addEventListener("DOMContentLoaded", () => {
       if (bookWrapper) {
         bookWrapper.innerHTML = `<p class="error">Could not load your books. Please try again later.</p>`;
       }
+      // Still animate header even on error
+      if (titleEl) titleEl.classList.add('fade-in');
+      if (subEl) subEl.classList.add('fade-in-delayed');
+      finishSkeleton();
       unskelton();
     });
 });

@@ -59,3 +59,52 @@ nav{
 .search{
     animation: slideInBottom 0.4s ease-in-out forwards;
 }
+
+/* ----- Home page basic animations ----- */
+/* Generic fade-in */
+.fade-in {
+    opacity: 0;
+    animation: fadeIn 0.6s ease-out forwards;
+}
+
+.fade-in-delayed {
+    opacity: 0;
+    animation: fadeIn 0.6s ease-out 0.25s forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Slide up + fade for book cards */
+.book-animate {
+    opacity: 0;
+    transform: translateY(16px);
+}
+
+.book-animate.appear {
+    animation: fadeInUp 0.4s ease-out forwards;
+    animation-delay: var(--stagger, 0ms);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Utility fade-out for skeleton containers */
+.fade-out {
+    animation: fadeOut 0.35s ease-out forwards;
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to   { opacity: 0; visibility: hidden; }
+}
