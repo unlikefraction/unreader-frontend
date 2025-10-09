@@ -1253,6 +1253,7 @@ canvas{
 body.drawing-mode { cursor: crosshair !important; }
 body.drawing-mode * { cursor: crosshair !important; }
 
+
 .heightSetterInfo{
   display: flex;
   flex-direction: column;
@@ -1301,8 +1302,6 @@ body.drawing-mode * { cursor: crosshair !important; }
   bottom: 7.5rem;
   left: 50%;
   transform: translateX(-50%);
-  /* background: url('/assets/holdupBg.svg') no-repeat center/contain; */
-  background: #fff;
   z-index: 100;
 }
 
@@ -1347,5 +1346,10 @@ body.drawing-mode * { cursor: crosshair !important; }
   bottom: 0px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 99;
+  z-index: 00;
+}
+
+
+.onboardingInterfaceDetailed{
+  display: none;
 }

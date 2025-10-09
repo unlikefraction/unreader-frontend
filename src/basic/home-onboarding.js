@@ -51,7 +51,15 @@ async function markOnboardingComplete() {
   const token = storageGet('authToken');
   const url = `${window.API_URLS.USER}update/`;
 
-  const body = { persisted_storage: { homepage_onboarding_completed: true } };
+  // Merge with existing persisted_storage to avoid overwriting other keys
+  let existing = {};
+  try {
+    const info = await fetchUserInfo();
+    existing = (info && info.persisted_storage) || {};
+  } catch {}
+
+  const merged = Object.assign({}, existing, { homepage_onboarding_completed: true });
+  const body = { persisted_storage: merged };
 
   let res = await fetch(url, {
     method: 'POST',
@@ -136,4 +144,3 @@ onReady(async () => {
     fadeIn(freeBooks);
   });
 });
-
