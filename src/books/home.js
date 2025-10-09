@@ -187,7 +187,25 @@ window.addEventListener("DOMContentLoaded", () => {
   function renderBooks(list, { includeDefaults = true } = {}) {
     if (!bookWrapper) return;
     bookWrapper.innerHTML = "";
-    list.forEach((book, i) => {
+
+    const sorted = list.slice().sort((a, b) => {
+      const at = (typeof a.startedAt === 'number' && isFinite(a.startedAt)) ? a.startedAt : null;
+      const bt = (typeof b.startedAt === 'number' && isFinite(b.startedAt)) ? b.startedAt : null;
+      if (at && bt && at !== bt) return bt - at;
+      if (at && !bt) return -1;
+      if (!at && bt) return 1;
+      const ta = String(a.title || '').trim().toLowerCase();
+      const tb = String(b.title || '').trim().toLowerCase();
+      if (ta < tb) return -1;
+      if (ta > tb) return 1;
+      const aa = String((a.authors && a.authors[0]) || '').trim().toLowerCase();
+      const ab = String((b.authors && b.authors[0]) || '').trim().toLowerCase();
+      if (aa < ab) return -1;
+      if (aa > ab) return 1;
+      return 0;
+    });
+
+    sorted.forEach((book, i) => {
       const item = document.createElement("div");
       item.className = "book-items book-animate";
       item.style.setProperty('--stagger', `${i * 60}ms`);
@@ -231,8 +249,8 @@ window.addEventListener("DOMContentLoaded", () => {
       }
     });
     if (includeDefaults) {
-      const ids = new Set(list.map(b => b.googleBooksId).filter(Boolean));
-      const titleKeys = new Set(list.map(b => normKey(b.title, b.authors || [])).filter(Boolean));
+      const ids = new Set(sorted.map(b => b.googleBooksId).filter(Boolean));
+      const titleKeys = new Set(sorted.map(b => normKey(b.title, b.authors || [])).filter(Boolean));
       renderDefaultTemplates(bookWrapper, { existingGoogleIds: ids, existingTitleKeys: titleKeys });
     }
   }
@@ -276,6 +294,7 @@ window.addEventListener("DOMContentLoaded", () => {
         coverUrl:   b.cover_image_url,
         authors:    b.authors,
         googleBooksId: b.google_books_id,
+        startedAt:  (b.book_started_at ? Date.parse(b.book_started_at) : null),
         oath:       b.oath,
         publisher:  b.publisher,
         language:   b.language
