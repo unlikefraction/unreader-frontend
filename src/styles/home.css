@@ -131,8 +131,10 @@
     position: relative;
     /* Align books to the left on the homepage */
     margin: 0; /* remove centering */
-    column-count: 3;
-    column-gap: 12px;
+    /* Use grid instead of multicol to keep strict left-to-right rows */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
     padding: 4px;
 }
 
@@ -297,8 +299,9 @@
   /* Books layout: 2 columns, full width */
   .book-wrapper {
     width: 100%;
-    column-count: 2;
-    column-gap: 12px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
     padding: 4px 8px;
   }
 
@@ -312,7 +315,7 @@
   .topSection .secondarySec .secondaryText { font-size: 13px; }
 
   /* Books layout: single column on very small screens */
-  .book-wrapper { column-count: 1; }
+  .book-wrapper { grid-template-columns: 1fr; }
 }
 
 

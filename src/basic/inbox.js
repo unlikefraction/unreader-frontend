@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (messagesEl.querySelector('.inboxEmpty')) return;
     const p = document.createElement('p');
     p.className = 'inboxEmpty';
-    p.textContent = 'Drop a message to start the conversation ;)';
+    p.textContent = 'drop a message to start the conversation º/-';
     messagesEl.appendChild(p);
   }
 
