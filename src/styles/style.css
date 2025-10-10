@@ -771,6 +771,18 @@ nav a{
   overflow: auto;
 }
 
+.inboxPopup .messages .inboxEmpty{
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 18px;
+  font-weight: 400;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  width: 100%;
+  color: #373737;
+}
+
 .message{
   display: flex;
   flex-direction: column;

@@ -97,6 +97,19 @@ window.addEventListener("DOMContentLoaded", () => {
     if (homePage) homePage.classList.add('fade-in');
   }
 
+  // Wait for all images in a container to settle (load or error)
+  function waitForImages(container) {
+    if (!container) return Promise.resolve();
+    const imgs = Array.from(container.querySelectorAll('img'));
+    if (imgs.length === 0) return Promise.resolve();
+    return Promise.all(imgs.map(img => new Promise(resolve => {
+      if (img.complete) return resolve();
+      const done = () => { resolve(); };
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+    })));
+  }
+
   // Poll for name changes (20× every 100 ms)
   let count = 0;
   const intervalId = setInterval(() => {
@@ -152,7 +165,7 @@ window.addEventListener("DOMContentLoaded", () => {
             <div class="book-cover" data-name="${(t.details?.title || '').toLowerCase()}" data-author="${(t.details?.authors||[]).join(', ').toLowerCase()}">
               <div class="book-inside"></div>
               <div class="book-image img-hidden">
-                <img src="${t.bookCover}" loading="lazy" alt="Cover of ${t.details?.title || 'book'}">
+                <img src="${t.bookCover}" loading="eager" alt="Cover of ${t.details?.title || 'book'}">
                 <div class="effect"></div>
                 <div class="light"></div>
               </div>
@@ -216,7 +229,7 @@ window.addEventListener("DOMContentLoaded", () => {
                data-author="${book.authors.join(", ").toLowerCase()}">
             <div class="book-inside"></div>
             <div class="book-image img-hidden">
-              <img src="${book.coverUrl}" loading="lazy"
+              <img src="${book.coverUrl}" loading="eager"
                    alt="Cover of ${book.title}">
               <div class="effect"></div>
               <div class="light"></div>
@@ -303,8 +316,12 @@ window.addEventListener("DOMContentLoaded", () => {
       // Ensure header fades once content is ready
       if (titleEl) titleEl.classList.add('fade-in');
       if (subEl) subEl.classList.add('fade-in-delayed');
-      finishSkeleton();
-      unskelton();
+      // Keep skeleton until book images are loaded (or errored),
+      // while covers remain hidden via opacity 0.
+      waitForImages(bookWrapper).then(() => {
+        finishSkeleton();
+        unskelton();
+      });
     })
     .catch(err => {
       printError("Error loading books:", err);

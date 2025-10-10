@@ -27,6 +27,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function showEmptyState() {
+    if (!messagesEl) return;
+    // Avoid duplicating the empty state
+    if (messagesEl.querySelector('.inboxEmpty')) return;
+    const p = document.createElement('p');
+    p.className = 'inboxEmpty';
+    p.textContent = 'Drop a message to start the conversation ;)';
+    messagesEl.appendChild(p);
+  }
+
+  function removeEmptyState() {
+    if (!messagesEl) return;
+    const el = messagesEl.querySelector('.inboxEmpty');
+    if (el) el.remove();
+  }
+
   function baseUrl() {
     let base = (window.API_URLS && window.API_URLS.INBOX) ? window.API_URLS.INBOX : '/api/inbox/';
     if (!base.endsWith('/')) base += '/';
@@ -71,13 +87,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderMessages(messages = []) {
     if (!messagesEl) return;
 
-    const frag = document.createDocumentFragment();
+    messagesEl.innerHTML = '';
 
+    if (!messages || messages.length === 0) {
+      showEmptyState();
+      updateUnreadBadge(0);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
     messages.forEach(msg => {
       frag.appendChild(buildMessageNode(msg));
     });
 
-    messagesEl.innerHTML = '';
     messagesEl.appendChild(frag);
     scrollMessagesToBottom();
 
@@ -157,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
       text,
       // we purposely do NOT set created_at/read flags yet
     };
+    removeEmptyState();
     const node = buildMessageNode(optimisticMsg, { pending: true, tempId });
     messagesEl.appendChild(node);
     scrollMessagesToBottom();
