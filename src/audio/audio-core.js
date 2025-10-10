@@ -13,7 +13,7 @@ export class AudioCore {
     this.offsetMs = offsetMs;
     this.sound = null;
     this.isPlaying = false;
-    this.playbackSpeed = 1.0;
+    this.playbackSpeed = 1.2;
 
     // Event callbacks (multi-listener)
     this._onPlayCbs = [];

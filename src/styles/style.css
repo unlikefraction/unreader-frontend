@@ -606,6 +606,7 @@ nav a{
 }
 
 .playBack{
+  position: relative; /* anchor slider to this box */
   padding: 6px;
   display: flex; /* show playback speed control in Settings */
 }
@@ -613,7 +614,8 @@ nav a{
 .slider {
   position: absolute;
   top: 50%;
-  width: 90%;
+  left: 6px;                 /* align with .playBack padding */
+  width: calc(100% - 12px);  /* match thumb width basis exactly */
   height: 40px;
   border-radius: 10px;
   z-index: -1;
