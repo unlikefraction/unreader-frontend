@@ -102,8 +102,9 @@ function __showConsoleSafetyNotice() {
       'margin:2px 0 10px',
     ].join(';');
 
-    __consoleBackup.log('%c⚠  DO NOT PASTE ANYTHING HERE', headerStyle);
-    __consoleBackup.log("%cAnd if you know what you are doing contact us ;) we are always looking for cool people, something something", bodyStyle);
+    __consoleBackup.log(
+      `exploring? cool. two things: first, those demo notes you see are just sitting in localstorage, but any real notes you make on books live safely on our backend. second, yeah we've thought about security but honestly a team of 2 + some ai is bound to miss stuff. bugs are fun to find – so go for it. just shoot us an email when you do so we can fix it? we'll hook you up with some of that sweet cash you just saved us. oh and we're always looking for solid people to join unlikefraction. our email? i'm sure you'll figure it out 😉`
+    );
   } catch {}
 }
 
