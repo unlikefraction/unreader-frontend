@@ -172,7 +172,7 @@ onReady(async () => {
   }
 
   function showFirst() {
-    setControlsDimmed(true);
+    setControlsDimmed(false);
     fadeIn(heightSetterInfo);
   }
 

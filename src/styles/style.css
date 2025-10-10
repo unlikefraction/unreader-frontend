@@ -1292,7 +1292,7 @@ body.drawing-mode * { cursor: crosshair !important; }
 }
 
 
-.heightSetterInfo .arrow{
+.heightSetterInfo .arrowInfo{
     margin-top: 1.4rem;
     margin-right: -1.5rem;
 }
@@ -1334,7 +1334,7 @@ body.drawing-mode * { cursor: crosshair !important; }
 }
 
 
-.holdupInfoContainer .arrow{
+.holdupInfoContainer .arrowInfo{
   position: absolute;
   right: 80px;
   margin-right: -1.5rem;
