@@ -4,7 +4,8 @@ import { getItem as storageGet } from './storage.js'
 // Global kill-switch: hard-disable all analytics.
 // When true, nothing initializes, no events are captured,
 // and the public API becomes a no-op.
-const ANALYTICS_DISABLED = true
+// Re-enabled (keep session replay off via init flag below)
+const ANALYTICS_DISABLED = false
 
 // module-scoped handle to clear background timers on navigation/HMR
 let __readingBumpTimer = null;
@@ -24,6 +25,8 @@ if (!ANALYTICS_DISABLED) {
     capture_pageview: true,
     capture_pageleave: true,
     autocapture: true,
+    // Explicitly disable Session Replay to avoid recording sessions
+    disable_session_recording: true,
   })
 }
 
