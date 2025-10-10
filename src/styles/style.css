@@ -1244,7 +1244,7 @@ canvas{
 
 @media (max-width: 480px) {
   .mainContent {
-    font-size: 18px;
+    font-size: 24px;
     line-height: 1.5;
   }
 }
