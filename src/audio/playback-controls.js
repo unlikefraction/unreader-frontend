@@ -11,7 +11,7 @@ export class PlaybackControls {
     this._currentInputId = null;
     this._holdupStarted = false;
     this._audioCore = audioCore || null;
-    this._speed = 1.2;
+    this._speed = 1.0;
 
     this._micPermissionBlocked = false; // sticky after explicit deny
     this._onDeviceChange = this._refreshDevices.bind(this);
@@ -55,8 +55,8 @@ export class PlaybackControls {
       if (vEl) vEl.textContent = s.toFixed(1);
     };
 
-    // Load saved speed and apply immediately (fallback 1.2x)
-    try { const saved = localStorage.getItem('ui:playbackSpeed'); if (saved != null) this._speed = clampSpeed(parseFloat(saved) || 1.2); } catch {}
+    // Load saved speed and apply immediately (fallback 1.0x)
+    try { const saved = localStorage.getItem('ui:playbackSpeed'); if (saved != null) this._speed = clampSpeed(parseFloat(saved) || 1.0); } catch {}
     applyUI(this._speed);
     this.setSpeed(this._speed);
 
@@ -95,7 +95,7 @@ export class PlaybackControls {
   }
 
   setSpeed(speed) {
-    const s = Math.max(0.5, Math.min(2.0, Number(speed) || 1.2));
+    const s = Math.max(0.5, Math.min(2.0, Number(speed) || 1.0));
     this._speed = s;
     try { if (this._audioCore && typeof this._audioCore.setPlaybackSpeed === 'function') this._audioCore.setPlaybackSpeed(s); } catch {}
   }

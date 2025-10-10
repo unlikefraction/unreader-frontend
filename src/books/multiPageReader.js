@@ -1171,8 +1171,8 @@ export default class MultiPageReader {
         const valEl = cleanThumb.querySelector('.value') || playBack.querySelector('.thumb .value');
         if (valEl) valEl.textContent = s.toFixed(1);
       };
-      // Initialize from persisted preference (falls back to 1.2x)
-      let initialSpeed = 1.2;
+      // Initialize from persisted preference (falls back to 1.0x)
+      let initialSpeed = 1.0;
       try { const saved = localStorage.getItem('ui:playbackSpeed'); if (saved != null) { const v = parseFloat(saved); if (!isNaN(v)) initialSpeed = Math.max(0.5, Math.min(2.0, v)); } } catch {}
       setSpeedUI(initialSpeed);
       try { this.setSpeed(initialSpeed); } catch {}

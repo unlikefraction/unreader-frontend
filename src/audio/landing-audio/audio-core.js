@@ -7,12 +7,12 @@ import { Howl, Howler } from 'howler';
 export class AudioCore {
   static _controlsBound = false; // avoid binding play/ff/rw multiple times
 
-  constructor(audioFile, offsetMs = 0) {
+  constructor(audioFile, offsetMs = -50) {
     this.audioFile = audioFile;
     this.offsetMs = offsetMs;
     this.sound = null;
     this.isPlaying = false;
-    this.playbackSpeed = 1.2;
+    this.playbackSpeed = 1;
 
     // Event callbacks
     this.onPlayCallback = null;
@@ -26,7 +26,7 @@ export class AudioCore {
     if (!this.sound) {
       this.sound = new Howl({
         src: [this.audioFile],
-        html5: true,
+        html5: false,
         preload: true,
         rate: this.playbackSpeed,
         onend: () => {
