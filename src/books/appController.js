@@ -135,16 +135,23 @@ export default class AppController {
       const pages = Array.isArray(book.pages) ? [...book.pages] : [];
       pages.sort((a, b) => (a.page_number || 0) - (b.page_number || 0));
       // Decide the initial anchor (page index)
-      // Default: next after last read (or first page if none read)
-      let anchor = computeAnchorIndex(pages);
-      // If user has no current progress and backend suggests a start_page, honor it
+      // Priority: current_page -> start_page -> first page
+      let anchor = 0;
       try {
-        const hasCurrent = !!(book && book.current_page && (typeof book.current_page.page_number !== 'undefined' && book.current_page.page_number !== null));
-        const startPn = (book && book.start_page && typeof book.start_page.page_number !== 'undefined') ? book.start_page.page_number : null;
-        if (!hasCurrent && startPn != null) {
-          const idx = pages.findIndex(p => p.page_number === startPn);
-          if (idx >= 0) anchor = idx;
-        }
+        // Support both shapes: number or { page_number }
+        const rawCur   = (book && typeof book.current_page !== 'undefined') ? book.current_page : null;
+        const rawStart = (book && typeof book.start_page   !== 'undefined') ? book.start_page   : null;
+        const curPn    = (rawCur && typeof rawCur === 'object'  && typeof rawCur.page_number  !== 'undefined') ? rawCur.page_number  : (typeof rawCur   === 'number' ? rawCur   : null);
+        const startPn  = (rawStart && typeof rawStart === 'object' && typeof rawStart.page_number !== 'undefined') ? rawStart.page_number : (typeof rawStart === 'number' ? rawStart : null);
+        const findIdx  = (pn) => {
+          if (pn == null) return -1;
+          const target = Number(pn);
+          return pages.findIndex(p => Number(p.page_number) === target);
+        };
+        const byCur   = findIdx(curPn);
+        const byStart = findIdx(startPn);
+        if (byCur >= 0) anchor = byCur;
+        else if (byStart >= 0) anchor = byStart;
       } catch {}
       // Delay removing skeleton UI until after we’ve aligned the initial scroll
 

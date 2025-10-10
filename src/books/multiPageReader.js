@@ -1,7 +1,7 @@
 import { AudioSystem } from './audioAndTextGen.js';
 import { updatePositionState, setPlaybackState } from '../audio/media-session.js';
 import { ReadAlong } from '../audio/read-along.js';
-import { setItem as storageSet, getItem as storageGet } from '../storage.js';
+import { getItem as storageGet } from '../storage.js';
 
 function slugify(s) {
   return String(s).toLowerCase()
@@ -14,7 +14,7 @@ function rIC(fn, timeout = 50) {
   const ric = window.requestIdleCallback || ((cb) => setTimeout(() => cb({ timeRemaining: () => 0, didTimeout: true }), timeout));
   return ric(fn, { timeout });
 }
-// no cookies — use localStorage via storage util
+// Persisted reading position removed — rely on backend current_page/start_page
 function qs(name, url = window.location.href) { try { return new URL(url).searchParams.get(name); } catch { return null; } }
 
 /* ---------- transcript normalizer ---------- */
@@ -100,15 +100,8 @@ export default class MultiPageReader {
     };
   }
 
-  /* ---------- persisted progress ---------- */
-  _cookieKey() { const id = this.userBookId || 'book'; return `mpr_last_played_${id}`; }
-  _saveLastPlayedCookie(pageIndex, seconds) {
-    if (pageIndex < 0 || pageIndex >= this.pageMeta.length) return;
-    const pn = this.pageMeta[pageIndex]?.page_number ?? pageIndex;
-    const payload = { page_number: pn, seconds: Math.max(0, Number(seconds) || 0), at: Date.now() };
-    storageSet(this._cookieKey(), JSON.stringify(payload), 365);
-  }
-  _readLastPlayedCookie() { const raw = storageGet(this._cookieKey()); if (!raw) return null; try { return JSON.parse(raw); } catch { return null; } }
+  /* ---------- persisted progress (removed) ---------- */
+  // No-op persistence: we no longer store or read current page/time from localStorage.
   _mapPageNumberToIndex(pn) { const idx = this.pageMeta.findIndex(p => p.page_number === pn); return idx === -1 ? 0 : idx; }
   _stopProgressTimer() { if (this._progressTimer) { clearInterval(this._progressTimer); this._progressTimer = null; } }
   _startProgressTimer() {
@@ -116,7 +109,6 @@ export default class MultiPageReader {
     this._progressTimer = setInterval(() => {
       if (this.active < 0) return;
       const t = this.getCurrentTime();
-      this._saveLastPlayedCookie(this.active, t);
       // Push position to Media Session so OS/external UI shows progress
       try {
         const dur = this.getDuration();
@@ -588,18 +580,9 @@ export default class MultiPageReader {
   async init() {
     // 1) Build UI scaffolding (this only fetches textBlobUrl for each page)
     await this._buildScaffolding();
-  
-    // 2) Restore last position (cookie) and set active page — but do NOT touch audio
-    const saved = this._readLastPlayedCookie();
-    let pageIndex, seconds;
-    if (saved && typeof saved.page_number !== 'undefined') {
-      pageIndex = this._mapPageNumberToIndex(saved.page_number);
-      seconds = Math.max(0, Number(saved.seconds) || 0);
-    } else {
-      pageIndex = this._initialActiveIndex;
-      seconds = 0;
-      this._saveLastPlayedCookie(pageIndex, 0);
-    }
+    
+    // 2) Set active page from AppController-provided initial index (backend-driven)
+    const pageIndex = this._initialActiveIndex;
   
     this.setActive(pageIndex);
   
@@ -914,7 +897,6 @@ export default class MultiPageReader {
     try { setPlaybackState('playing'); } catch {}
     this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(true);
     this._startProgressTimer();
-    this._saveLastPlayedCookie(this.active, this.getCurrentTime());
 
     try { window.app?.holdup?.noteLocalAudioActivity?.(true); } catch {}
 
@@ -938,7 +920,6 @@ export default class MultiPageReader {
       this._syncPlayButton(false);
     }
     this._stopProgressTimer();
-    this._saveLastPlayedCookie(this.active, this.getCurrentTime());
     try { window.app?.holdup?.noteLocalAudioActivity?.(false); } catch {}
   }
 
@@ -950,8 +931,8 @@ export default class MultiPageReader {
     return this.play();
   }
 
-  forward(seconds = 10) { if (this.active < 0) return; const s = this.getCurrentTime(); this.seek(s + seconds); this._saveLastPlayedCookie(this.active, this.getCurrentTime()); }
-  rewind(seconds = 10)  { if (this.active < 0) return; const s = this.getCurrentTime(); this.seek(Math.max(0, s - seconds)); this._saveLastPlayedCookie(this.active, this.getCurrentTime()); }
+  forward(seconds = 10) { if (this.active < 0) return; const s = this.getCurrentTime(); this.seek(s + seconds); }
+  rewind(seconds = 10)  { if (this.active < 0) return; const s = this.getCurrentTime(); this.seek(Math.max(0, s - seconds)); }
 
   seek(seconds) {
     if (this.active < 0) return;
@@ -978,7 +959,6 @@ export default class MultiPageReader {
       if (sys) { sys.highlighter?.handleAudioEnd?.(sys.getDuration()); this.#pageEl(this.active)?.classList.add('pageCompleted'); }
       // Don't force paused UI here.
       this._stopProgressTimer();
-      this._saveLastPlayedCookie(this.active, this.getCurrentTime());
       return;
     }
 
@@ -1020,7 +1000,6 @@ export default class MultiPageReader {
     }
 
     await this._prefetchAround(target);
-    this._saveLastPlayedCookie(target, this.getCurrentTime());
   }
 
   async prev() {
@@ -1041,7 +1020,6 @@ export default class MultiPageReader {
     this._prefetchNextAudio(target);
 
     await this._prefetchAround(target);
-    this._saveLastPlayedCookie(target, this.getCurrentTime());
   }
 
   async goto(index, { play = true } = {}) {
@@ -1062,7 +1040,7 @@ export default class MultiPageReader {
     this._prefetchNextAudio(index);
 
     if (play) await this.play();
-    else { this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false); this._saveLastPlayedCookie(index, this.getCurrentTime()); }
+    else { this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false); }
     await this._prefetchAround(index);
   }
 
@@ -1116,7 +1094,6 @@ export default class MultiPageReader {
     // NEW: prefetch next after jumping within this page
     this._prefetchNextAudio(pageIndex);
 
-    this._saveLastPlayedCookie(pageIndex, this.getCurrentTime());
     await this._prefetchAround(pageIndex);
     return seekRes;
   }
