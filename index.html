@@ -49,6 +49,22 @@
       </nav>
     </div>
     <div class="main landing">
+      <div class="topSectionLoginLanding">
+        <div class="loginLanding">
+          <h2>login to experience unreader</h2>
+          <div class="ctaLoginHome">
+            <button class="buttonLogin buttonloginGoogle" type="button" onclick="openGooglePopup()" aria-label="Continue with Google"><img src="/assets/googleLogo.webp" alt="Google"></button>
+            <button class="buttonLogin buttonloginApple" type="button" onclick="loginWithApple()" aria-label="Continue with Apple"><img src="/assets/appleLogo.webp" alt="Apple"></button>
+          </div>
+        </div>
+
+        <div class="lineLanding">
+          <div class="lineOr"></div>
+          <span class="orText">or listen to how it works</span>
+          <div class="lineOr"></div>
+        </div>
+      </div>
+
       <div class="bottomControl">
         <div class="controls">
           <div class="settings control">
@@ -195,6 +211,7 @@
     <script type="module" src="./src/utils.js"></script>
     <script type="module" src="./src/analytics.js"></script>
     <script type="module" src="./src/apiUrls.js"></script>
+    <script type="module" src="./src/authorization/login.js"></script>
     <script type="module" src="/src/audio/main.js"></script>
     <script type="module" src="/src/whiteboard/main-drawing-tools.js"></script>
     <script type="module" src="/src/keyboard.js"></script>
