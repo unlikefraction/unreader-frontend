@@ -638,6 +638,29 @@ nav a{
 @media (max-width: 600px) {
   .main.landing { margin-top: 2rem; }
   .main.landing .pageDetailsBottomRight { display: none; }
+
+  /* Login hero area */
+  .topSectionLoginLanding {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 16px;
+    margin-top: 4rem;
+  }
+  .loginLanding h2 {
+    font-size: 22px;
+  }
+  .ctaLoginHome { gap: 6px; }
+  .ctaLoginHome button {
+    width: 44px;
+    height: 44px;
+    padding: 9px;
+  }
+  .ctaLoginHome button img { width: 24px; height: 24px; }
+  .ctaLoginHome .buttonloginApple img { width: 20px; }
+
+  /* OR divider */
+  .lineLanding { gap: 6px; margin-top: 24px; margin-bottom: -80px; }
+  .lineLanding .orText { font-size: 16px; }
 }
 
 .thumb{
@@ -1215,6 +1238,16 @@ canvas{
     display: none !important;
   }
 
+  .lineLanding{
+    margin-bottom: -50px !important;
+  }
+  
+  .topSectionLoginLanding{
+    width: 100% !important;
+    padding: 0 16px;
+  }
+
+
   /* Make text comfortable and fluid */
   .mainContainer {
     gap: 2rem;
@@ -1248,6 +1281,19 @@ canvas{
     line-height: 1.5;
     margin-top: 1rem;
   }
+  /* Center and fluid width for login hero */
+  .topSectionLoginLanding {
+    width: 100%;
+    max-width: 100%;
+    padding: 0 16px;
+  }
+  .loginLanding h2 { font-size: 24px; }
+  .ctaLoginHome button {
+    width: 48px;
+    height: 48px;
+    padding: 10px;
+  }
+  .lineLanding { margin-top: 28px; margin-bottom: -96px; }
   /* Hide inbox/chat on phones */
   .inbox,
   .inboxPopup { display: none !important; }

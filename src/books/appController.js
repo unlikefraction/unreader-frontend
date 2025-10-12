@@ -209,6 +209,19 @@ export default class AppController {
               // Switch LiveKit room on page change, show loading in holdup status
               await this.holdup.switchToPage(ctx);
 
+              // Update global reading context for other modules (e.g., inbox)
+              try {
+                const total = this.pageDescriptors.length;
+                const base = {
+                  page: 'readBook',
+                  userBookId,
+                  title: this.bookMeta.title,
+                  authors: this.bookMeta.authors,
+                  totalPages: total,
+                };
+                window.currentBookContext = Object.assign({}, base, { pageNumber: pageNo });
+              } catch {}
+
               // Update Media Session metadata with cover so external UIs show a banner
               try {
                 const artist = this.bookMeta.authors.join(', ');
@@ -233,6 +246,18 @@ export default class AppController {
 
       // Seed the Page X of Y UI immediately on load
       updatePageDetails(startPageNo, this.pageDescriptors.length);
+
+      // Seed global context for inbox/messages on reading page
+      try {
+        window.currentBookContext = {
+          page: 'readBook',
+          userBookId,
+          title: this.bookMeta.title,
+          authors: this.bookMeta.authors,
+          pageNumber: startPageNo,
+          totalPages: this.pageDescriptors.length,
+        };
+      } catch {}
 
       // Seed Media Session metadata + show in-app banner image
       try {

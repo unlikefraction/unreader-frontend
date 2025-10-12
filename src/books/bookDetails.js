@@ -420,6 +420,20 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
     if (filledBar) filledBar.style.width = `${percentageRead}%`;
     if (percentText) percentText.textContent = `${percentageRead}%`;
 
+    // Expose lightweight context for other modules (e.g., inbox) to enrich metadata
+    try {
+      window.currentBookContext = {
+        page: 'bookDetails',
+        userBookId,
+        title: book.title || '',
+        subtitle: book.subtitle || '',
+        authors: Array.isArray(book.authors) ? book.authors : [],
+        lastPageRead,
+        totalPages,
+        percentageRead
+      };
+    } catch {}
+
     // === Start Date ===
     const startDate = new Date(book.book_started_at);
     const userStartDate = new Date(startDate.getTime() - userTimezoneOffset);

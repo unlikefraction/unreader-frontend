@@ -235,6 +235,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentPage = (typeof window !== 'undefined' && window.location) ? window.location.pathname : undefined;
     const metadata = {};
     if (currentPage) metadata.currentPage = currentPage;
+
+    // If we're on the reader page, attach richer context to metadata
+    try {
+      const ctx = (typeof window !== 'undefined') ? window.currentBookContext : null;
+      const onBookDetails = currentPage && currentPage.includes('bookDetails');
+      const onReadBook    = currentPage && currentPage.includes('readBook');
+      if (ctx && onReadBook) {
+        const pageNum = Number.isFinite(ctx.pageNumber) ? ctx.pageNumber
+                       : (Number.isFinite(ctx.lastPageRead) ? ctx.lastPageRead : undefined);
+        metadata.book = {
+          id: ctx.userBookId,
+          title: ctx.title,
+          authors: ctx.authors,
+          pageNumber: pageNum,
+          totalPages: Number.isFinite(ctx.totalPages) ? ctx.totalPages : undefined,
+          percent: Number.isFinite(ctx.percentageRead) ? ctx.percentageRead : undefined
+        };
+      }
+    } catch {}
     const res = await fetch(url, {
       method: 'POST',
       headers: authHeaders(),
