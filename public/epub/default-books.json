@@ -56,17 +56,17 @@
     "epubFile": "https://cdn.unlikefraction.com/books/default/steve-jobs-walter-isaacson.epub"
   },
   {
-    "id": "india_after_gandhi",
-    "google_books_id": "29lXtwoeA44C",
+    "id": "1984",
+    "google_books_id": "kotPYEqx7kMC",
     "details": {
-      "title": "India After Gandhi",
-      "authors": ["Ramchanda Guha"],
-      "publisher": "Macmillan",
-      "published_date": "2008",
-      "isbns": "0330396110",
+      "title": "1984",
+      "authors": ["George Orwell"],
+      "publisher": "",
+      "published_date": "1949",
+      "isbns": "0547249640",
       "language": "en"
     },
-    "bookCover": "https://cdn.unlikefraction.com/books/default/indiaAfterGandhi.jpg",
-    "epubFile": "https://cdn.unlikefraction.com/books/default/india-after-gandhi-ramachandra-guha.epub"
+    "bookCover": "https://cdn.unlikefraction.com/books/default/1984Cover.jpg",
+    "epubFile": "https://cdn.unlikefraction.com/books/default/1984English.epub"
   }
 ]
