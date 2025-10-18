@@ -52,6 +52,7 @@ export class HoldupManager {
 
     // NEW: sticky mic-permission denial; once set, we never re-request this session
     this._micPermissionBlocked = false;
+    this._holdupFadeTimer = null;
 
     this._ensureStatusOutlet();
     this._bindHoldUpButton();
@@ -65,6 +66,50 @@ export class HoldupManager {
       window.addEventListener('pagehide', () => this.disconnect());
       window.addEventListener('beforeunload', () => this.disconnect());
     } catch {}
+  }
+
+  /* -------------------- holdup active mark -------------------- */
+  _updateHoldupActiveMark(active) {
+    try {
+      const el = document.querySelector('.holdupActiveMark');
+      if (!el) return;
+
+      // Cancel any pending fade-out cleanup
+      if (this._holdupFadeTimer) {
+        clearTimeout(this._holdupFadeTimer);
+        this._holdupFadeTimer = null;
+      }
+
+      if (active) {
+        // Ensure visible and animated
+        el.classList.add('holdupActive'); // CSS also supports .activeHoldup
+        // Clear inline opacity if we set it during a fade
+        el.style.removeProperty('opacity');
+      } else {
+        // Start fade-out while keeping the class for 0.5s
+        el.style.opacity = '0';
+        this._holdupFadeTimer = setTimeout(() => {
+          try { el.classList.remove('holdupActive'); } catch {}
+          try { el.classList.remove('activeHoldup'); } catch {}
+          try { el.style.removeProperty('opacity'); } catch {}
+        }, 500);
+      }
+    } catch {}
+  }
+
+  /* -------------------- public helpers for other modules -------------------- */
+  isActive() {
+    // Active means remote/output is unmuted (we might still be connecting mic)
+    return this._connected && this._outputMuted === false;
+  }
+
+  async muteIfActive(reason = '') {
+    try {
+      if (this.isActive() && !this._connecting) {
+        await this.toggleMute();
+        if (reason) this._setStatus(`Muted (${reason})`);
+      }
+    } catch (e) { printWarning('muteIfActive failed:', e); }
   }
 
   /* -------------------- UI helpers -------------------- */
@@ -359,6 +404,7 @@ export class HoldupManager {
       this._setStatus('Listening…');
       // show active state (we are at least listening to remote)
       this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: true });
+      this._updateHoldupActiveMark(true);
       if (this._cb.onEngageStart) { try { this._cb.onEngageStart(); } catch {} }
       try { if (window.Analytics) window.Analytics.capture('holdup_engage_start', { page_number: this._currentPage || null }); } catch {}
     } else {
@@ -372,6 +418,7 @@ export class HoldupManager {
       // Reflect muted-but-connected state
       this._setStatus('Muted (connected)');
       this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+      this._updateHoldupActiveMark(false);
       if (this._cb.onEngageEnd) { try { this._cb.onEngageEnd(); } catch {} }
       try { if (window.Analytics) window.Analytics.capture('holdup_engage_end', { page_number: this._currentPage || null }); } catch {}
     }
@@ -396,6 +443,7 @@ export class HoldupManager {
       this.room = null;
       // on disconnect, drop to neutral classes
       this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+      this._updateHoldupActiveMark(false);
       document.querySelectorAll('audio[data-lk-remote]').forEach(el => { try { el.remove(); } catch {} });
       try { if (window.Analytics) window.Analytics.capture('holdup_disconnect', { page_number: this._currentPage || null }); } catch {}
     }

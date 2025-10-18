@@ -75,6 +75,11 @@ export class AudioSystem {
       });
     }
 
+    // Whenever page audio starts, mute holdup if it's currently active
+    this.audioCore.onPlay(() => {
+      try { window.holdup?.muteIfActive?.('audio playing'); } catch {}
+    });
+
     // Notify ReadAlong after words are painted; pass the concrete element if available.
     const original = this.highlighter.highlightWordsInRange.bind(this.highlighter);
     this.highlighter.highlightWordsInRange = (startIndex, endIndex, reason = '') => {

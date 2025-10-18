@@ -192,7 +192,13 @@ onReady(async () => {
       fadeOut(holdupInfo, () => {
         setControlsDimmed(false);
         setPageWrappersZ(false);
-        try { if (pausedForSecond) window.reader?.play?.(); } catch {}
+        try {
+          const holdupActive = !!window.holdup?.isActive?.();
+          // Only resume autoplay if holdup is NOT active
+          if (!holdupActive && pausedForSecond) {
+            window.reader?.play?.();
+          }
+        } catch {}
       });
     });
   }
