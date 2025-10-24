@@ -68,5 +68,19 @@
     },
     "bookCover": "https://cdn.unlikefraction.com/books/default/1984Cover.jpg",
     "epubFile": "https://cdn.unlikefraction.com/books/default/1984English.epub"
+  },
+  {
+    "id": "a-little-life",
+    "google_books_id": "mEx4BwAAQBAJ",
+    "details": {
+      "title": "A little life",
+      "authors": ["Hanya Yanagihara"],
+      "publisher": "",
+      "published_date": "2015",
+      "isbns": "144729484X",
+      "language": "en"
+    },
+    "bookCover": "https://cdn.unlikefraction.com/books/default/a-little-life-book-cover.jpg",
+    "epubFile": "https://cdn.unlikefraction.com/books/default/a-little-life.epub"
   }
 ]
