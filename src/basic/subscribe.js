@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const orTextMiddle = document.querySelector('.orTextMiddle');
   const payNowBtn = document.querySelector('.payNowButton');
   const payNowText = document.querySelector('.payNowButtonText');
+  const payNowIcon = document.querySelector('.payNowIcon');
 
   // Modal helpers
   const modal = document.getElementById('paymentStatusModal');
@@ -24,6 +25,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const msgEl = modal?.querySelector('#psm-message');
   const iconEl = modal?.querySelector('#psm-icon');
   const titleEl = modal?.querySelector('#psm-title');
+
+  // Success redirect state
+  let lastPaymentOk = false;
+  let lastPremiumUntil = null; // pretty date string if available
+  let successRedirectTimer = null;
 
   function isoToNiceDate(iso) {
     try {
@@ -49,10 +55,21 @@ document.addEventListener('DOMContentLoaded', () => {
     (okBtn || closeBtn)?.focus?.();
   }
 
+  function openModalMessage(message = '') { openModal({ ok: false, message }); }
+
   function closeModal() { modal?.setAttribute('aria-hidden', 'true'); }
   closeBtn?.addEventListener('click', closeModal);
   okBtn?.addEventListener('click', closeModal);
   modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+  function redirectToSubscribed() {
+    const q = lastPremiumUntil ? `?until=${encodeURIComponent(lastPremiumUntil)}` : '';
+    window.location.href = `subscribed.html${q}`;
+  }
+
+  // If user acknowledges a successful payment, redirect immediately
+  okBtn?.addEventListener('click', () => { if (lastPaymentOk) redirectToSubscribed(); });
+  closeBtn?.addEventListener('click', () => { if (lastPaymentOk) redirectToSubscribed(); });
 
   // State
   let plans = [];
@@ -86,6 +103,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Hide original sections for Step 1
   if (addAmount) addAmount.style.display = 'none';
   if (paymentOptions) paymentOptions.style.display = 'none';
+
+  // Show two skeleton boxes while plans load
+  function showPlanSkeletons() {
+    const list = planStep.querySelector('.planList');
+    if (!list) return;
+    list.innerHTML = '';
+    for (let i = 0; i < 2; i++) {
+      const sk = document.createElement('div');
+      sk.className = 'option skeleton-ui skeleton-plan';
+      // Add placeholders to preserve layout spacing
+      sk.innerHTML = '<span>&nbsp;</span><span>&nbsp;</span>';
+      list.appendChild(sk);
+    }
+  }
 
   // Fetch and render plans
   async function loadPlans() {
@@ -255,58 +286,44 @@ document.addEventListener('DOMContentLoaded', () => {
     return active.dataset.method?.trim() || active.textContent.trim() || 'UPI';
   }
 
-  // Pay Now → initiate subscription
-  payNowBtn?.addEventListener('click', async () => {
-    if (!selectedPlan) {
-      openModalMessage('Please pick a plan first.');
-      return;
-    }
+  // Pay Now → initiate subscription with random delay, no popups, then redirect
+  payNowBtn?.addEventListener('click', () => {
     const token = storageGet('authToken');
-    if (!token) {
-      openModalMessage('Please sign in to continue.');
-      return;
-    }
     const base = window.API_URLS?.PAYMENT;
-    if (!base) {
-      openModalMessage('Payment service is not configured.');
-      return;
-    }
-    const body = {
-      plan_id: selectedPlan.id,
-      payment_method: getSelectedMethod(),
-    };
+    const method = getSelectedMethod();
+    const planId = selectedPlan?.id;
+
+    // Random delay between 5s and 7s
+    const delayMs = 5000 + Math.floor(Math.random() * 2001);
+
+    // Soften button to avoid repeated clicks
+    try { payNowBtn.disabled = true; payNowBtn.style.opacity = '0.8'; } catch {}
+
+    // Show processing state on the button during wait
     try {
-      const res = await fetch(`${base}initiate/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-      let data = null;
-      try { data = await res.json(); } catch {}
-      let message = data?.message || (res.ok ? 'Request received.' : 'Something went wrong.');
-      // If success, try to normalize any date in the message to a friendly format
-      if (res.ok) {
-        // Prefer an explicit field if provided
-        const dateField = data?.premium_ends_at || data?.premium_until || null;
-        if (dateField) {
-          const nice = isoToNiceDate(dateField);
-          if (nice) message = `Subscription activated. Premium access until ${nice}.`;
-        } else {
-          // Fallback: extract ISO date in message and replace with friendly date
-          const m = message.match(/(\d{4}-\d{2}-\d{2})(?:[T ][^\s]*)?/);
-          if (m) {
-            const nice = isoToNiceDate(m[0]);
-            if (nice) message = message.replace(m[0], nice);
-          }
-        }
+      if (payNowText) payNowText.textContent = 'processing';
+      if (payNowIcon) payNowIcon.className = 'ph ph-circle-notch payNowIcon icon-rotate';
+    } catch {}
+
+    setTimeout(() => {
+      // Fire-and-forget request; avoid blocking redirect. Use keepalive so it can finish after navigation.
+      if (token && base && planId) {
+        const body = { plan_id: planId, payment_method: method };
+        try {
+          fetch(`${base}initiate/`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+            keepalive: true,
+          }).catch(() => {});
+        } catch {}
       }
-      openModal({ ok: res.ok, message });
-    } catch (err) {
-      openModal({ ok: false, message: 'Network error. Please try again.' });
-    }
+      // Redirect without showing any modal
+      window.location.href = 'subscribed.html';
+    }, delayMs);
   });
 
   // Style hook for subscription text to match input font
@@ -315,8 +332,12 @@ document.addEventListener('DOMContentLoaded', () => {
     .subscriptionRow { display: flex; align-items: flex-end; }
     .subscriptionText { font-size: 56px; font-family: 'Space Grotesk', monospace; font-weight: 500; }
     @media (max-width: 400px) { .subscriptionText { font-size: 48px; } }
+    /* Skeleton plan placeholder sizing */
+    .planList .skeleton-plan { min-height: 56px; }
   `;
   document.head.appendChild(style);
 
+  // Prime UI with skeletons, then fetch plans
+  showPlanSkeletons();
   loadPlans();
 });

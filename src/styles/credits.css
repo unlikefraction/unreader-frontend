@@ -137,6 +137,7 @@
     font-size: 20px;
 
     background: #373737;
+    border: none;
     box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.2);
     border-radius: 25px;
     cursor: pointer;
@@ -306,3 +307,7 @@
 .hidden{
     display: none;
 }
+
+/* Processing icon rotation used on credits page */
+@keyframes icon-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.icon-rotate { animation: icon-spin 0.9s linear infinite; }

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/lightFav.png" media="(prefers-color-scheme: light)">
+  <link rel="icon" type="image/png" sizes="16x16" href="/assets/darkFav.png" media="(prefers-color-scheme: dark)">
+  <title>Subscribed | Unreader</title>
+  <link rel="stylesheet" href="./src/styles/style.css" />
+  <link rel="stylesheet" href="./src/styles/credits.css" />
+  <link rel="stylesheet" href="./src/styles/subscribed.css" />
+  <link
+    rel="stylesheet"
+    type="text/css"
+    href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css"
+  />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <nav>
+      <a href="/">
+        <div class="logoContainer">
+          <div class="sleep">z</div>
+          <h2 class="logo">º/º</h2>
+        </div>
+      </a>
+      <div class="links">
+        <a href="account.html">Account</a>
+      </div>
+    </nav>
+  </div>
+
+  <main class="subscribed-page">
+    <section class="subscribed-card">
+      <h1 class="subscribed-title">you are now unlimited!</h1>
+      <button class="payNowButton goHomeBtn" style="margin-top:14px;">
+        <i class="ph ph-books payNowIcon"></i>
+        <span class="payNowButtonText">let's read</span>
+      </button>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <script type="module" src="./src/utils.js"></script>
+  <script type="module" src="./src/analytics.js"></script>
+  <script type="module" src="./src/basic/subscribed.js"></script>
+</body>
+</html>

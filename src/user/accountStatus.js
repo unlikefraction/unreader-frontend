@@ -80,6 +80,14 @@ async function initAccountStatus() {
   try {
     const data = await fetchUserInfo();
     const ends = data?.premium_ends_at ?? null;
+    const now = new Date();
+    let endsInFuture = false;
+    if (ends) {
+      const d = new Date(ends);
+      if (!isNaN(d.getTime())) {
+        endsInFuture = d.getTime() > now.getTime();
+      }
+    }
 
     // Trial logic: if account is within 30 days of creation, show Unlimited (trial)
     let trialUntil = null;
@@ -102,7 +110,7 @@ async function initAccountStatus() {
 
     if (trialUntil) {
       setUnlimitedUI(trialUntil);
-    } else if (ends) {
+    } else if (ends && endsInFuture) {
       setUnlimitedUI(ends);
     } else {
       setNotUnlimitedUI();
