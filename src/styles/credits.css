@@ -17,8 +17,9 @@
 }
 
 .addAmount .headingAmount, .addAmount .noteToInput{
-    font-weight: 400;
-    font-size: 20px;
+    font-weight: 300;
+    color: #373737;
+    font-size: 21px;
 }
 
 .inputAmountSection{
@@ -26,13 +27,18 @@
     align-items: flex-end;
 }
 
+.subscriptionText{
+  font-size: 35px !important;
+  color: #373737 !important;
+}
+
 .inputAmountSection input{
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.5rem 0;
     border: none;
     border-bottom: 1px solid #B2B2B2;
     border-radius: 5px;
-    font-size: 56px;
+    font-size: 44px;
     outline: none;
     font-family: 'Space Grotesk', monospace;
     font-weight: 500;
@@ -165,6 +171,9 @@
 .formattedAmountOverlay .amt-bold { font-weight: 500; }
 .formattedAmountOverlay .muted    { opacity: 0.5; font-weight: 400; }
 .formattedAmountOverlay .amt-dec  { font-variant-numeric: tabular-nums; }
+
+/* Final subscribe display: color decimal part */
+.subFormattedOverlay .decimal { color: #7D7D7D; }
 
 
 /* Modal overlay */

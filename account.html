@@ -37,9 +37,6 @@
                 </div>
             </a>
             <div class="links">
-                <div class="credits">
-                    <p class="credit">$ --</p>
-                </div>
                 <a href="account.html">Account</a>
             </div>
         </nav>
@@ -47,10 +44,14 @@
 
     <div class="homePage">
         <div class="topSection skeleton-ui">
-            <img src="/assets/dino.webp" alt="Dinosaur">
-            <div class="creditsSection">
-                <h2 class="creditRemaining"><span class="dollarIcon">$</span>--</h2>
-                <button class="addCreditsButton"><a href="credits.html">add credits</a></button>
+            <img class="statusImage" src="/assets/dino.webp" alt="Dinosaur">
+            <div class="creditsSection" id="statusSection">
+                <div class="statusText">
+                  <div class="statusPrefix">you are</div>
+                  <h2 class="creditRemaining">Unlimited</h2>
+                  <div class="statusUntil" style="display:none"></div>
+                </div>
+                <button class="addCreditsButton" id="getUnlimitedBtn"><a href="credits.html">get unlimited</a></button>
             </div>
         </div>
 
@@ -115,8 +116,9 @@
     <script type="module" src="./src/apiUrls.js"></script>
     <script type="module" src="./src/basic/logo-animation.js"></script>
     <script type="module" src="./src/authorization/loggedOutRedirect.js"></script>
-    <script type="module" src="./src/user/userDetails.js"></script>
+    
     <script type="module" src="./src/basic/inbox.js"></script>
+    <script type="module" src="./src/user/accountStatus.js"></script>
 
 
     <script>
