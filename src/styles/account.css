@@ -92,6 +92,71 @@
     font-weight: 400;
 }
 
+/* Usage bar chart */
+.usageChartScroller {
+    overflow-x: auto;
+    margin-top: 8px;
+}
+
+.usageChart {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    min-height: 180px;
+    padding: 12px 0; /* no horizontal padding so baseline spans full bar width; bottom padding reserves space for labels */
+    position: relative;
+}
+
+.barCol {
+    width: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.bar {
+    position: relative;
+    width: 60px; /* fixed per requirement */
+    border-radius: 0; /* 0 border radius as requested */
+    background: #373737; /* requested bg */
+    box-shadow: none; /* remove box shadow */
+    display: flex;
+    align-items: flex-start; /* so the value can sit 8px from top */
+    justify-content: center;
+    overflow: visible; /* allow value to remain visible for very small bars */
+}
+
+.barValue {
+    position: absolute;
+    top: 8px; /* 8px from the top of the bar */
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fff;
+    font-size: 12px; /* requested font size */
+    font-weight: 400; /* requested weight */
+    line-height: 1;
+}
+
+.barValue.outside {
+    top: -16px; /* place above the bar */
+    color: #373737; /* requested color for outside label */
+}
+
+
+/* Thin horizontal scrollbar styling */
+.usageChartScroller { scrollbar-width: thin; scrollbar-color: #B2B2B2 transparent; }
+.usageChartScroller::-webkit-scrollbar { height: 4px; }
+.usageChartScroller::-webkit-scrollbar-track { background: transparent; }
+.usageChartScroller::-webkit-scrollbar-thumb { background-color: #B2B2B2; border-radius: 2px; }
+
+.barLabel {
+    margin-top: 6px;
+    color: #373737;
+    font-size: 12px;
+    text-align: center;
+    white-space: nowrap;
+}
+
 /* Account status UI additions */
 .statusPrefix { font-size: 18px; font-weight: 400; color: #373737; }
 .statusUntil { font-size: 16px; font-weight: 400; color: #373737; margin-top: 6px; }

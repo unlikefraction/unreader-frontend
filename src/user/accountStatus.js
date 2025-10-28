@@ -79,6 +79,29 @@ function setUnlimitedUI(untilDateStr) {
 async function initAccountStatus() {
   try {
     const data = await fetchUserInfo();
+    // Demo request: fetch analytics pages-read for this user
+    try {
+      const userId = data?.id;
+      const base = window.API_URLS?.BASE;
+      const token = storageGet('authToken');
+      if (userId && base && token) {
+        const url = `${base}/analytics/users/${encodeURIComponent(userId)}/pages-read/`;
+        fetch(url, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json'
+          }
+        })
+        .then(async (res) => {
+          let body = null; try { body = await res.json(); } catch (_) {}
+          console.log('analytics.pages-read demo', { status: res.status, ok: res.ok, body });
+        })
+        .catch((err) => {
+          console.warn('analytics.pages-read demo failed', err);
+        });
+      }
+    } catch {}
     const ends = data?.premium_ends_at ?? null;
     const now = new Date();
     let endsInFuture = false;
