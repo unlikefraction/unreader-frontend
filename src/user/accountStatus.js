@@ -143,6 +143,13 @@ async function initAccountStatus() {
     try { console.warn('accountStatus failed', err); } catch {}
     setNotUnlimitedUI();
   }
+  // Mark top section ready for skeleton removal coordination
+  try {
+    if (typeof window !== 'undefined') {
+      window.__acctTopReady = true;
+      if (typeof window.__tryUnskeltonAccount === 'function') window.__tryUnskeltonAccount();
+    }
+  } catch {}
 }
 
 initAccountStatus();

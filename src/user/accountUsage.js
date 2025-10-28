@@ -50,8 +50,8 @@ function keyYYYYMM(d) {
 function continuousGroups(items, period) {
   if (!items || items.length === 0) return [];
 
-  // Build raw count map first
-  const countMap = new Map();
+  // Build raw unique page_id map per bucket
+  const bucketMap = new Map(); // key -> Set(page_id)
   let minDate = null;
   let maxDate = null;
   for (const it of items) {
@@ -64,7 +64,10 @@ function continuousGroups(items, period) {
     if (period === 'monthly') key = keyYYYYMM(t);
     else if (period === 'weekly') key = keyYYYYMMDD(startOfWeek(t));
     else key = keyYYYYMMDD(t);
-    countMap.set(key, (countMap.get(key) || 0) + 1);
+    const pid = it.page_id ?? it.pageId ?? it.page?.id ?? it.id; // fallback just in case
+    let set = bucketMap.get(key);
+    if (!set) { set = new Set(); bucketMap.set(key, set); }
+    set.add(String(pid));
   }
 
   if (!minDate || !maxDate) return [];
@@ -107,7 +110,7 @@ function continuousGroups(items, period) {
       label = labelDDMM(cursor);
     }
 
-    const count = countMap.get(key) || 0;
+    const count = (bucketMap.get(key)?.size) || 0;
     out.push({ key, label, count });
 
     // step forward
@@ -118,6 +121,37 @@ function continuousGroups(items, period) {
     } else {
       cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
     }
+  }
+  // Ensure at least 10 buckets by prepending earlier zero buckets if needed
+  const minBuckets = 10;
+  if (out.length < minBuckets) {
+    const need = minBuckets - out.length;
+    const prefix = [];
+    const firstKey = out[0].key;
+    if (period === 'monthly') {
+      const [y, m] = firstKey.split('-').map(Number);
+      const firstDate = new Date(y, (m - 1), 1);
+      for (let k = need; k >= 1; k--) {
+        const d = new Date(firstDate.getFullYear(), firstDate.getMonth() - k, 1);
+        prefix.push({ key: keyYYYYMM(d), label: labelMonthShortLower(d), count: 0 });
+      }
+    } else if (period === 'weekly') {
+      const [y, m, d] = firstKey.split('-').map(Number);
+      const firstDate = new Date(y, (m - 1), d);
+      for (let k = need; k >= 1; k--) {
+        const dt = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate() - (7 * k));
+        const s = startOfWeek(dt);
+        prefix.push({ key: keyYYYYMMDD(s), label: labelWeekRangeShort(s), count: 0 });
+      }
+    } else {
+      const [y, m, d] = firstKey.split('-').map(Number);
+      const firstDate = new Date(y, (m - 1), d);
+      for (let k = need; k >= 1; k--) {
+        const dt = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate() - k);
+        prefix.push({ key: keyYYYYMMDD(dt), label: labelDDMM(dt), count: 0 });
+      }
+    }
+    out = prefix.concat(out);
   }
   return out;
 }
@@ -217,8 +251,24 @@ async function fetchPagesRead(userId) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const usageEl = document.querySelector('.usage');
+  const usageSection = document.querySelector('.usageSection');
   const select = document.querySelector('.usageHistory');
   let rawItems = [];
+
+  // Ensure skeleton remains until analytics fetch completes; global removal happens when both top+usage ready
+  try { usageSection?.classList.add('skeleton-ui'); } catch {}
+  try {
+    if (typeof window !== 'undefined') {
+      window.__acctUsageReady = false;
+      if (typeof window.__tryUnskeltonAccount !== 'function') {
+        window.__tryUnskeltonAccount = function () {
+          try {
+            if (window.__acctTopReady && window.__acctUsageReady) window.unskelton?.();
+          } catch {}
+        };
+      }
+    }
+  } catch {}
 
   async function load() {
     try {
@@ -227,9 +277,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const items = await fetchPagesRead(user.id);
       rawItems = items || [];
       update();
+      try { if (typeof window !== 'undefined') { window.__acctUsageReady = true; window.__tryUnskeltonAccount?.(); } } catch {}
     } catch (err) {
       try { console.warn('usage graph load failed', err); } catch {}
       renderNoUsage(usageEl);
+      try { if (typeof window !== 'undefined') { window.__acctUsageReady = true; window.__tryUnskeltonAccount?.(); } } catch {}
     }
   }
 
