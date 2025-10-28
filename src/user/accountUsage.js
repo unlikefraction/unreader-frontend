@@ -1,9 +1,9 @@
 import { getItem as storageGet } from '../storage.js';
 
 function labelDDMM(d) {
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}-${mm}`;
+  // Daily label: e.g., "28 oct"
+  const dd = d.getDate();
+  return `${dd} ${labelMonthShortLower(d)}`;
 }
 
 function labelMonthShortLower(d) {
@@ -15,14 +15,19 @@ function labelMonthShortLower(d) {
   }
 }
 
+function labelMonthYearShortLower(d) {
+  // Monthly label: e.g., "oct 2025"
+  const m = labelMonthShortLower(d);
+  return `${m} ${d.getFullYear()}`;
+}
+
 function labelWeekRangeShort(start) {
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  const y = start.getFullYear();
+  const m = start.getMonth();
+  const last = daysInMonth(y, m);
   const sd = start.getDate();
-  const ed = end.getDate();
-  if (start.getMonth() === end.getMonth()) {
-    return `${sd}-${ed} ${labelMonthShortLower(end)}`;
-  }
-  return `${sd} ${labelMonthShortLower(start)}-${ed} ${labelMonthShortLower(end)}`;
+  const ed = Math.min(sd + 6, last);
+  return `${sd}-${ed} ${labelMonthShortLower(start)}`;
 }
 
 function startOfWeek(date) {
@@ -32,6 +37,42 @@ function startOfWeek(date) {
   d.setHours(0,0,0,0);
   d.setDate(d.getDate() - day);
   return d;
+}
+
+// Month-anchored 7-day windows: 1–7, 8–14, 15–21, 22–28, 29–end
+function daysInMonth(y, m /* 0-based */) {
+  return new Date(y, m + 1, 0).getDate();
+}
+
+function monthAnchoredWeekStart(date) {
+  const d = new Date(date);
+  d.setHours(0,0,0,0);
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const day = d.getDate();
+  const startDay = Math.floor((day - 1) / 7) * 7 + 1; // 1,8,15,22,29
+  return new Date(y, m, startDay);
+}
+
+function nextMonthAnchoredWeekStart(d) {
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const start = d.getDate();
+  const last = daysInMonth(y, m);
+  const nextStart = start + 7;
+  if (nextStart <= last) return new Date(y, m, nextStart);
+  return new Date(y, m + 1, 1);
+}
+
+function prevMonthAnchoredWeekStart(d) {
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const start = d.getDate();
+  if (start - 7 >= 1) return new Date(y, m, start - 7);
+  const pmLast = new Date(y, m, 0); // last day of previous month
+  const last = pmLast.getDate();
+  const lastBucketStart = Math.floor((last - 1) / 7) * 7 + 1;
+  return new Date(pmLast.getFullYear(), pmLast.getMonth(), lastBucketStart);
 }
 
 function keyYYYYMMDD(d) {
@@ -62,9 +103,12 @@ function continuousGroups(items, period) {
 
     let key;
     if (period === 'monthly') key = keyYYYYMM(t);
-    else if (period === 'weekly') key = keyYYYYMMDD(startOfWeek(t));
+    else if (period === 'weekly') key = keyYYYYMMDD(monthAnchoredWeekStart(t));
     else key = keyYYYYMMDD(t);
-    const pid = it.page_id ?? it.pageId ?? it.page?.id ?? it.id; // fallback just in case
+
+    const pid = it.page_id ?? it.pageId ?? it.page?.id ?? it.id; // fallback
+    if (pid == null) continue;
+
     let set = bucketMap.get(key);
     if (!set) { set = new Set(); bucketMap.set(key, set); }
     set.add(String(pid));
@@ -73,14 +117,13 @@ function continuousGroups(items, period) {
   if (!minDate || !maxDate) return [];
 
   // Align boundaries to the period
-  let cursor;
-  let end;
+  let cursor, end;
   if (period === 'monthly') {
     cursor = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
     end    = new Date(maxDate.getFullYear(), maxDate.getMonth(), 1);
   } else if (period === 'weekly') {
-    cursor = startOfWeek(minDate);
-    end    = startOfWeek(maxDate);
+    cursor = monthAnchoredWeekStart(minDate);
+    end    = monthAnchoredWeekStart(maxDate);
   } else { // daily
     cursor = new Date(minDate.getFullYear(), minDate.getMonth(), minDate.getDate());
     end    = new Date(maxDate.getFullYear(), maxDate.getMonth(), maxDate.getDate());
@@ -88,73 +131,75 @@ function continuousGroups(items, period) {
 
   // Ensure the last bucket includes "today"
   const today = new Date();
-  let todayAnchor;
-  if (period === 'monthly') todayAnchor = new Date(today.getFullYear(), today.getMonth(), 1);
-  else if (period === 'weekly') todayAnchor = startOfWeek(today);
-  else todayAnchor = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const todayAnchor =
+    period === 'monthly' ? new Date(today.getFullYear(), today.getMonth(), 1) :
+    period === 'weekly'  ? monthAnchoredWeekStart(today) :
+                           new Date(today.getFullYear(), today.getMonth(), today.getDate());
   if (end < todayAnchor) end = todayAnchor;
 
-  const out = [];
+  // <-- make this mutable
+  let out = [];
   while (cursor <= end) {
-    let key;
-    let label;
+    let key, label;
     if (period === 'monthly') {
       key = keyYYYYMM(cursor);
-      label = labelMonthShortLower(new Date(cursor.getFullYear(), cursor.getMonth(), 1));
+      label = labelMonthYearShortLower(new Date(cursor.getFullYear(), cursor.getMonth(), 1));
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1); // step
     } else if (period === 'weekly') {
-      const s = startOfWeek(cursor);
+      const s = monthAnchoredWeekStart(cursor);
       key = keyYYYYMMDD(s);
       label = labelWeekRangeShort(s);
+      cursor = nextMonthAnchoredWeekStart(cursor); // step
     } else {
       key = keyYYYYMMDD(cursor);
       label = labelDDMM(cursor);
+      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1); // step
     }
-
     const count = (bucketMap.get(key)?.size) || 0;
     out.push({ key, label, count });
-
-    // step forward
-    if (period === 'monthly') {
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
-    } else if (period === 'weekly') {
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 7);
-    } else {
-      cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1);
-    }
   }
+
   // Ensure at least 10 buckets by prepending earlier zero buckets if needed
   const minBuckets = 10;
   if (out.length < minBuckets) {
     const need = minBuckets - out.length;
     const prefix = [];
     const firstKey = out[0].key;
+
     if (period === 'monthly') {
       const [y, m] = firstKey.split('-').map(Number);
-      const firstDate = new Date(y, (m - 1), 1);
+      const firstDate = new Date(y, m - 1, 1);
       for (let k = need; k >= 1; k--) {
         const d = new Date(firstDate.getFullYear(), firstDate.getMonth() - k, 1);
-        prefix.push({ key: keyYYYYMM(d), label: labelMonthShortLower(d), count: 0 });
+        prefix.push({ key: keyYYYYMM(d), label: labelMonthYearShortLower(d), count: 0 });
       }
     } else if (period === 'weekly') {
       const [y, m, d] = firstKey.split('-').map(Number);
-      const firstDate = new Date(y, (m - 1), d);
-      for (let k = need; k >= 1; k--) {
-        const dt = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate() - (7 * k));
-        const s = startOfWeek(dt);
-        prefix.push({ key: keyYYYYMMDD(s), label: labelWeekRangeShort(s), count: 0 });
+      let d0 = new Date(y, m - 1, d);
+      const prevStarts = [];
+      for (let i = 0; i < need; i++) {
+        d0 = prevMonthAnchoredWeekStart(d0);
+        prevStarts.push(new Date(d0.getFullYear(), d0.getMonth(), d0.getDate()));
       }
+      prevStarts.reverse().forEach(s => {
+        prefix.push({ key: keyYYYYMMDD(s), label: labelWeekRangeShort(s), count: 0 });
+      });
     } else {
       const [y, m, d] = firstKey.split('-').map(Number);
-      const firstDate = new Date(y, (m - 1), d);
+      const firstDate = new Date(y, m - 1, d);
       for (let k = need; k >= 1; k--) {
         const dt = new Date(firstDate.getFullYear(), firstDate.getMonth(), firstDate.getDate() - k);
         prefix.push({ key: keyYYYYMMDD(dt), label: labelDDMM(dt), count: 0 });
       }
     }
+
+    // instead of reassigning a const, mutate safely
     out = prefix.concat(out);
   }
+
   return out;
 }
+
 
 function clear(el) { while (el && el.firstChild) el.removeChild(el.firstChild); }
 
