@@ -281,9 +281,8 @@ nav a{
   transition: 0.2s all;
 }
 
-.hold-up:hover{
-  transform: scale(1.1);
-}
+/* Removed hover scale-up for holdup */
+/* .hold-up:hover { transform: scale(1.1); } */
 
 .hold-up svg{
   transform: scale(2);
@@ -513,6 +512,165 @@ nav a{
 .holdup{
   background: rebeccapurple;
 }
+
+/* ---------- Holdup hover menu ---------- */
+.holdup-wrapper{
+  position: relative;
+  display: inline-block;
+  height: 62px; /* match holdup */
+}
+
+.holdup-menu{
+  position: absolute;
+  top: 50%;
+  left: 62px;                 /* align to circle's right edge */
+  margin-left: -31px;         /* pull to start at center of circle */
+  transform: translateY(-50%) translateX(-14px); /* tucked under circle initially */
+  opacity: 0;                 /* hidden until hover */
+  pointer-events: none;       /* prevent stray clicks until hover */
+
+  display: flex;
+  gap: 6px;                   /* 6px between icons */
+  padding: 6px;               /* vertical + right padding 6px */
+  padding-left: calc(31px + 8px); /* compensate overlap + 6px gap from circle */
+  padding-right: 6px;         /* 6px to the end */
+
+  border-radius: 0 500px 500px 0; /* left corners 0 to connect to circle */
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  border-left: none; /* seam hidden under the holdup circle for a single outline */
+  filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
+  transition: transform 180ms ease, opacity 180ms ease; /* container arrives first */
+  z-index: 1; /* behind holdup circle */
+}
+
+/* Keep holdup above the connected menu so the seam is invisible */
+.holdup-wrapper .hold-up{ position: relative; z-index: 2; }
+
+/* Show the menu on hover, let it get in place first */
+.holdup-wrapper:hover .holdup-menu{
+  transform: translateY(-50%) translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Also show the menu when holdup is active (no hover needed) */
+.holdup-wrapper .hold-up.active + .holdup-menu{
+  transform: translateY(-50%) translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Instant mode: applied after a user click to remove any delays */
+.holdup-menu.instant .control{
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  transition: none;
+}
+.holdup-menu.instant .control.active{
+  background: #373737;
+  color: #fff;
+  transition: none;
+}
+
+/* Icons come in: overlap slightly, first starts a bit scaled up */
+.holdup-menu .control{
+  opacity: 0;
+  transform: translateX(-8px) scale(0.98);
+  transition: transform 220ms ease, opacity 220ms ease;
+}
+.holdup-menu .option-voice{
+  transform: translateX(-10px) scale(1.12); /* a bit larger and overlapping */
+  z-index: 2;
+}
+.holdup-menu .option-chat{
+  transform: translateX(-16px) scale(0.96); /* tuck slightly under voice */
+  z-index: 1;
+}
+.holdup-wrapper:hover .holdup-menu .option-voice{
+  opacity: 1;
+  transform: translateX(0) scale(1.0);
+  transition-delay: 180ms; /* wait for container, then arrive first */
+}
+.holdup-wrapper .hold-up.active + .holdup-menu .option-voice{
+  opacity: 1;
+  transform: translateX(0) scale(1.0);
+  transition-delay: 180ms; /* same timing when active by default */
+}
+.holdup-wrapper:hover .holdup-menu .option-chat{
+  opacity: 1;
+  transform: translateX(0) scale(1.0);
+  transition-delay: 240ms; /* arrive after voice */
+}
+.holdup-wrapper .hold-up.active + .holdup-menu .option-chat{
+  opacity: 1;
+  transform: translateX(0) scale(1.0);
+  transition-delay: 240ms; /* same timing when active by default */
+}
+
+/* Active state highlight fades in after icons become visible */
+.holdup-menu .control.active{
+  background: transparent; /* override base .control.active while closed */
+  color: #373737;          /* icon same as inactive until visible */
+  /* Slide/fade like others, but do not animate activation colors */
+  transition: transform 220ms ease, opacity 220ms ease, background-color 0s, color 0s;
+}
+.holdup-wrapper:hover .holdup-menu .control.active{
+  background: #373737;
+  color: #fff;
+}
+.holdup-wrapper .hold-up.active + .holdup-menu .control.active{
+  background: #373737;
+  color: #fff;
+}
+
+/* ---------- Holdup Chat Bar (chat mode) ---------- */
+.holdupChatBar{
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px;
+
+  border-radius: 500px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
+  z-index: 1001;
+}
+
+.holdupChatBar .holdupChatInput{
+  flex: 1 1 auto;
+  height: 38px;
+  line-height: 38px;
+  padding: 0 14px;
+  font-size: 16px;
+  border-radius: 500px;
+  border: none;
+  outline: none;
+  background: none;
+}
+
+/* Reuse inbox send hover look via the same class names */
+.holdupChatBar .sendButton{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #B5B5B5;
+  background: none;
+  cursor: pointer;
+}
+.holdupChatBar .sendButton i{ font-size: 18px; color: #373737; }
+.holdupChatBar .sendButton:hover{ background: #000; }
+.holdupChatBar .sendButton:hover i{ color: #fff; }
 
 @font-face {
   font-family: 'excalifont';
@@ -862,7 +1020,8 @@ nav a{
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  width: 50px;
+  width: 40px;
+  height: 40px;
   border: 1px solid #B5B5B5;
   background: none;
   cursor: pointer;
@@ -873,9 +1032,8 @@ nav a{
   color: #373737;
 }
 
-.sendButton:hover{
-  background: #f4f4f4;
-}
+.sendButton:hover{ background: #000; }
+.sendButton:hover i{ color: #fff; }
 
 mark{
   background: none;
@@ -1619,4 +1777,78 @@ body.drawing-mode * { cursor: crosshair !important; }
     transform: translate(0px, 0px) scale(1.48) rotate(0deg);
     filter: blur(45px);
   }
+}
+.holdupMessageBox{
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 650px;
+  max-width: calc(100vw - 32px);
+  border-radius: 25px;
+  padding: 25px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(54, 54, 54, 0.35);
+  filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1002;
+}
+
+.holdupMessageBox .hmsg-progress{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.holdupMessageBox .hmsg-step{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Apfel Grotezk', sans-serif;
+  font-weight: 400;
+  color: #9a9a9a;
+  font-size: 14px;
+}
+.holdupMessageBox .hmsg-step .dot{
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #C9C9C9;
+}
+.holdupMessageBox .hmsg-step.done .dot{ background: #373737; }
+.holdupMessageBox .hmsg-step.done .label{ color: #5a5a5a; }
+
+.holdupMessageBox .hmsg-question{
+  font-family: 'Apfel Grotezk', sans-serif;
+  font-weight: 400;
+  color: #919191;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+.holdupMessageBox .hmsg-answer{
+  font-family: 'Apfel Grotezk', sans-serif;
+  font-weight: 400;
+  color: #000;
+  font-size: 16px;
+  line-height: 22px;
+}
+
+
+.holdupMessageBox .hmsg-status{
+  font-family: 'Apfel Grotezk', sans-serif;
+  font-weight: 400;
+  color: #9a9a9a;
+  font-size: 14px;
+  min-width: 2px;
+  min-height: 18px;
+}
+
+@keyframes holdupBlink{
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }

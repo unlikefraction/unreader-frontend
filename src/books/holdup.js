@@ -1,5 +1,6 @@
 // holdup.js
 import { getItem as storageGet } from '../storage.js';
+import { showHoldupChatBar, hideHoldupChatBar } from './holdup-chat.js';
 function slugify(s) {
   return String(s || '')
     .toLowerCase()
@@ -53,6 +54,8 @@ export class HoldupManager {
     // NEW: sticky mic-permission denial; once set, we never re-request this session
     this._micPermissionBlocked = false;
     this._holdupFadeTimer = null;
+    this._chatModeActive = false; // when in chat mode, we only show UI, no network
+    this._textHoldupId = null;    // ephemeral id for text holdup session
 
     this._ensureStatusOutlet();
     this._bindHoldUpButton();
@@ -125,6 +128,52 @@ export class HoldupManager {
     const btn = document.querySelector('.hold-up');
     if (!btn) return;
     btn.addEventListener('click', () => this.toggleMute().catch(e => printWarning('toggleMute err', e)));
+    // React to mode changes while UI is present
+    try {
+      const wrapper = document.querySelector('.holdup-wrapper');
+      if (wrapper) {
+        wrapper.addEventListener('holdup-mode-change', async (e) => {
+          const mode = (e && e.detail && e.detail.mode) || (storageGet('ui:holdupMode') || 'voice');
+          try {
+            if (mode === 'chat') {
+              const wasActive = this.isActive() || this._chatModeActive;
+              if (wasActive) {
+                // If currently in voice active state, stop audio and soft-disconnect but keep UI active
+                if (this._connected) {
+                  this._outputMuted = true; // stop playing remote audio immediately
+                  this._applyOutputMuteState();
+                  await this._disconnectInternal({ retainUI: true }).catch(() => {});
+                }
+                this._chatModeActive = true;
+                this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: true });
+                this._updateHoldupActiveMark(true);
+                showHoldupChatBar(); // show input immediately
+                this._setStatus('Chat');
+                // initiate in background, don't block UI
+                try { this._initiateTextHoldup(); } catch (e) { printWarning('text holdup initiate failed', e); }
+              } else {
+                // not active → just ensure chat UI hidden and status neutral
+                this._chatModeActive = false;
+                hideHoldupChatBar();
+                this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+              }
+            } else {
+              // Switch from chat → voice: connect without visually deactivating holdup
+              if (this._chatModeActive) {
+                this._chatModeActive = false;
+                hideHoldupChatBar();
+                // Keep UI active while we connect+unmute
+                try {
+                  await this.toggleMute({ keepActiveDuringConnect: true });
+                } catch (err) {
+                  printWarning('holdup switch chat→voice failed', err);
+                }
+              }
+            }
+          } catch (err) { printWarning('holdup mode-change handler error', err); }
+        });
+      }
+    } catch {}
   }
   /**
    * Manage state classes on the .hold-up button.
@@ -265,6 +314,21 @@ export class HoldupManager {
 
   /* -------------------- public API -------------------- */
   async connectForPage({ pageNumber, metadata }) {
+    // Respect chat mode: skip any network/API work
+    const prefMode = storageGet('ui:holdupMode') || 'voice';
+    if (prefMode === 'chat') {
+      this._connected = false;
+      this._connecting = false;
+      this._currentPage = pageNumber;
+      this._lastMetadata = metadata || null;
+      this._currentRoomName = this._roomNameFor(pageNumber);
+      this._setStatus('Chat mode');
+      this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+      this._startInactivityWatch();
+      this.bumpActivity();
+      return; // no LiveKit, no token, no tracks
+    }
+
     await this._ensureLiveKit();
     const roomName = this._roomNameFor(pageNumber);
 
@@ -343,8 +407,37 @@ export class HoldupManager {
     await this.connectForPage({ pageNumber, metadata });
   }
 
-  async toggleMute() {
+  async toggleMute(opts = {}) {
+    const { keepActiveDuringConnect = false } = opts || {};
     if (this._connecting) return;
+
+    const mode = storageGet('ui:holdupMode') || 'voice';
+    if (mode === 'chat') {
+      // UI-only chat mode: animate, pause/resume via callbacks, no network or mic
+      if (!this._chatModeActive) {
+        // Ensure any prior voice connections are torn down
+        try { await this.disconnect(); } catch {}
+        this._chatModeActive = true;
+        this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: true });
+        this._updateHoldupActiveMark(true);
+        this._setStatus('Chat');
+        showHoldupChatBar(); // show input immediately
+        // initiate in background, don't block UI
+        try { this._initiateTextHoldup(); } catch (e) { printWarning('text holdup initiate failed', e); }
+        if (this._cb.onEngageStart) { try { this._cb.onEngageStart(); } catch {} }
+        try { if (window.Analytics) window.Analytics.capture('holdup_chat_open', { page_number: this._currentPage || null }); } catch {}
+      } else {
+        this._chatModeActive = false;
+        this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+        this._updateHoldupActiveMark(false);
+        this._setStatus('Idle');
+        hideHoldupChatBar();
+        if (this._cb.onEngageEnd) { try { this._cb.onEngageEnd(); } catch {} }
+        try { if (window.Analytics) window.Analytics.capture('holdup_chat_close', { page_number: this._currentPage || null }); } catch {}
+      }
+      this.bumpActivity();
+      return;
+    }
     // If not connected (or room torn down), reconnect on-demand first
     if (!this.room || !this._connected) {
       if (this._currentPage != null) {
@@ -361,7 +454,11 @@ export class HoldupManager {
     }
 
     // optimistic feedback: entering a transition
-    this._setHoldupBtn({ disabled: true, connecting: false, loading: true, active: false });
+    if (keepActiveDuringConnect) {
+      this._setHoldupBtn({ disabled: true, connecting: false, loading: true, active: true });
+    } else {
+      this._setHoldupBtn({ disabled: true, connecting: false, loading: true, active: false });
+    }
 
     const micIsMuted = this.localMicTrack ? (this.localMicTrack.isMuted ?? true) : true;
     const currentlyMuted = this._outputMuted && micIsMuted;
@@ -427,6 +524,10 @@ export class HoldupManager {
   }
 
   async disconnect() {
+    return this._disconnectInternal({ retainUI: false });
+  }
+
+  async _disconnectInternal({ retainUI = false } = {}) {
     try { if (this._inactivityTimer) clearInterval(this._inactivityTimer); } catch {}
     this._inactivityTimer = null;
     this._clearStrictCapTimer();
@@ -441,11 +542,65 @@ export class HoldupManager {
       this._connecting = false;
       this.localMicTrack = null;
       this.room = null;
-      // on disconnect, drop to neutral classes
-      this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
-      this._updateHoldupActiveMark(false);
+      if (!retainUI) {
+        this._chatModeActive = false;
+        // on disconnect, drop to neutral classes
+        this._setHoldupBtn({ disabled: false, connecting: false, loading: false, active: false });
+        this._updateHoldupActiveMark(false);
+        hideHoldupChatBar();
+      }
       document.querySelectorAll('audio[data-lk-remote]').forEach(el => { try { el.remove(); } catch {} });
       try { if (window.Analytics) window.Analytics.capture('holdup_disconnect', { page_number: this._currentPage || null }); } catch {}
     }
+  }
+
+  /* -------------------- text holdup (chat) API helpers -------------------- */
+  async _initiateTextHoldup() {
+    if (this._textHoldupId) return this._textHoldupId;
+    const token = storageGet('authToken');
+    if (!token) throw new Error('Missing auth token');
+    const base = window.API_URLS?.BASE;
+    if (!base) throw new Error('Missing window.API_URLS.BASE');
+    const md = this._lastMetadata || {};
+    const body = {
+      previous_page: md.previous_page || '',
+      current_page:  md.current_page  || '',
+      next_page:     md.next_page     || '',
+      user_book_id: Number(this.userBookId)
+    };
+    const res = await fetch(`${base}/holdup/text/initiate/`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`Text holdup initiate failed (${res.status}): ${t}`);
+    }
+    const json = await res.json();
+    const id = json?.text_holdup_id ?? json?.textHoldupId ?? json?.id;
+    if (!id) throw new Error('Missing text_holdup_id');
+    this._textHoldupId = id;
+    return id;
+  }
+
+  async sendChatMessage(message) {
+    if (!message || !String(message).trim()) return { text_holdup_id: this._textHoldupId || null, response: '' };
+    const id = await this._initiateTextHoldup();
+    const token = storageGet('authToken');
+    const base = window.API_URLS?.BASE;
+    const res = await fetch(`${base}/holdup/text/respond/`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text_holdup_id: id, message: String(message) })
+    });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      throw new Error(`Text holdup respond failed (${res.status}): ${t}`);
+    }
+    const json = await res.json();
+    const newId = json?.text_holdup_id ?? json?.textHoldupId ?? null;
+    if (newId) this._textHoldupId = newId;
+    return { text_holdup_id: this._textHoldupId, response: json?.response || '' };
   }
 }

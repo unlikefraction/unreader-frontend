@@ -1,7 +1,5 @@
 // apiUrls.js
 
-// apiUrls.js
-
 // Default to PROD; allow switching to DEV via window.useDev()
 const PROD_BASE = 'https://unreaderprod.unlikefraction.com';
 const DEV_BASE  = 'https://unreaderdev.unlikefraction.com';

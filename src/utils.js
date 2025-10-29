@@ -1,5 +1,5 @@
 // Module-friendly utilities, while also exposing to window for legacy usage
-let debugging = true;
+let debugging = false;
 
 // Keep original console methods so we can restore them when debugging is enabled
 const __consoleBackup = (() => {
