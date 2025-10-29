@@ -148,7 +148,7 @@ function elCreateMessageBoxAbove(bar) {
 
 function positionMessageBoxAbove(bar, box) {
   const rect = bar.getBoundingClientRect();
-  const gap = 30; // 50px above the text input bar
+  const gap = 8; // 50px above the text input bar
   const width = 650;
   box.style.position = 'fixed';
   box.style.left = '50%';
@@ -263,6 +263,11 @@ function startStatusLooper(box) {
   let cancelled = false;
 
   (async () => {
+    // Hide status initially; reveal after 0.5s
+    try { node.style.display = 'none'; } catch {}
+    await sleep(500);
+    if (cancelled) return;
+    try { node.style.removeProperty('display'); } catch { try { node.style.display = ''; } catch {} }
     let i = 0;
     while (!cancelled) {
       const t = msgs[i % msgs.length];

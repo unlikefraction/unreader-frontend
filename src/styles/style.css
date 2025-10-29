@@ -1842,7 +1842,8 @@ body.drawing-mode * { cursor: crosshair !important; }
 .holdupMessageBox .hmsg-status{
   font-family: 'Apfel Grotezk', sans-serif;
   font-weight: 400;
-  color: #9a9a9a;
+  color: #0e0e0e;
+  opacity: 0.6;
   font-size: 14px;
   min-width: 2px;
   min-height: 18px;
