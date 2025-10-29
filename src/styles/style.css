@@ -108,6 +108,30 @@ nav{
 
 }
 
+/* Sticky mode toggle: right: 30px; 20px below nav (JS adjusts top) */
+.mode-toggle {
+  position: fixed;
+  right: 30px;
+  top: 84px; /* fallback; JS sets based on nav height + 20px */
+  z-index: 1001;
+}
+.initializing .mode-toggle,
+.initialising .mode-toggle { display: none !important; }
+.mode-toggle button.control{
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+}
+
+/* -------- Reading Mode UI adjustments -------- */
+body.reading-mode .regenerateAudio { display: none !important; }
+body.reading-mode .bottomControl .controls { display: none !important; }
+body.reading-mode .heightSetter { display: none !important; }
+body.reading-mode .scrollToPlayhead { display: none !important; }
+/* Make all reading text black */
+body.reading-mode .mainContent, 
+body.reading-mode .mainContent * { color: #000 !important; }
+
 nav a{
   text-decoration: none;
   color: #000;

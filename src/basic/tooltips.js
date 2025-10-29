@@ -26,7 +26,12 @@ const tools = {
   ".forward": ["Forward", "→", "top"],
   ".read-along": ["Read Along", null, "top"],
 
-  ".heightSetter": ["Aligner", null, "left"],
+  ".option-voice": ["Voice Holdup", null, "top"],
+  ".option-chat": ["Chat Holdup", null, "top"],
+
+
+  ".mode-audio": ["Audio Mode", null, "top"],
+  ".mode-reading": ["Reading Mode", null, "top"],
 };
 
 (function () {
