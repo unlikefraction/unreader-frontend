@@ -242,6 +242,18 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
   z-index: 2;
   height: 62%;
 }
+
+.videoPlayOverlay i{
+  font-size: 32px;
+  padding: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(54, 54, 54, 0.5);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  font-weight: 300;
+  color: #000;
+}
+
 .videoPlayOverlay.hidden { display: none; }
 /* Credits area under the video, aligned to the right */
 .genVideoContainer .genCredits {

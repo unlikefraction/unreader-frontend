@@ -122,6 +122,7 @@ export class AudioCore {
 
   async playAudio() {
     try {
+      try { if (window.GeneratingOverlay?.isOpen?.() || document?.body?.classList?.contains?.('generating-audio')) return; } catch {}
       this.setupAudio();
       if (!this.sound.playing()) {
         this.sound.play();

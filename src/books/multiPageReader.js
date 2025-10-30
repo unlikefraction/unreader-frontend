@@ -894,6 +894,16 @@ export default class MultiPageReader {
     const flat = this.pageMeta[this.active]?._readyTranscriptFlat;
     if (Array.isArray(flat) && flat.length) await tryApplyTimings(sys, flat);
 
+    // If the generating overlay is open, defer starting playback until user confirms
+    try {
+      const overlayOpen = !!(window.GeneratingOverlay?.isOpen?.());
+      const bodyFlag = !!document?.body?.classList?.contains?.('generating-audio');
+      if (overlayOpen || bodyFlag) {
+        this._isLoadingActiveAudio = false; this._autoplayOnReady = false; this._syncPlayButton(false);
+        return;
+      }
+    } catch {}
+
     for (let k = 0; k < this.instances.length; k++) { if (k !== this.active) this.instances[k]?.audioCore?.pauseAudio?.(); }
     await sys.play();
     try { setPlaybackState('playing'); } catch {}

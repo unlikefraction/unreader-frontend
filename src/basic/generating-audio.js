@@ -35,7 +35,7 @@ export function startGeneratingAudioOverlay({ pageNumber } = {}) {
 
   // Center text
   const pg = pageNumber || currentPageNumber();
-  const centerText = buildEl('div', 'genCenterText', `Generating audio for page ${pg}`);
+  const centerText = buildEl('div', 'genCenterText', `Generating audio for {page ${pg}}`);
   overlay.appendChild(centerText);
 
   // Back button (top-left, 20px below nav)
@@ -66,6 +66,9 @@ export function startGeneratingAudioOverlay({ pageNumber } = {}) {
   let vidMeta = getVideo(currentVideoId) || {};
   video.src = String(vidMeta.url || '');
   video.preload = 'metadata';
+  video.muted = true;
+  try { video.setAttribute('muted', ''); } catch {}
+  try { video.playsInline = true; } catch {}
   video.controls = false; // we implement toggling
   video.autoplay = true; // attempt autoplay
   // Try autoplay as soon as possible (may be blocked; we also try on 'canplay')
