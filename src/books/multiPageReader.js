@@ -222,6 +222,7 @@ export default class MultiPageReader {
     // Ensure the scroll-to-playhead button sits above the notice when both visible
     this._positionScrollToPlayhead();
     el.style.display = 'inline-flex';
+    try { window.GeneratingOverlay?.start?.(pageNumber); } catch {}
   }
   _hideGeneratingNotice() {
     const el = this._ensureGeneratingNotice();
@@ -804,6 +805,7 @@ export default class MultiPageReader {
             meta._readyTranscript = transcript;
             meta._readyTranscriptFlat = normalizeWordTimings(transcript);
             meta._audioSettled = true;
+            try { window.GeneratingOverlay?.completeSoon?.(); } catch {}
             if (noticeShown) this._hideGeneratingNotice();
             return audioUrl;
           }

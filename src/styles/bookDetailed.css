@@ -88,7 +88,9 @@ body.initialising .inboxPopup,
 body.initializing .thoughtsFab,
 body.initialising .thoughtsFab,
 body.initializing .thoughtsPopup,
-body.initialising .thoughtsPopup {
+body.initialising .thoughtsPopup,
+body.initializing .pawTab,
+body.initialising .pawTab {
   visibility: hidden !important;
 }
 /* Optionally hide the top nav during initial load to avoid flicker */
@@ -113,3 +115,204 @@ body.initialising .skeletonLoadingMainBook {
   background-color: #ececec;
   border-radius: 8px;
 }
+
+/* === Generating Audio overlay flow === */
+/* Dim/hide most interactive UI while generating */
+body.generating-audio .main,
+body.generating-audio .leftControls,
+body.generating-audio .settingsDialog,
+body.generating-audio #heightSetter,
+body.generating-audio .thoughtsFab,
+body.generating-audio .thoughtsPopup,
+body.generating-audio .inboxPopup,
+body.generating-audio .pawTab,
+body.generating-audio .holdupInfo,
+body.generating-audio .holdupActiveMark,
+body.generating-audio .holdup-menu,
+body.generating-audio .mode-toggle,
+body.generating-audio .pageDetails,
+body.generating-audio .pageWrapper,
+body.generating-audio .mainContainer {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 250ms ease;
+}
+/* Hide the small in-page generating flag while overlay is active */
+body.generating-audio .audioGeneratingNotice { display: none !important; }
+/* nav and .inbox remain visible */
+
+.genAudioOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646; /* beneath boot skeleton, above UI */
+  pointer-events: none; /* allow nav/inbox; children opt back in */
+}
+
+.genCenterText {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.3;
+  font-family: 'Space Mono', monospace;
+  color: #373737;
+  opacity: 0;
+}
+
+.genBackBtn {
+  position: fixed;
+  left: 20px;
+  /* top is set dynamically based on nav height */
+  padding: 16px 25px;
+  border: 1px solid #b7b7b7;
+  border-radius: 50px;
+  background: #fff;
+  color: #0e0e0e;
+  font: 600 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0;
+  pointer-events: auto;
+}
+.genBackBtn i { font-size: 18px; }
+
+.genProgress {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 500px;
+  height: 30px;
+  border-radius: 500px;
+  border: 1px solid #B7B7B7;
+  background: #fff;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: auto;
+  transition: 400ms all ease-in-out;
+}
+
+.genProgress .bar {
+  height: 100%;
+  width: 26%;
+  background: #373737;
+  color: #fff;
+  border-radius: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 600 14px/1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  transition: width 400ms linear;
+}
+.genProgress.moved-bottom {
+  top: 93%;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.genVideoContainer {
+  position: fixed;
+  left: 50%;
+  top: 25% !important;
+  transform: translate(-50%, -50%);
+  width: 750px;
+  opacity: 0;
+  pointer-events: auto;
+}
+.genVideoContainer.visible { opacity: 1; transition: opacity 300ms ease; }
+.genVideoContainer video {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 12px;
+  background: #000;
+}
+.videoPlayOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 48px;
+  pointer-events: none; /* clicks fall through to video */
+  z-index: 2;
+  height: 62%;
+}
+.videoPlayOverlay.hidden { display: none; }
+/* Credits area under the video, aligned to the right */
+.genVideoContainer .genCredits {
+  position: static;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.genVideoContainer .genCredits p {
+  margin: 0;
+  color: #9B9B9B;
+  font: 500 18px/1.4 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-weight: 400;
+}
+.genVideoContainer .genCredits a {
+  color: #9B9B9B;
+  text-decoration: none;
+  border: 1px solid #D9D9D9;
+  border-radius: 5px;
+  padding: 2px 8px;
+  transition: 0.2s all;
+}
+
+.genVideoContainer .genCredits a:hover{
+  background: rgb(230, 230, 230, 0.3);
+}
+
+.genVideoContainer .genCredits .creditVideo i,
+.genVideoContainer .genCredits .suggested i { margin-right: 6px; }
+
+/* Completion CTA */
+.genCompleteBox {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 30px;
+  width: 100%;
+  text-align: center;
+  opacity: 0;
+  pointer-events: auto;
+}
+.genCompleteNote { margin: 0 0 12px; color: #373737; font: 500 16px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; font-weight: 400;}
+.genReturnBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #373737;
+  color: #fff;
+  border: none;
+  border-radius: 50px;
+  padding: 12px 60px;
+  font-size: 21px;
+  cursor: pointer;
+  transition: 0.2s all;
+}
+
+.genReturnBtn:hover{
+  background: #0e0e0e;
+}
+
+/* Animations */
+@keyframes slideInLeft { from { opacity: 0; transform: translate(-50%, -50%) translateX(-20px);} to { opacity: 1; transform: translate(-50%, -50%) translateX(0);} }
+@keyframes slideOutRight { from { opacity: 1; transform: translate(-50%, -50%) translateX(0);} to { opacity: 0; transform: translate(-50%, -50%) translateX(20px);} }
+@keyframes fadeDownIn { from { opacity: 0; transform: translateY(-10px);} to { opacity: 1; transform: translateY(0);} }
+@keyframes fadeInLeftFixed { from { opacity: 0; transform: translateX(calc(-50% - 20px));} to { opacity: 1; transform: translateX(-50%);} }
+
+.anim-enter-left { animation: slideInLeft 300ms ease forwards; }
+.anim-exit-right { animation: slideOutRight 300ms ease forwards; }
+.anim-fade-down-in { animation: fadeDownIn 250ms ease forwards; }
+.anim-fade-in-left-fixed { animation: fadeInLeftFixed 300ms ease forwards; }
+.anim-fade-in { animation: fadeDownIn 250ms ease forwards; }

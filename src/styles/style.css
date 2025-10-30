@@ -1811,7 +1811,7 @@ body.drawing-mode * { cursor: crosshair !important; }
   border-radius: 25px;
   padding: 25px;
   background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(25px);
   border: 1px solid rgba(54, 54, 54, 0.35);
   filter: drop-shadow(0px 4px 10px rgba(0, 0, 0, 0.2));
   display: flex;
@@ -1876,4 +1876,45 @@ body.drawing-mode * { cursor: crosshair !important; }
 @keyframes holdupBlink{
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
+}
+
+
+.pawTab{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: fixed;
+  right: 160px;
+  transition: 0.4s all;
+  top: 90px;
+  font-size: 1.5rem;
+  font-weight: 500;
+  width: 60px;
+  height: 60px;
+  border-radius: 500px;
+  border: 1px solid #B7B7B7;
+  cursor: pointer;
+}
+
+.pawTab:hover .mainIconPaw{
+  background: #ddd;
+}
+
+.pawTab .mainIconPaw{
+  display: flex;
+  width: 48px;
+  height: 48px;
+  border-radius: 500px;
+  align-items: center;
+  transition: 0.4s all;
+  justify-content: center;
+}
+
+.pawTab.active .mainIconPaw{
+  background: #373737;
+  color: #fff;
+}
+
+.pawTab.active:hover .mainIconPaw{
+  background: #0e0e0e;
 }
