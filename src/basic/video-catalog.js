@@ -9,6 +9,9 @@ export const videosById = {
   // Example/default entry used by generating-audio overlay
   default: {
     url: 'https://cdn.pixabay.com/video/2020/05/13/39009-420224623_large.mp4',
+    // Thumbnail used by the paw video stack (240x135 will be scaled via CSS)
+    // You can replace this placeholder with a more representative image anytime.
+    thumbnail: '/assets/bodyguard.webp',
     credits: {
       label: 'Daily Dose Of Internet',
       icon: 'ph-youtube-logo',
@@ -20,9 +23,26 @@ export const videosById = {
       href: 'https://x.com/eipieq'
     }
   },
+
   // Another sample entry
   cats: {
     url: 'https://cdn.pixabay.com/video/2020/05/13/39009-420224623_large.mp4',
+    thumbnail: '/assets/unreaderCover.webp',
+    credits: {
+      label: 'Cats',
+      icon: 'ph-youtube-logo',
+      href: 'https://www.youtube.com/@cats'
+    },
+    suggestedBy: {
+      label: '@shubham',
+      icon: 'ph-x-logo',
+      href: 'https://x.com/shubham'
+    }
+  },
+
+  dogs: {
+    url: 'https://cdn.pixabay.com/video/2020/05/13/39009-420224623_large.mp4',
+    thumbnail: '/assets/debit.webp',
     credits: {
       label: 'Cats',
       icon: 'ph-youtube-logo',
@@ -34,6 +54,7 @@ export const videosById = {
       href: 'https://x.com/shubham'
     }
   }
+
   // Add more videos here with unique IDs
   // "some-other-id": {
   //   url: 'https://.../video.mp4',
@@ -46,6 +67,7 @@ export const videosById = {
 export const playlistOrder = [
   'default',
   'cats',
+  'dogs',
 ];
 
 export function getVideo(id = 'default') {

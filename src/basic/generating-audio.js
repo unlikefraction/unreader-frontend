@@ -35,7 +35,7 @@ export function startGeneratingAudioOverlay({ pageNumber } = {}) {
 
   // Center text
   const pg = pageNumber || currentPageNumber();
-  const centerText = buildEl('div', 'genCenterText', `Generating audio for {page ${pg}}`);
+  const centerText = buildEl('div', 'genCenterText', `Generating audio for page ${pg}`);
   overlay.appendChild(centerText);
 
   // Back button (top-left, 20px below nav)

@@ -32,6 +32,8 @@ const tools = {
 
   ".mode-audio": ["Audio Mode", null, "top"],
   ".mode-reading": ["Reading Mode", null, "top"],
+
+  ".pawTab": ["Paw", null, "top"],
 };
 
 (function () {

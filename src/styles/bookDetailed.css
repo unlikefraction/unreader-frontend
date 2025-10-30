@@ -176,6 +176,7 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
   gap: 10px;
   opacity: 0;
   pointer-events: auto;
+  cursor: pointer;
 }
 .genBackBtn i { font-size: 18px; }
 
@@ -240,7 +241,7 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
   font-size: 48px;
   pointer-events: none; /* clicks fall through to video */
   z-index: 2;
-  height: 62%;
+  height: 422px;
 }
 
 .videoPlayOverlay i{
@@ -291,7 +292,7 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
 .genCompleteBox {
   position: fixed;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) !important;
   bottom: 30px;
   width: 100%;
   text-align: center;
@@ -325,6 +326,29 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
 
 .anim-enter-left { animation: slideInLeft 300ms ease forwards; }
 .anim-exit-right { animation: slideOutRight 300ms ease forwards; }
-.anim-fade-down-in { animation: fadeDownIn 250ms ease forwards; }
 .anim-fade-in-left-fixed { animation: fadeInLeftFixed 300ms ease forwards; }
-.anim-fade-in { animation: fadeDownIn 250ms ease forwards; }
+
+/* From bottom to top entrance (for timer+button box) */
+@keyframes fadeUpIn { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: translateY(0);} }
+.anim-fade-up-in { animation: fadeUpIn 250ms ease forwards; }
+
+/* Paw dialog overlay that shows the completion box + timer */
+.pawDialogOverlay{ position: fixed; inset: 0; z-index: 10; pointer-events: auto; }
+.pawDialogOverlay .genVideoContainer{ top: 50% !important; transform: translate(-50%, -50%); }
+.pawDialogOverlay .genCompleteBox{ left: 50%; transform: translateX(-50%); }
+.pawDialogOverlay .genCompleteActions{ display: flex; align-items: center; gap: 12px; justify-content: center; }
+.pawDialogOverlay .genBackBtn{ opacity: 1; z-index: 3; }
+html.pawDialog-open, body.pawDialog-open { overflow: hidden; }
+.genCompleteActions{ display: inline-flex; align-items: center; gap: 12px; }
+.genReturnTimer{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 25px;
+  border-radius: 100px;
+  border: 1px solid #B7B7B7;
+  font-family: 'Space Mono', monospace;
+  font-size: 20px;
+  color: #373737;
+  background: #fff;
+}
