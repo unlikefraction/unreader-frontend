@@ -180,6 +180,10 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
 }
 .genBackBtn i { font-size: 18px; }
 
+.genBackBtn span{
+  font-weight: 400;
+}
+
 .genProgress {
   position: fixed;
   top: 50%;
@@ -227,6 +231,7 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
 .genVideoContainer video {
   width: 100%;
   height: auto;
+  min-height: 400px;
   display: block;
   border-radius: 12px;
   background: #000;

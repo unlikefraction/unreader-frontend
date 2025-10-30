@@ -1948,7 +1948,7 @@ body.drawing-mode * { cursor: crosshair !important; }
 .pawVideoItem.visible.idx-2{ transform: translateY(calc(135px + 16px)) rotate(var(--rot-deg, 0deg)); opacity: 1; }
 .pawVideoItem.visible.idx-3{ transform: translateY(calc((135px + 16px) * 2)) rotate(var(--rot-deg, 0deg)); opacity: 1; }
 
-.pawVideoThumb{ width: 100%; height: 100%; background-size: cover; background-position: center; }
+.pawVideoThumb{ width: 100%; height: 100%; background-size: cover; background-position: center; cursor: pointer;}
 .pawVideoThumb.fallback{
   background: linear-gradient(135deg, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
 }
