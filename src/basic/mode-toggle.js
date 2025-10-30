@@ -27,10 +27,10 @@ function createModeToggle() {
     wrapper.append(btnAudio, btnReading);
     document.body.appendChild(wrapper);
 
-    // Initial mode from storage or default to 'reading'
-    let mode = 'reading';
+    // Initial mode from storage or default to 'audio' (voice)
+    let mode = 'audio';
     try {
-      mode = localStorage.getItem('unreader_mode') || 'reading';
+      mode = localStorage.getItem('unreader_mode') || 'audio';
     } catch {}
 
     function applyMode(next) {

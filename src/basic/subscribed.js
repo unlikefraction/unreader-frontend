@@ -15,7 +15,7 @@ export function celebrateBuckeyes(ms = 15000) {
 document.addEventListener('DOMContentLoaded', () => {
   const btn = document.querySelector('.goHomeBtn');
   // Navigate home on click
-  btn?.addEventListener('click', () => { window.location.href = '/'; });
+  btn?.addEventListener('click', () => { window.location.href = '/home.html'; });
   // Immediately celebrate without delay
   celebrateBuckeyes();
 });
