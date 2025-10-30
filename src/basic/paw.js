@@ -168,8 +168,11 @@ function initPawToggle() {
       try {
         video.src = String(meta?.url || '');
         video.preload = 'metadata';
-        video.muted = true; video.setAttribute('muted', '');
-        video.playsInline = true; video.controls = false; video.autoplay = true;
+        // Detailed view: start paused and with sound
+        video.muted = false;
+        video.playsInline = true;
+        video.controls = false;
+        video.autoplay = false;
       } catch {}
       const playOverlay = buildEl('div', 'videoPlayOverlay', '<i class="ph ph-play"></i>');
       videoWrap.appendChild(video);
@@ -228,7 +231,7 @@ function initPawToggle() {
       // Interactions
       const togglePlay = () => { try { if (video.paused) { video.play().catch(() => {}); } else { video.pause(); } } catch {} };
       videoWrap.addEventListener('click', togglePlay);
-      video.addEventListener('canplay', () => { try { video.play?.().catch(() => {}); } catch {} });
+      // Do not autoplay; wait for explicit user interaction to play with sound
       video.addEventListener('play', () => { playOverlay.classList.add('hidden'); });
       video.addEventListener('pause', () => { playOverlay.classList.remove('hidden'); });
 
