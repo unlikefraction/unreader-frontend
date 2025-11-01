@@ -85,6 +85,25 @@ window.addEventListener("DOMContentLoaded", () => {
   if (titleEl) titleEl.classList.add('fade-in');
   if (subEl) subEl.classList.add('fade-in-delayed');
 
+  // Compute Paw video progress (viewed/total) for homepage usage
+  try {
+    const VC = window.VideoCatalog || {};
+    const tsMap = VC.getTimestampMap ? VC.getTimestampMap() : {};
+    const durMap = VC.getDurationMap ? VC.getDurationMap() : {};
+    let activeId = (VC.loadState && VC.loadState()?.id) || null;
+    if (!activeId && VC.list) { const l = VC.list(); if (l && l.length) activeId = l[0]; }
+    let progressPct = 0;
+    if (activeId && durMap[activeId] > 0) {
+      const t = Math.max(0, Math.floor(Number(tsMap[activeId] || 0)));
+      const d = Math.max(1, Math.floor(Number(durMap[activeId] || 0)));
+      progressPct = Math.max(0, Math.min(100, Math.round((t / d) * 100)));
+    }
+    document.documentElement.style.setProperty('--paw-progress', String(progressPct));
+    document.documentElement.setAttribute('data-paw-progress', String(progressPct));
+    // Expose for quick reads by other scripts/widgets
+    window.__pawProgressPct = progressPct;
+  } catch {}
+
   function finishSkeleton() {
     const skel = document.querySelector('.skeletonLoading');
     if (skel) {

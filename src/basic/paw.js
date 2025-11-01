@@ -1,9 +1,9 @@
 // Paw tab toggle + stacked video thumbnails (3 items) with progress
 // - Adds a stack panel under the `.pawTab` showing the first 3 videos
 //   from the catalog, rotated as requested and animated open/close.
-// - Clicking the thumbnails does nothing for now.
+// - Clicking a thumbnail opens a dialog with video + credits.
 
-import { listVideos, getVideo, getVideoState } from './video-catalog.js';
+import { listVideos, getVideo, getVideoState, saveVideoState, getVideoTimestamp, saveVideoTimestamp, getVideoDuration, saveVideoDuration } from './video-catalog.js';
 
 function buildEl(tag, className, html) {
   const el = document.createElement(tag);
@@ -60,7 +60,7 @@ function initPawToggle() {
           try { stack.classList.remove('visible'); } catch {}
           try { items.forEach(({card}) => card.classList.remove('visible')); } catch {}
         } catch {}
-        openPawDialog(meta);
+        openPawDialog(meta, id);
       });
 
       stack.appendChild(card);
@@ -86,23 +86,42 @@ function initPawToggle() {
     }
 
     function updateProgressBars() {
-      // Load percentages by reading saved state and metadata for durations
-      const saved = getVideoState?.() || null;
+      // Default 0%; compute percent for each item based on per-video timestamps
+      const savedSingle = getVideoState?.() || null;
+      const tFor = (vid) => {
+        try {
+          const t = Number(getVideoTimestamp?.(vid) || 0);
+          if (t > 0) return t;
+        } catch {}
+        try {
+          // Fallback to legacy single saved state
+          if (savedSingle && savedSingle.id === vid) return Number(savedSingle.t || 0);
+        } catch {}
+        return 0;
+      };
       items.forEach(({ id, meta, progFill }) => {
-        // Default 0%; if we can fetch duration, compute percent
         progFill.style.width = '0%';
         try {
-          const v = document.createElement('video');
-          v.preload = 'metadata';
-          v.src = String(meta.url || '');
-          v.addEventListener('loadedmetadata', () => {
-            try {
-              const t = (saved && saved.id === id) ? (saved.t || 0) : 0;
-              const d = Math.max(1, Number(v.duration) || 1);
-              const pct = Math.max(0, Math.min(100, (t / d) * 100));
-              progFill.style.width = pct.toFixed(1) + '%';
-            } catch {}
-          }, { once: true });
+          // Prefer stored duration. If missing, fetch metadata once and cache.
+          let d = Math.max(0, Number(getVideoDuration?.(id) || 0));
+          if (d > 0) {
+            const t = tFor(id);
+            const pct = Math.max(0, Math.min(100, (t / d) * 100));
+            progFill.style.width = pct.toFixed(1) + '%';
+          } else {
+            const v = document.createElement('video');
+            v.preload = 'metadata';
+            v.src = String(meta.url || '');
+            v.addEventListener('loadedmetadata', () => {
+              try {
+                const dur = Math.max(1, Number(v.duration) || 1);
+                try { saveVideoDuration?.(id, Math.floor(dur)); } catch {}
+                const t = tFor(id);
+                const pct = Math.max(0, Math.min(100, (t / dur) * 100));
+                progFill.style.width = pct.toFixed(1) + '%';
+              } catch {}
+            }, { once: true });
+          }
         } catch {}
       });
     }
@@ -119,6 +138,20 @@ function initPawToggle() {
       items.forEach(({ card }, idx) => {
         openTimers.push(setTimeout(() => { card.classList.add('visible'); }, idx * 120));
       });
+
+      // Click-away to close when user clicks anywhere outside paw/stack
+      const onDocClick = (ev) => {
+        try {
+          const t = ev.target;
+          if (paw.contains(t) || stack.contains(t)) return; // clicks inside keep it open
+        } catch {}
+        try { paw.classList.remove('active'); } catch {}
+        closeStack();
+      };
+      // Save for removal on close
+      openStack._onDocClick = onDocClick;
+      document.addEventListener('mousedown', onDocClick, true);
+      document.addEventListener('touchstart', onDocClick, { passive: true, capture: true });
     }
 
     function closeStack() {
@@ -134,6 +167,15 @@ function initPawToggle() {
         stack.classList.remove('visible');
         stack.setAttribute('aria-hidden', 'true');
       }, 3 * 120 + 180));
+
+      // Remove click-away listeners if present
+      try {
+        if (openStack._onDocClick) {
+          document.removeEventListener('mousedown', openStack._onDocClick, true);
+          document.removeEventListener('touchstart', openStack._onDocClick, { capture: true });
+          openStack._onDocClick = null;
+        }
+      } catch {}
     }
 
     // Keep position in sync when viewport changes
@@ -147,7 +189,7 @@ function initPawToggle() {
     });
 
     // Dialog UI from generating final screen with a left timer
-    function openPawDialog(meta) {
+    function openPawDialog(meta, videoId) {
       // Build overlay
       const overlay = buildEl('div', 'genAudioOverlay pawDialogOverlay');
       overlay.setAttribute('role', 'dialog');
@@ -174,9 +216,10 @@ function initPawToggle() {
         video.controls = false;
         video.autoplay = false;
       } catch {}
-      const playOverlay = buildEl('div', 'videoPlayOverlay', '<i class="ph ph-play"></i>');
+      // Loading spinner overlay (visible until video is ready)
+      const loadingOverlay = buildEl('div', 'videoLoadingOverlay', '<i class="ph ph-circle-notch paw-spin"></i>');
       videoWrap.appendChild(video);
-      videoWrap.appendChild(playOverlay);
+      videoWrap.appendChild(loadingOverlay);
       
       // Credits
       const credits = buildEl('div', 'genCredits');
@@ -208,10 +251,11 @@ function initPawToggle() {
 
       document.body.appendChild(overlay);
       try { document.documentElement.classList.add('pawDialog-open'); document.body.classList.add('pawDialog-open'); } catch {}
-
-      // Fade the rest of the UI like generating mode
+      // Dim most UI while dialog is open; keep nav + inbox visible via CSS rules
       const hadGenerating = document.body.classList.contains('generating-audio');
-      if (!hadGenerating) document.body.classList.add('generating-audio');
+      if (!hadGenerating) {
+        try { document.body.classList.add('generating-audio'); } catch {}
+      }
 
       // Timer logic
       let start = Date.now();
@@ -229,15 +273,62 @@ function initPawToggle() {
       int = setInterval(tick, 1000);
 
       // Interactions
-      const togglePlay = () => { try { if (video.paused) { video.play().catch(() => {}); } else { video.pause(); } } catch {} };
-      videoWrap.addEventListener('click', togglePlay);
-      // Do not autoplay; wait for explicit user interaction to play with sound
-      video.addEventListener('play', () => { playOverlay.classList.add('hidden'); });
-      video.addEventListener('pause', () => { playOverlay.classList.remove('hidden'); });
+      let hasPlayedOnce = false;
+      const applyResumeTime = () => {
+        try {
+          const legacy = getVideoState?.();
+          let t = Number(getVideoTimestamp?.(videoId) || 0);
+          if (!t && legacy && legacy.id === videoId) t = Number(legacy.t || 0);
+          t = Math.max(0, Math.floor(t || 0));
+          if (!t) return;
+          const setT = () => { try { if (isFinite(video.duration)) video.currentTime = Math.min(t, Math.max(0, (video.duration || t) - 0.5)); } catch {} };
+          if (video.readyState >= 1) setT(); else video.addEventListener('loadedmetadata', setT, { once: true });
+        } catch {}
+      };
+      const togglePlay = () => { try { if (video.paused) { applyResumeTime(); video.play().catch(() => {}); } else { video.pause(); } } catch {} };
+      const onWrapClick = () => togglePlay();
+      videoWrap.addEventListener('click', onWrapClick);
+      // First play: enable native controls and stop hijacking clicks
+      video.addEventListener('play', () => {
+        hasPlayedOnce = true;
+        // After playback starts, show native controls and stop hijacking clicks
+        try { video.controls = true; } catch {}
+        try { videoWrap.removeEventListener('click', onWrapClick); } catch {}
+      });
+      // Loading state: while loading/buffering, hide the play icon
+      const hideLoading = () => {
+        try { loadingOverlay.classList.add('hidden'); } catch {}
+      };
+      const showLoading = () => {
+        try { loadingOverlay.classList.remove('hidden'); } catch {}
+      };
+      showLoading();
+      video.addEventListener('canplay', () => { hideLoading(); try { saveVideoDuration?.(videoId, Math.floor(Number(video.duration) || 0)); } catch {} });
+      video.addEventListener('canplaythrough', hideLoading);
+      video.addEventListener('playing', hideLoading);
+      video.addEventListener('waiting', showLoading);
 
       // Close helpers
+      // Persist timestamp every 2 seconds and on close
+      let saveTick = 0; let lastSave = 0;
+      const doSave = () => {
+        try {
+          const t = Math.floor(Number(video.currentTime) || 0);
+          if (!videoId) return;
+          saveVideoState(videoId, t); // legacy single-state cookie
+          saveVideoTimestamp(videoId, t); // per-video map in localStorage
+          try { localStorage.setItem('unr_video_state', JSON.stringify({ id: String(videoId), t })); } catch {}
+        } catch {}
+      };
+      saveTick = setInterval(() => {
+        const now = Date.now();
+        if (now - lastSave > 500) { doSave(); lastSave = now; }
+      }, 2000);
+
       function close(){
         try { clearInterval(int); } catch {}
+        try { if (saveTick) clearInterval(saveTick); } catch {}
+        try { doSave(); } catch {}
         try { overlay.remove(); } catch {}
         try { if (!hadGenerating) document.body.classList.remove('generating-audio'); } catch {}
         try { document.documentElement.classList.remove('pawDialog-open'); document.body.classList.remove('pawDialog-open'); } catch {}
@@ -246,6 +337,9 @@ function initPawToggle() {
       backBtn.addEventListener('click', (e)=>{ e.preventDefault(); close(); });
       // Clicking the background should NOT close the dialog
       // Intentionally no Escape-to-close; only back or main button
+
+      // Restore previous timestamp if we have it
+      try { applyResumeTime(); } catch {}
 
       // Entrance animations
       setTimeout(()=>{ backBtn.classList.add('anim-fade-down-in'); }, 20);

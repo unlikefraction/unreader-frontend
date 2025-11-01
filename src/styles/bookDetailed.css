@@ -141,6 +141,8 @@ body.generating-audio .mainContainer {
 body.generating-audio .audioGeneratingNotice { display: none !important; }
 /* nav and .inbox remain visible */
 
+/* Paw stack open: no special dimming — keep everything normal */
+
 .genAudioOverlay {
   position: fixed;
   inset: 0;
@@ -249,6 +251,31 @@ body.generating-audio .audioGeneratingNotice { display: none !important; }
   /* stretch to the video container's height */
   height: auto;
 }
+
+/* Loading spinner overlay above play icon until video is ready */
+.videoLoadingOverlay {
+  position: absolute;
+  top: 43%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(1.5);
+  width: 50px;
+  height: 50px;
+  padding: 10px;
+  border-radius: 50%;
+  color: #0e0e0e;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+  pointer-events: none;
+}
+.videoLoadingOverlay.hidden { display: none; }
+.paw-spin { animation: paw-spin 0.9s linear infinite; }
+@keyframes paw-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .videoPlayOverlay i{
   font-size: 32px;

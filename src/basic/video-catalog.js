@@ -115,6 +115,98 @@ export function getVideoState() {
   } catch { return null; }
 }
 
+// --- Per-video timestamp map (localStorage) ---
+const LS_TS_MAP = 'unr_video_timestamps';
+
+export function saveVideoTimestamp(id, seconds = 0) {
+  try {
+    const key = String(id || 'default');
+    const t = Math.max(0, Math.floor(Number(seconds) || 0));
+    let map = {};
+    try { map = JSON.parse(localStorage.getItem(LS_TS_MAP) || '{}') || {}; } catch { map = {}; }
+    map[key] = t;
+    localStorage.setItem(LS_TS_MAP, JSON.stringify(map));
+  } catch {}
+}
+
+export function getVideoTimestamp(id) {
+  try {
+    const key = String(id || 'default');
+    const raw = localStorage.getItem(LS_TS_MAP);
+    if (!raw) return 0;
+    const map = JSON.parse(raw) || {};
+    const v = map[key];
+    return Math.max(0, Math.floor(Number(v) || 0));
+  } catch { return 0; }
+}
+
+export function getVideoTimestampMap() {
+  try {
+    const raw = localStorage.getItem(LS_TS_MAP);
+    if (!raw) return {};
+    const map = JSON.parse(raw) || {};
+    const out = {};
+    for (const [k, v] of Object.entries(map)) out[k] = Math.max(0, Math.floor(Number(v) || 0));
+    return out;
+  } catch { return {}; }
+}
+
+// --- Per-video duration map (localStorage) ---
+const LS_DUR_MAP = 'unr_video_durations';
+
+export function saveVideoDuration(id, seconds = 0) {
+  try {
+    const key = String(id || 'default');
+    const d = Math.max(0, Math.floor(Number(seconds) || 0));
+    if (!d) return;
+    let map = {};
+    try { map = JSON.parse(localStorage.getItem(LS_DUR_MAP) || '{}') || {}; } catch { map = {}; }
+    map[key] = d;
+    localStorage.setItem(LS_DUR_MAP, JSON.stringify(map));
+  } catch {}
+}
+
+export function getVideoDuration(id) {
+  try {
+    const key = String(id || 'default');
+    const raw = localStorage.getItem(LS_DUR_MAP);
+    if (!raw) return 0;
+    const map = JSON.parse(raw) || {};
+    const v = map[key];
+    return Math.max(0, Math.floor(Number(v) || 0));
+  } catch { return 0; }
+}
+
+export function getVideoDurationMap() {
+  try {
+    const raw = localStorage.getItem(LS_DUR_MAP);
+    if (!raw) return {};
+    const map = JSON.parse(raw) || {};
+    const out = {};
+    for (const [k, v] of Object.entries(map)) out[k] = Math.max(0, Math.floor(Number(v) || 0));
+    return out;
+  } catch { return {}; }
+}
+
+export function getVideoProgress(id) {
+  const t = getVideoTimestamp(id) || 0;
+  const d = getVideoDuration(id) || 0;
+  if (d <= 0) return 0;
+  return Math.max(0, Math.min(1, t / d));
+}
+
+export function getAllVideoProgress() {
+  const ts = getVideoTimestampMap();
+  const ds = getVideoDurationMap();
+  const out = {};
+  for (const id of Object.keys({ ...videosById, ...ts, ...ds })) {
+    const t = Math.max(0, Math.floor(Number(ts[id] || 0)));
+    const d = Math.max(0, Math.floor(Number(ds[id] || 0)));
+    out[id] = d > 0 ? Math.max(0, Math.min(1, t / d)) : 0;
+  }
+  return out;
+}
+
 // Optional global for non-module consumers
 if (typeof window !== 'undefined') {
   window.VideoCatalog = {
@@ -124,5 +216,13 @@ if (typeof window !== 'undefined') {
     nextId: getNextId,
     saveState: saveVideoState,
     loadState: getVideoState,
+    saveTimestamp: saveVideoTimestamp,
+    getTimestamp: getVideoTimestamp,
+    getTimestampMap: getVideoTimestampMap,
+    saveDuration: saveVideoDuration,
+    getDuration: getVideoDuration,
+    getDurationMap: getVideoDurationMap,
+    getProgress: getVideoProgress,
+    getAllProgress: getAllVideoProgress,
   };
 }
