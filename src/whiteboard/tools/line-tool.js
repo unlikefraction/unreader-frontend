@@ -14,7 +14,7 @@ export function handleLine(drawingTools, type, e) {
     type,
     xRel,
     y,
-    // Preview
+    // Preview (rough-style)
     (x1, y1, x2, y2, seed) => {
       drawingTools.canvasManager.previewRough.line(
         zeroX + x1,

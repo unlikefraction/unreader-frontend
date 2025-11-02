@@ -18,7 +18,7 @@ export function handleEllipse(drawingTools, type, e) {
     type,
     startX,
     startY,
-    // Preview callback
+    // Preview callback (rough-style)
     (x1, y1, x2, y2, seed) => {
       let width = x2 - x1;
       let height = y2 - y1;

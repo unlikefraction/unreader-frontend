@@ -46,43 +46,44 @@ export function handleEraser(drawingTools, type, e) {
     drawingTools.isErasing = true;
     drawingTools.erasedShapeIds.clear();
     document.body.style.userSelect = 'none';
+    try { drawingTools.canvasManager.clearPreview(); } catch {}
 
   } else if (type === 'mousemove' && drawingTools.isErasing) {
-    // redraw to apply fading
-    drawingTools.redrawAll();
+    // Immediately delete any shapes the eraser touches (no dimming/preview)
+    const absX = xRel + getZeroXPoint();
+    let didDelete = false;
+    // Build deletion sets per kind to avoid mutating while iterating
+    const toDelete = Object.create(null);
+    Object.keys(drawingTools.shapesData).forEach(kind => { toDelete[kind] = new Set(); });
 
-    // detect shapes under cursor with rotation-aware bounds
-    drawingTools.canvasManager.clearPreview();
     Object.entries(drawingTools.shapesData).forEach(([kind, shapes]) => {
       shapes.forEach((shape, idx) => {
-        const id = `${kind}-${idx}`;
-        if (!drawingTools.erasedShapeIds.has(id)) {
-          const absX = xRel + getZeroXPoint();
-          if (isPointInRotatedBounds(kind, shape, absX, y)) {
-            drawingTools.erasedShapeIds.add(id);
-          }
+        if (isPointInRotatedBounds(kind, shape, absX, y)) {
+          toDelete[kind].add(idx);
         }
       });
     });
 
-    // preview overlay
-    drawingTools.erasedShapeIds.forEach(id => {
-      const [kind, idx] = id.split('-');
-      drawShapePreview(drawingTools, kind, drawingTools.shapesData[kind][idx], 0.2);
+    Object.keys(toDelete).forEach(kind => {
+      if (toDelete[kind].size > 0) {
+        drawingTools.shapesData[kind] = drawingTools.shapesData[kind].filter((_, i) => !toDelete[kind].has(i));
+        didDelete = true;
+      }
     });
 
+    if (didDelete) {
+      // One efficient redraw for the committed deletions
+      drawingTools.redrawAll({ skipSizing: true });
+    }
   } else if (type === 'mouseup' && drawingTools.isErasing) {
     drawingTools.isErasing = false;
     document.body.style.userSelect = 'auto';
     drawingTools.canvasManager.clearPreview();
 
-    // remove flagged shapes
-    Object.keys(drawingTools.shapesData).forEach(kind => {
-      drawingTools.shapesData[kind] =
-        drawingTools.shapesData[kind].filter((_, i) => !drawingTools.erasedShapeIds.has(`${kind}-${i}`));
-    });
+    // Persist any deletions performed during move
     drawingTools.erasedShapeIds.clear();
     drawingTools.save();
+    // Ensure final repaint if needed
     drawingTools.redrawAll();
 
     // switch back to cursor

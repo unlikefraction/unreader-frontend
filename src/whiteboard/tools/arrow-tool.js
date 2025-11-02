@@ -13,7 +13,7 @@ export function handleArrow(drawingTools, type, e) {
   
   drawingTools._genericDraw(
     type, xRel, y,
-    // preview draw
+    // preview draw (rough-style)
     (x1, y1, x2, y2, seed) => {
       drawingTools.canvasManager.previewRough.line(
         zeroX + x1, y1,

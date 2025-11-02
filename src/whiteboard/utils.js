@@ -20,7 +20,16 @@ export function computeCoords(e, getZeroXPoint) {
 
 /** X-axis zero offset for centering */
 export function getZeroXPoint() {
-  return window.innerWidth / 2 - 325;
+  try {
+    const el = document.querySelector('.mainContent');
+    if (el) {
+      const r = el.getBoundingClientRect();
+      // Use viewport-based left edge of the reading column as origin
+      return Math.round(r.left);
+    }
+  } catch {}
+  // Fallback: assume a 650px centered column
+  return Math.round(window.innerWidth / 2 - 325);
 }
 
 /** Check if click is on a tool button */

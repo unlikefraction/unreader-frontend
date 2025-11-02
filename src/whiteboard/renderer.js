@@ -19,14 +19,24 @@ export function redrawAll(drawingTools, opts = {}) {
 
   const zeroX = getZeroXPoint();
 
-  // helper: pick manager by a page-space Y (ABSOLUTE top)
-  const pickManagerByY = (y) => {
+  // helpers: pick managers by ABSOLUTE Y or a Y range
+  const pickManagersByY = (y) => {
+    const out = [];
     for (const m of drawingTools.canvasManagers) {
       const top = (typeof m._absTop === 'number') ? m._absTop : m.topOffset;
       const bottom = top + (m.height || 0);
-      if (y >= top && y <= bottom) return m;
+      if (y >= top && y <= bottom) { out.push(m); break; }
     }
-    return null; // if no band covers this Y, do not draw
+    return out;
+  };
+  const pickManagersByYRange = (minY, maxY) => {
+    const out = [];
+    for (const m of drawingTools.canvasManagers) {
+      const top = (typeof m._absTop === 'number') ? m._absTop : m.topOffset;
+      const bottom = top + (m.height || 0);
+      if (maxY >= top && minY <= bottom) out.push(m);
+    }
+    return out;
   };
 
   const runDraw = (id, mgr, drawFn) => {
@@ -46,20 +56,23 @@ export function redrawAll(drawingTools, opts = {}) {
     const h = r.height;
     const cx = zeroX + r.xRel + w / 2;
     const cy = r.y + h / 2;
-    const mgr = pickManagerByY(cy);
-    if (!mgr) return;
+    const b = getShapeBounds('rectangle', r);
+    const mgrs = pickManagersByYRange(b.minY, b.maxY);
+    if (!mgrs.length) return;
     const rotRad = ((r.rotation || 0) * Math.PI) / 180;
 
-    runDraw(id, mgr, (ctx) => {
-      ctx.save();
-      ctx.translate(cx, cy); // page-space; CanvasManager maps Y to local
-      ctx.rotate(rotRad);
-      mgr.drawRough.rectangle(
-        -w / 2, -h / 2,
-        w, h,
-        { stroke: r.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: r.seed }
-      );
-      ctx.restore();
+    mgrs.forEach((mgr) => {
+      runDraw(id, mgr, (ctx) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rotRad);
+        mgr.drawRough.rectangle(
+          -w / 2, -h / 2,
+          w, h,
+          { stroke: r.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: r.seed }
+        );
+        ctx.restore();
+      });
     });
   });
 
@@ -70,18 +83,20 @@ export function redrawAll(drawingTools, opts = {}) {
     const h = Math.abs(e.height);
     const cx = zeroX + e.xRel + e.widthRel / 2;
     const cy = e.y + e.height / 2;
-    const mgr = pickManagerByY(cy);
-    if (!mgr) return;
+    const b = getShapeBounds('ellipse', e);
+    const mgrs = pickManagersByYRange(b.minY, b.maxY);
+    if (!mgrs.length) return;
     const rotRad = ((e.rotation || 0) * Math.PI) / 180;
-
-    runDraw(id, mgr, (ctx) => {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rotRad);
-      mgr.drawRough.ellipse(0, 0, w, h, {
-        stroke: e.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: e.seed
+    mgrs.forEach((mgr) => {
+      runDraw(id, mgr, (ctx) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rotRad);
+        mgr.drawRough.ellipse(0, 0, w, h, {
+          stroke: e.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: e.seed
+        });
+        ctx.restore();
       });
-      ctx.restore();
     });
   });
 
@@ -94,20 +109,22 @@ export function redrawAll(drawingTools, opts = {}) {
     const y2 = l.y2;
     const cx = (x1 + x2) / 2;
     const cy = (y1 + y2) / 2;
-    const mgr = pickManagerByY(cy);
-    if (!mgr) return;
+    const b = getShapeBounds('line', l);
+    const mgrs = pickManagersByYRange(b.minY, b.maxY);
+    if (!mgrs.length) return;
     const rotRad = ((l.rotation || 0) * Math.PI) / 180;
-
-    runDraw(id, mgr, (ctx) => {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rotRad);
-      mgr.drawRough.line(
-        x1 - cx, y1 - cy,
-        x2 - cx, y2 - cy,
-        { stroke: l.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: l.seed }
-      );
-      ctx.restore();
+    mgrs.forEach((mgr) => {
+      runDraw(id, mgr, (ctx) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rotRad);
+        mgr.drawRough.line(
+          x1 - cx, y1 - cy,
+          x2 - cx, y2 - cy,
+          { stroke: l.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: l.seed }
+        );
+        ctx.restore();
+      });
     });
   });
 
@@ -120,24 +137,26 @@ export function redrawAll(drawingTools, opts = {}) {
     const y2 = a.y2;
     const cx = (x1 + x2) / 2;
     const cy = (y1 + y2) / 2;
-    const mgr = pickManagerByY(cy);
-    if (!mgr) return;
+    const b = getShapeBounds('arrow', a);
+    const mgrs = pickManagersByYRange(b.minY, b.maxY);
+    if (!mgrs.length) return;
     const rotRad = ((a.rotation || 0) * Math.PI) / 180;
-
-    runDraw(id, mgr, (ctx) => {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rotRad);
-      mgr.drawRough.line(
-        x1 - cx, y1 - cy,
-        x2 - cx, y2 - cy,
-        { stroke: a.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: a.seed }
-      );
-      drawArrowHead(
-        Object.assign({}, drawingTools, { selectedColor: a.color, canvasManager: mgr }),
-        x1 - cx, y1 - cy, x2 - cx, y2 - cy, a.seed
-      );
-      ctx.restore();
+    mgrs.forEach((mgr) => {
+      runDraw(id, mgr, (ctx) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rotRad);
+        mgr.drawRough.line(
+          x1 - cx, y1 - cy,
+          x2 - cx, y2 - cy,
+          { stroke: a.color, strokeWidth: drawingTools.strokeWidth, roughness: drawingTools.roughness, seed: a.seed }
+        );
+        drawArrowHead(
+          Object.assign({}, drawingTools, { selectedColor: a.color, canvasManager: mgr }),
+          x1 - cx, y1 - cy, x2 - cx, y2 - cy, a.seed
+        );
+        ctx.restore();
+      });
     });
   });
 
@@ -148,29 +167,31 @@ export function redrawAll(drawingTools, opts = {}) {
     const raw = p.points.map(pt => [pt.xRel, pt.y]);
     const ys = raw.map(r => r[1]);
     const cy = ys.reduce((a,b)=>a+b)/ys.length;
-    const mgr = pickManagerByY(cy);
-    if (!mgr) return;
+    const b = getShapeBounds('pencil', p);
+    const mgrs = pickManagersByYRange(b.minY, b.maxY);
+    if (!mgrs.length) return;
 
     const xs = raw.map(r => r[0]);
     const cxRel = xs.reduce((a,b)=>a+b)/xs.length;
     const cx = zeroX + cxRel;
     const rotRad = ((p.rotation || 0) * Math.PI) / 180;
     const stroke = getStroke(raw, p.options);
-
-    runDraw(id, mgr, (ctx) => {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rotRad);
-      ctx.beginPath();
-      stroke.forEach(([x, y], j) => {
-        const rx = x - cxRel;
-        const ry = y - cy;
-        j ? ctx.lineTo(rx, ry) : ctx.moveTo(rx, ry);
+    mgrs.forEach((mgr) => {
+      runDraw(id, mgr, (ctx) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rotRad);
+        ctx.beginPath();
+        stroke.forEach(([x, y], j) => {
+          const rx = x - cxRel;
+          const ry = y - cy;
+          j ? ctx.lineTo(rx, ry) : ctx.moveTo(rx, ry);
+        });
+        ctx.closePath();
+        ctx.fillStyle = p.color;
+        ctx.fill();
+        ctx.restore();
       });
-      ctx.closePath();
-      ctx.fillStyle = p.color;
-      ctx.fill();
-      ctx.restore();
     });
   });
 
@@ -181,29 +202,31 @@ export function redrawAll(drawingTools, opts = {}) {
     const raw = h.points.map(pt => [pt.xRel, pt.y]);
     const ys = raw.map(r => r[1]);
     const cy = ys.reduce((a,b)=>a+b)/ys.length;
-    const mgr = pickManagerByY(cy);
-    if (!mgr) return;
+    const b = getShapeBounds('highlighter', h);
+    const mgrs = pickManagersByYRange(b.minY, b.maxY);
+    if (!mgrs.length) return;
 
     const xs = raw.map(r => r[0]);
     const cxRel = xs.reduce((a,b)=>a+b)/xs.length;
     const cx = getZeroXPoint() + cxRel;
     const rotRad = ((h.rotation || 0) * Math.PI) / 180;
     const stroke = getStroke(raw, h.options);
-
-    runDraw(id, mgr, (ctx) => {
-      ctx.save();
-      ctx.translate(cx, cy);
-      ctx.rotate(rotRad);
-      ctx.beginPath();
-      stroke.forEach(([x, y], j) => {
-        const rx = x - cxRel;
-        const ry = y - cy;
-        j ? ctx.lineTo(rx, ry) : ctx.moveTo(rx, ry);
+    mgrs.forEach((mgr) => {
+      runDraw(id, mgr, (ctx) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rotRad);
+        ctx.beginPath();
+        stroke.forEach(([x, y], j) => {
+          const rx = x - cxRel;
+          const ry = y - cy;
+          j ? ctx.lineTo(rx, ry) : ctx.moveTo(rx, ry);
+        });
+        ctx.closePath();
+        ctx.fillStyle = drawingTools._hexToRgba(h.color, h.opacity);
+        ctx.fill();
+        ctx.restore();
       });
-      ctx.closePath();
-      ctx.fillStyle = drawingTools._hexToRgba(h.color, h.opacity);
-      ctx.fill();
-      ctx.restore();
     });
   });
 
@@ -239,7 +262,8 @@ export function redrawAll(drawingTools, opts = {}) {
     const top = centerY - height / 2;
 
     // Only draw text if a canvas band covers this Y
-    const mgr = pickManagerByY(centerY);
+    const mgrList = pickManagersByYRange(centerY, centerY);
+    const mgr = mgrList[0] || null;
     if (!mgr) return;
 
     let div = document.querySelector(`[data-text-id="${id}"]`);
@@ -269,7 +293,8 @@ export function redrawAll(drawingTools, opts = {}) {
     style.whiteSpace = 'pre';
     style.background = 'transparent';
     style.color = t.color;
-    style.zIndex = '1';
+    // Ensure text overlays render above both draw (1000) and preview (1001) canvases
+    style.zIndex = '1100';
     style.opacity = opacity;
   });
 

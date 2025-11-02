@@ -38,7 +38,7 @@ export function createTextEditor(drawingTools, e) {
     outline: '1px dashed rgba(0,0,0,0.3)',
     outlineOffset: '2px',
     background: 'transparent',
-    zIndex: '1000',
+    zIndex: '1100',
     fontSize: '24px',
     // Match renderer line-height to avoid vertical shift on save
     lineHeight: 'normal',
@@ -163,6 +163,10 @@ export function createTextEditor(drawingTools, e) {
       fontFamily
     });
     drawingTools.save();
+    // Prevent the same click that caused blur from spawning a new editor immediately
+    try { drawingTools._suppressNextTextClick = true; } catch {}
+    // Prevent the same click that caused blur from spawning a new editor immediately
+    try { drawingTools._suppressNextTextClick = true; } catch {}
     el.remove();
     drawingTools.redrawAll();
     // Done editing; allow selection overlay again
@@ -225,7 +229,7 @@ export function startEditExistingText(drawingTools, index) {
     outline: '1px dashed rgba(0,0,0,0.3)',
     outlineOffset: '2px',
     background: 'transparent',
-    zIndex: '1000',
+    zIndex: '1100',
     fontSize: `${fontSize}px`,
     lineHeight: 'normal',
     color,

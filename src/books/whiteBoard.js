@@ -76,8 +76,8 @@ export class DrawingTools {
     const sync = initScribblesSync({
       getData: () => this.shapesData,
       setData: (data) => { this.shapesData = data; this.redrawAll(); },
-      // Push instantly after saving to localStorage
-      debounceMs: 0
+      // Debounce pushes to reduce network chatter during bursts
+      debounceMs: 1200
     });
     this._scheduleScribblesPush = sync.schedulePush;
 
@@ -90,6 +90,12 @@ export class DrawingTools {
 
     // base absolute top for band 0 (used when some APIs expect normalized offsets)
     this._bandsBaseTop = 0;
+
+    // rAF-throttled pointer move state
+    this._moveTicking = false;
+    this._lastMoveEvent = null;
+    // Track viewport width to detect horizontal layout changes
+    this._lastViewportWidth = (typeof window !== 'undefined') ? (window.innerWidth || document.documentElement.clientWidth || 0) : 0;
 
     initSelectionHandler(this);
 
@@ -294,7 +300,7 @@ export class DrawingTools {
 
     // throttle scroll/resize via rAF
     let ticking = false;
-    const onScrollOrResize = () => {
+    const onScroll = () => {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
@@ -302,8 +308,26 @@ export class DrawingTools {
         ticking = false;
       });
     };
-    window.addEventListener('scroll', onScrollOrResize, { passive: true });
-    window.addEventListener('resize', onScrollOrResize);
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    // On resize, the canvases get resized (cleared) by ResizeObserver.
+    // Ensure we repaint even if band plan is unchanged.
+    const onResize = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const vw = window.innerWidth || document.documentElement.clientWidth || 0;
+        const widthChanged = vw !== this._lastViewportWidth;
+        this._lastViewportWidth = vw;
+        this._replanAndMount(false);
+        if (widthChanged) {
+          // Repaint to realign X-origin with the text column
+          this.redrawAll();
+        }
+        ticking = false;
+      });
+    };
+    window.addEventListener('resize', onResize);
 
     // tools UI
     this.tools.forEach(tool =>
@@ -316,8 +340,8 @@ export class DrawingTools {
       }
     });
 
-    // global pointer routing (eraser + shapes tools)
-    ['mousedown','mousemove','mouseup'].forEach(evt =>
+    // global pointer routing (eraser)
+    ['mousedown','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
         this._bindManagerForEvent(e);
@@ -338,13 +362,14 @@ export class DrawingTools {
 
     // text tool on click
     document.addEventListener('click', e => {
+      if (this._suppressNextTextClick) { this._suppressNextTextClick = false; return; }
       this._bindManagerForEvent(e);
       if (!this.canvasManager) return;
       handleText(this, e, this.selectedColor);
     });
 
-    // draw tools
-    ['mousedown','mousemove','mouseup'].forEach(evt =>
+    // draw tools (mousedown/mouseup immediate)
+    ['mousedown','mouseup'].forEach(evt =>
       document.addEventListener(evt, e => {
         if (evt === 'mousedown' && this._isClickOnTool(e)) return;
         this._bindManagerForEvent(e);
@@ -357,6 +382,40 @@ export class DrawingTools {
         handleHighlight(this, evt, e, this.highlightOptions, this.highlightColor, this.highlightOptions.opacity);
       })
     );
+
+    // rAF-throttled mousemove for eraser + draw previews + cursor tracking
+    document.addEventListener('mousemove', (e) => {
+      this._lastMoveEvent = e;
+      if (this._moveTicking) return;
+      this._moveTicking = true;
+      requestAnimationFrame(() => {
+        const ev = this._lastMoveEvent;
+        this._moveTicking = false;
+        if (!ev) return;
+        this._bindManagerForEvent(ev);
+        if (!this.canvasManager) return;
+
+        // Eraser preview/update
+        handleEraser(this, 'mousemove', ev);
+
+        // Shape previews/updates
+        handleRectangle(this, 'mousemove', ev, this.selectedColor);
+        handleEllipse(this, 'mousemove', ev, this.selectedColor);
+        handleLine(this, 'mousemove', ev, this.selectedColor);
+        handleArrow(this, 'mousemove', ev, this.selectedColor);
+        handlePencil(this, 'mousemove', ev, this.pencilOptions, this.selectedColor);
+        handleHighlight(this, 'mousemove', ev, this.highlightOptions, this.highlightColor, this.highlightOptions.opacity);
+
+        // Eraser cursor
+        if (this.activeTool?.classList.contains('eraser')) {
+          this.eraserCursor.style.display = 'block';
+          this.eraserCursor.style.left = `${ev.pageX}px`;
+          this.eraserCursor.style.top = `${ev.pageY}px`;
+        } else {
+          this.eraserCursor.style.display = 'none';
+        }
+      });
+    });
   }
 
   // ========== hit-testing manager (bulletproof) ==========

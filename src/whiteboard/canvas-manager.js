@@ -102,7 +102,7 @@ export class CanvasManager {
     const doc = document.documentElement;
     const body = document.body;
     const width = Math.max(doc.scrollWidth, body.scrollWidth, doc.clientWidth);
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
 
     [this.drawCanvas, this.previewCanvas].forEach(c => {
       // Backing store in device pixels for crisp rendering
