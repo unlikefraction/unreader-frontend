@@ -844,7 +844,7 @@ function renderOathCopy() {
       color: transparent;
     ">${label}</span>`;
 
-  oathCopy.innerHTML = `I, <strong>${username}</strong>, hereby take the <strong>${labelHTML}</strong> to read “<u>${title}</u>”, and <strong>wager $${price}</strong>, which I shall receive if, and only if, I complete the book.`;
+  oathCopy.innerHTML = `I, <strong>${username}</strong>, hereby take the <strong>${labelHTML}</strong> to read “<u>${title}</u>”.`;
 }
 
 takeOathBtn.addEventListener("click", createBookOnBackend);
