@@ -383,7 +383,7 @@
 
 .endDate{
     position: relative;
-    bottom: -0.8rem;
+    margin-top: 2.5rem;
     display: flex;
     justify-content: end;
 }
@@ -391,7 +391,19 @@
 .bookCompleted{
     border: none;
     font-size: 1.4rem;
-    margin-top: -0.4rem;
+}
+
+/* Anchor the completion arrow + date to the completed dot so it never
+   drifts to a new grid row when wrapping occurs. */
+.progressDot.bookCompleted { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.progressDot.bookCompleted .endDate {
+    position: absolute;
+    left: 26px;   /* place arrow+date to the right of the dot */
+    top: -8px;    /* vertically align with the dot nicely */
+    right: auto;
+    bottom: auto;
+    display: flex;
+    justify-content: flex-start;
 }
 
 .endDayArrow{

@@ -68,7 +68,6 @@
   
   h1 {
     font-size: 30px;
-    margin: 40px 0;
     text-align: center;
     font-weight: 500;
   }
@@ -574,4 +573,30 @@
 .editableTitle.isEditing,
 .editableTitle:not([readonly]) {
   border-bottom: 1px solid #373737;
+}
+
+
+.topSectionStep1{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  margin: 170px 0 30px 0;
+}
+
+.topSectionStep1 .description{
+  font-family: 'space mono', monospace;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.topSectionStep1 .description a{
+  color: #047AFE;
+  font-weight: 500;
+  text-decoration: none;
+  transition: 0.1s all;
+}
+
+.topSectionStep1 .description a:hover{
+  color: #005bc3;
 }

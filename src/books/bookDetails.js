@@ -474,13 +474,19 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
 
       const start = new Date(userStartDate);
       let isFirst = true;
+      const todayKey = todayLocal.toISOString().split("T")[0];
+      const cursor = new Date(start);
 
-      while (start <= endBoundaryLocal) {
+      // Iterate by calendar day using date-only comparison to ensure
+      // the final day is included regardless of time-of-day.
+      while (true) {
         const dot = document.createElement("div");
         dot.classList.add("progressDot");
 
-        const dateKey = start.toISOString().split("T")[0];
-        const isToday = dateKey === todayLocal.toISOString().split("T")[0];
+        const dateKey = cursor.toISOString().split("T")[0];
+        // Stop if we've moved past the end boundary day
+        if (dateKey > endKey) break;
+        const isToday = dateKey === todayKey;
         const wasRead = !!dayMap[dateKey];
 
         if (isFirst) {
@@ -512,11 +518,16 @@ function wireThoughtsAutosave({ textarea, userBookId, token, initialServerText =
         }
 
         progressContainer.appendChild(dot);
-        // If this dot is the completed one, place endDate next to it inside the same grid
+        // If this dot is the completed one, anchor endDate to this dot itself
+        // so the arrow always sticks to the last oath-marked dot even if the
+        // grid wraps to a new line.
         if (dot.classList.contains("bookCompleted") && endDateContainer) {
-          progressContainer.appendChild(endDateContainer);
+          dot.appendChild(endDateContainer);
         }
-        start.setDate(start.getDate() + 1);
+
+        // If we just rendered the end day, stop; else move to next calendar day
+        if (dateKey === endKey) break;
+        cursor.setDate(cursor.getDate() + 1);
       }
 
       // Toggle + fill pre-existing endDate block in HTML
