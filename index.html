@@ -31,7 +31,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Homemade+Apple&display=swap" rel="stylesheet">
     <title>Unreader by Unlikefraction</title>
   </head>
   <body>
@@ -49,16 +49,110 @@
       </nav>
 
       <div class="hero">
-        <div class="books"></div>
         <div class="machine">
           <img src="./public/assets/3dbox-right-out.svg" alt="machine">
         </div>
         <div class="hero-text">
-          <h1>squeeze<br/>knowledge<br/>out of books</h1>
+          <h1><span class="squeeze-word" data-word="squeeze">squeeze</span><br/>knowledge<br/>out of books</h1>
           <a class="startBook" href="login.html">start your book →</a>
         </div>
+        <button class="hero-scroll-button" type="button" aria-label="Scroll down to explore more">
+          <i class="ph ph-arrow-down"></i>
+        </button>
       </div>
     </div>
+    <p class="index-how-question">how?</p>
+    <section class="index-todo-section" aria-label="things unreader lets you do">
+      <div class="index-todo-list">
+        <div class="index-todo-item">
+          <div class="index-todo-rect" aria-hidden="true">
+            <svg class="index-todo-rough" role="presentation" aria-hidden="true"></svg>
+          </div>
+          <div class="index-todo-content">
+            <p class="index-todo-text">
+              <span>read and listen at the same time</span>
+              <svg class="index-todo-strike" role="presentation" aria-hidden="true"></svg>
+            </p>
+          </div>
+        </div>
+        <div class="index-todo-item">
+          <div class="index-todo-rect" aria-hidden="true">
+            <svg class="index-todo-rough" role="presentation" aria-hidden="true"></svg>
+          </div>
+          <div class="index-todo-content">
+            <p class="index-todo-text">
+              <span>ask questions</span>
+              <svg class="index-todo-strike" role="presentation" aria-hidden="true"></svg>
+            </p>
+          </div>
+        </div>
+        <div class="index-todo-item">
+          <div class="index-todo-rect" aria-hidden="true">
+            <svg class="index-todo-rough" role="presentation" aria-hidden="true"></svg>
+          </div>
+          <div class="index-todo-content">
+            <p class="index-todo-text">
+              <span>write thoughts as you read</span>
+              <svg class="index-todo-strike" role="presentation" aria-hidden="true"></svg>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="preface">
+      <div class="preface-text">
+        <h1>preface</h1>
+        <p>Books contain centuries of knowledge. But the format hasn't changed while everything else has. You're not supposed to just stare at static text for hours and hope your mind doesn't wander. You're not supposed to struggle alone when you don't understand something. That's not how your brain works. That's not how learning works.<br/>
+<br/>
+Understanding shouldn't be something you hope for. It should be demanded. Expected. Built into the experience.<br/>
+<br/>
+We built unreader because we were tired of abandoning books. Tired of feeling like we weren't 'real readers.' Tired of knowledge being locked away in a format that fights against how we naturally think and learn.<br/>
+<br/>
+Books should adapt to you. Not the other way around.</p>
+      </div>
+    </section>
+    <section class="index-cta" aria-label="30 day unlimited access call to action">
+      <div class="index-cta-card">
+        <div class="index-cta-label">
+          <i class="ph ph-credit-card"></i>
+          <span>no credit card</span>
+        </div>
+        <div class="index-cta-body">
+          <p class="index-cta-text">get started with 30 day unlimited access</p>
+          <a class="index-cta-button" href="login.html">start your book</a>
+        </div>
+      </div>
+    </section>
+    <footer class="index-footer" aria-label="Unreader site footer">
+      <div class="index-footer-inner">
+        <div class="index-footer-left">
+          <div class="index-footer-brand">
+            <span class="index-footer-logo">º/º</span>
+            <span class="index-footer-name">unreader by unlikefraction</span>
+          </div>
+          <div class="index-footer-nav">
+            <div class="index-footer-nav-primary">
+              <a href="login.html">start your book</a>
+              <a href="home.html">unreader blogs</a>
+              <a href="pricing.html">pricing</a>
+              <a href="credits.html">about</a>
+              <a href="mailto:hello@unlikefraction.com">contact us</a>
+            </div>
+            <div class="index-footer-divider"></div>
+            <div class="index-footer-nav-sub">
+              <a href="#" aria-disabled="true">privacy policy</a>
+              <a href="#" aria-disabled="true">terms and conditions</a>
+            </div>
+            <p class="index-footer-copy">© 2025 Unlikefraction</p>
+          </div>
+        </div>
+        <p class="index-footer-tagline">rediscover the joy of books!!</p>
+        <div class="index-footer-image">
+          <img src="./public/assets/books-stack.png" alt="Stack of classic books" loading="lazy">
+        </div>
+      </div>
+    </footer>
+    <script type="module" src="./src/basic/index-books.js"></script>
     <script type="module" src="./src/basic/logo-animation.js"></script>
   </body>
 </html>

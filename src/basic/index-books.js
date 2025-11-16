@@ -1,3 +1,4 @@
+import rough from 'roughjs';
 import { BOOKS } from './book-machine.js';
 
 const BOOK_WIDTH_WITH_PADDING = 232; // width + padding fallback
@@ -140,6 +141,88 @@ let loopPromise = null;
 let relayoutQueue = Promise.resolve();
 let baselineBottom = 0;
 let squeezeWordController = null;
+let todoShapeResizeTimer = null;
+
+function drawTodoShapes() {
+  const rects = document.querySelectorAll('.index-todo-rect');
+  rects.forEach(rect => {
+    const svg = rect.querySelector('.index-todo-rough');
+    if (!svg) return;
+    const width = Math.round(rect.clientWidth);
+    const height = Math.round(rect.clientHeight);
+    if (!width || !height) return;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.innerHTML = '';
+    const rc = rough.svg(svg);
+    const inset = Math.max(8, Math.min(width, height) * 0.12);
+    const innerWidth = Math.max(2, width - inset * 2);
+    const innerHeight = Math.max(2, height - inset * 2);
+    const scribbleColor = '#373737';
+    const fillRect = rc.rectangle(inset, inset, innerWidth, innerHeight, {
+      fill: scribbleColor,
+      fillStyle: 'hachure',
+      fillWeight: 1.2,
+      hachureAngle: 120,
+      hachureGap: 10,
+      stroke: 'none',
+      roughness: 2.2,
+    });
+    fillRect.classList.add('index-todo-rough-fill');
+    const outlineRect = rc.rectangle(
+      inset * 0.55,
+      inset * 0.55,
+      Math.max(2, width - inset * 1.1),
+      Math.max(2, height - inset * 1.1),
+      {
+        stroke: scribbleColor,
+        strokeWidth: 2.2,
+        roughness: 1.4,
+      }
+    );
+    outlineRect.classList.add('index-todo-rough-outline');
+    svg.append(fillRect, outlineRect);
+  });
+
+  const STRIKE_HEIGHT = 26;
+  document.querySelectorAll('.index-todo-item').forEach(item => {
+    const svg = item.querySelector('.index-todo-strike');
+    const textSpan = item.querySelector('.index-todo-text span');
+    if (!svg || !textSpan) return;
+    const width = Math.round(textSpan.getBoundingClientRect().width);
+    if (!width) return;
+    svg.setAttribute('viewBox', `0 0 ${width} ${STRIKE_HEIGHT}`);
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', STRIKE_HEIGHT);
+    svg.innerHTML = '';
+    const rc = rough.svg(svg);
+    const mid = STRIKE_HEIGHT / 2;
+    const clampX = val => Math.max(4, Math.min(val, width - 4));
+    const points = [
+      [clampX(4), mid - 2],
+      [clampX(width * 0.32), mid + 3],
+      [clampX(width * 0.62), mid - 2],
+      [clampX(width - 6), mid + 1],
+    ];
+    const strikePath = rc.curve(points, {
+      stroke: '#373737',
+      strokeWidth: 4,
+      roughness: 1.7,
+    });
+    strikePath.classList.add('index-todo-strike-path');
+    svg.append(strikePath);
+  });
+}
+
+function scheduleTodoShapeDraw(immediate = false) {
+  if (immediate) {
+    drawTodoShapes();
+    return;
+  }
+  clearTimeout(todoShapeResizeTimer);
+  todoShapeResizeTimer = setTimeout(drawTodoShapes, 140);
+}
 
 function placeCardInstant(card, position) {
   if (!position) return;
@@ -304,8 +387,51 @@ function queueRelayout() {
   });
 }
 
+function setupTodoScrollSection() {
+  const section = document.querySelector('.index-todo-section');
+  if (!section) return;
+  const items = Array.from(section.querySelectorAll('.index-todo-item'));
+  if (items.length === 0) return;
+
+  let hasRevealed = true;
+  let hasCompleted = false;
+
+  const startCheckSequence = () => {
+    if (hasCompleted) return;
+    hasCompleted = true;
+    detachCheckListeners();
+    section.classList.add('todos-checked');
+    items.forEach((item, idx) => {
+      setTimeout(() => {
+        item.classList.add('checked');
+      }, idx * 650);
+    });
+  };
+
+  const maybeStartChecks = () => {
+    if (!hasRevealed || hasCompleted) return;
+    const triggerLine = window.innerHeight * 0.25; // slightly above center
+    const rect = section.getBoundingClientRect();
+    if (rect.top <= triggerLine) {
+      startCheckSequence();
+    }
+  };
+
+  const detachCheckListeners = () => {
+    window.removeEventListener('scroll', maybeStartChecks);
+    window.removeEventListener('resize', maybeStartChecks);
+  };
+
+  window.addEventListener('scroll', maybeStartChecks, { passive: true });
+  window.addEventListener('resize', maybeStartChecks);
+  section.classList.add('todos-visible');
+  maybeStartChecks();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   squeezeWordController = setupSqueezeWord();
+  setupTodoScrollSection();
+  drawTodoShapes();
   heroRef = document.querySelector('.hero');
   machineRef = heroRef?.querySelector('.machine');
   if (!heroRef || !machineRef) return;
@@ -325,6 +451,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let resizeTimer = null;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(queueRelayout, 120);
+    resizeTimer = setTimeout(() => {
+      queueRelayout();
+      scheduleTodoShapeDraw(true);
+    }, 120);
   });
+  window.addEventListener('orientationchange', () => scheduleTodoShapeDraw());
 });
+window.addEventListener('load', () => scheduleTodoShapeDraw(true));
