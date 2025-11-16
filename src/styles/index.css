@@ -1,0 +1,321 @@
+.links .logInLink{
+    font-family: "Space Mono";
+    color: #373737;
+    border: 1px solid #D2D2D2;
+    padding: 5px 15px;
+    border-radius: 50px;
+    background: white;
+    transition: 0.2s all;
+}
+
+.links .logInLink:hover{
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+    transition: 0.2s all;
+}
+
+
+.startBook{
+    font-family: "Space Mono";
+    text-decoration: none;
+    color: #373737;
+    border: 1px solid #D2D2D2;
+    padding: 5px 15px;
+    border-radius: 50px;
+    background: white;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    transition: 0.2s all;
+}
+
+.startBook:hover{
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+    transition: 0.2s all;
+}
+
+.hero{
+    height: 100vh;
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.hero .machine{
+    position: relative;
+    z-index: 2;
+}
+
+.hero .hero-text{
+    position: absolute;
+    top: calc(50% - 50px);
+    left: calc(50% + 285px);
+    transform: translate(-50%, -50%);
+}
+
+.hero .hero-text h1{
+    font-size: 45px;
+    font-weight: 400;
+    color: #373737;
+    margin-bottom: 1rem;
+}
+
+.squeeze-word{
+    position: relative;
+    display: inline-block;
+    font: inherit;
+    --squeeze-color: #373737;
+    --squeeze-wipe-duration: 700ms;
+}
+
+.squeeze-word__letters{
+    display: inline-flex;
+    gap: 0;
+    position: relative;
+    z-index: 0;
+}
+
+.squeeze-letter{
+    display: inline-block;
+    transform-origin: center;
+    --squeeze-letter-index: 0;
+    --squeeze-letter-tilt: 6deg;
+    --squeeze-letter-delay-step: 60ms;
+    will-change: transform;
+}
+
+.squeeze-word__overlay{
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    overflow: hidden;
+    color: var(--squeeze-color);
+    pointer-events: none;
+    white-space: nowrap;
+    font: inherit;
+    z-index: 1;
+}
+
+.squeeze-word--wiping .squeeze-word__overlay{
+    animation: squeeze-wipe var(--squeeze-wipe-duration, 700ms) ease forwards;
+}
+
+@keyframes squeeze-wipe{
+    from{
+        width: 0%;
+    }
+    to{
+        width: 100%;
+    }
+}
+
+.squeeze-anim-stretch .squeeze-letter{
+    animation: squeeze-letter-stretch 650ms cubic-bezier(.34,1.56,.64,1);
+    animation-delay: calc(var(--squeeze-letter-index, 0) * var(--squeeze-letter-delay-step, 60ms));
+    animation-fill-mode: both;
+}
+
+@keyframes squeeze-letter-stretch{
+    0%{
+        transform: scale(1);
+    }
+    35%{
+        transform: scale(1.2, 0.85);
+    }
+    70%{
+        transform: scale(0.92, 1.08);
+    }
+    100%{
+        transform: scale(1);
+    }
+}
+
+.squeeze-anim-tilt .squeeze-letter{
+    animation: squeeze-letter-tilt 550ms ease-out;
+    animation-delay: calc(var(--squeeze-letter-index, 0) * var(--squeeze-letter-delay-step, 60ms));
+    animation-fill-mode: both;
+}
+
+@keyframes squeeze-letter-tilt{
+    0%{
+        transform: rotate(0deg);
+    }
+    60%{
+        transform: rotate(var(--squeeze-letter-tilt, 8deg));
+    }
+    100%{
+        transform: rotate(0deg);
+    }
+}
+
+.squeeze-anim-bounce .squeeze-letter{
+    animation: squeeze-letter-bounce 620ms cubic-bezier(.34,1.56,.64,1);
+    animation-delay: calc(var(--squeeze-letter-index, 0) * var(--squeeze-letter-delay-step, 60ms));
+    animation-fill-mode: both;
+}
+
+@keyframes squeeze-letter-bounce{
+    0%{
+        transform: translateY(0);
+    }
+    40%{
+        transform: translateY(-8px);
+    }
+    70%{
+        transform: translateY(3px);
+    }
+    100%{
+        transform: translateY(0);
+    }
+}
+
+.squeeze-anim-wave .squeeze-letter{
+    animation: squeeze-letter-wave 700ms ease-in-out;
+    animation-delay: calc(var(--squeeze-letter-index, 0) * var(--squeeze-letter-delay-step, 60ms));
+    animation-fill-mode: both;
+}
+
+@keyframes squeeze-letter-wave{
+    0%{
+        transform: translateY(0) scale(1);
+    }
+    30%{
+        transform: translateY(-4px) scale(1.05);
+    }
+    60%{
+        transform: translateY(4px) scale(0.95);
+    }
+    100%{
+        transform: translateY(0) scale(1);
+    }
+}
+
+.squeeze-anim-pop .squeeze-letter{
+    animation: squeeze-letter-pop 600ms ease;
+    animation-delay: calc(var(--squeeze-letter-index, 0) * var(--squeeze-letter-delay-step, 60ms));
+    animation-fill-mode: both;
+}
+
+@keyframes squeeze-letter-pop{
+    0%{
+        transform: translateY(0) scale(1);
+    }
+    45%{
+        transform: translateY(-6px) scale(1.15);
+    }
+    75%{
+        transform: translateY(2px) scale(0.97);
+    }
+    100%{
+        transform: translateY(0) scale(1);
+    }
+}
+
+.index-book{
+    position: absolute;
+    cursor: default;
+    padding: 16px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    width: 200px;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.index-book.book-ready{
+    opacity: 1;
+}
+
+.index-book.book-disappear{
+    opacity: 0;
+    transition: opacity 0.4s ease-in-out;
+}
+
+.index-book.book-hidden{
+    visibility: hidden;
+}
+
+.index-book .main-book-wrap{
+    position: relative;
+}
+
+.index-book .book-cover{
+    position: relative;
+}
+
+.index-book .book-cover .book-inside{
+    position: absolute;
+    width: 90%;
+    height: 96%;
+    top: 1%;
+    left: 16px;
+    border: 1px solid grey;
+    border-radius: 2px 6px 6px 2px;
+    background: white;
+    box-shadow: 10px 40px 40px -10px #00000030, inset -2px 0 0 grey,
+        inset -3px 0 0 #dbdbdb, inset -4px 0 0 white, inset -5px 0 0 #dbdbdb,
+        inset -6px 0 0 white, inset -7px 0 0 #dbdbdb, inset -8px 0 0 white,
+        inset -9px 0 0 #dbdbdb;
+}
+
+.index-book .book-cover .book-image{
+    line-height: 0;
+    position: relative;
+    border-radius: 2px 6px 6px 2px;
+    box-shadow: 6px 6px 18px -2px rgba(0, 0, 0, 0.2),
+        24px 28px 40px -6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease-in-out;
+    transform: perspective(2000px) rotateY(-15deg) translateX(-10px) scaleX(0.94);
+    cursor: pointer;
+    background: #F4F4F4;
+}
+
+.index-book .book-cover .book-image.img-hidden{
+    opacity: 0;
+}
+
+.index-book .book-image img{
+    grid-row: 1 / -1;
+    grid-column: 1;
+    width: 100%;
+    border-radius: 2px 6px 6px 2px;
+}
+
+.index-book .book-image:hover{
+    transform: perspective(2000px) rotateY(0deg) translateX(0px) scaleX(1);
+    transform-style: preserve-3d;
+    box-shadow: 6px 6px 12px -1px rgba(0, 0, 0, 0.1),
+        20px 14px 16px -6px rgba(0, 0, 0, 0.1);
+}
+
+.index-book .effect{
+    position: absolute;
+    width: 20px;
+    height: 100%;
+    margin-left: 16px;
+    top: 0;
+    border-left: 2px solid #00000010;
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%);
+    transition: all 0.5s ease;
+    z-index: 5;
+}
+
+.index-book .light{
+    width: 90%;
+    height: 100%;
+    position: absolute;
+    border-radius: 3px;
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.2) 100%);
+    top: 0;
+    right: 0;
+    opacity: 0.1;
+    transition: all 0.5s ease;
+    z-index: 4;
+}
+
+.index-book .book-image:hover .effect{
+    margin-left: 14px;
+}
