@@ -501,8 +501,8 @@
 
 .preface .preface-text p{
     font-size: 24px;
-    font-family: "Space Mono", monospace;
     text-transform: lowercase;
+    line-height: 1.5;
 }
 
 .index-cta{
