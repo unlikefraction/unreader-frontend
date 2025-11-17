@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Learn about Unreader and the thinking behind the product." />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/lightFav.png" media="(prefers-color-scheme: light)">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/darkFav.png" media="(prefers-color-scheme: dark)">
+    <title>About | Unreader</title>
+    <link rel="stylesheet" href="./src/styles/style.css">
+    <link rel="stylesheet" href="./src/styles/about.css">
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/regular/style.css"
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Homemade+Apple&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div class="app">
+      <nav>
+        <a href="/">
+          <div class="logoContainer">
+            <div class="sleep">z</div>
+            <h2 class="logo">º/º</h2>
+          </div>
+        </a>
+        <div class="links">
+          <a href="pricing.html">pricing</a>
+          <a class="logInLink" href="login.html">start your book →</a>
+        </div>
+      </nav>
+    </div>
+
+    <main class="about-page" aria-labelledby="about-heading">
+      <section class="about-preface" aria-label="About Unreader">
+        <h1>about unreader</h1>
+        <div class="about-text">
+          <p>unreader started as a way for me to read more books. it has now turned into this mission to help people learn better from the books they read.</p>
+          <p>at its core: the product lets you read and listen to the text you're reading. since this engages all your sense, you are more focused.</p>
+          <p>then it lets you ask questions. asking solves 2 things: you get to read more actively and you get to explore the angles that make you curious. it helps you go beyond the book or stay more grounded with it. you pick.</p>
+          <p>and finally, you interact with the book itself. you write your thoughts on a whiteboard. you write your takeaways to come back to. you write about what the book stirred in you.</p>
+        </div>
+        <h1>team behind unreader</h1>
+        <div class="about-text">
+          <p>we're a team of 4 people who love learning new thing. each person involved with what the project demands of them.</p>
+          <p>unreader is co-founded by shubham and saket.</p>
+          <p>code is a combined effort by saket and shubham; design by shubham; product by shubham, saket and anil; and marketing by shubham, janhavi and anil.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="about-footer">
+      <p>unreader by unlikefraction · © 2025</p>
+    </footer>
+
+    <script>
+      // Replace each configured name with its LinkedIn anchor within the about text
+      const linkedInDirectory = {
+        'saket': 'https://www.linkedin.com/in/codanium/',
+        'shubham': 'https://www.linkedin.com/in/unlikefraction/',
+        'anil': 'https://www.linkedin.com/in/eipi/',
+        'janhavi': 'https://www.linkedin.com/in/janhavi-dadhania-485385166/',
+      };
+
+      const escapeName = (name) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const aboutText = document.querySelector('.about-page');
+
+      if (aboutText) {
+        let html = aboutText.innerHTML;
+        Object.entries(linkedInDirectory).forEach(([name, url]) => {
+          const namePattern = new RegExp(`\\b${escapeName(name)}\\b`, 'g');
+          html = html.replace(
+            namePattern,
+            `<a class="about-linkedin" href="${url}" target="_blank" rel="noopener noreferrer">${name}</a>`
+          );
+        });
+        aboutText.innerHTML = html;
+      }
+    </script>
+    <script type="module" src="./src/basic/logo-animation.js"></script>
+  </body>
+</html>

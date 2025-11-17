@@ -1,0 +1,74 @@
+body{
+  color: #373737;
+  background: #fff;
+}
+
+.links{
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+
+.links .logInLink{
+  font-family: "Space Mono", monospace;
+  color: #373737;
+  border: 1px solid #d2d2d2;
+  padding: 5px 15px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.about-page{
+  min-height: 100vh;
+  padding: 140px 20px 80px;
+  display: flex;
+  justify-content: center;
+}
+
+.about-preface{
+  width: min(520px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.about-preface h1{
+  font-size: 36px;
+  line-height: 1.5;
+  text-transform: lowercase;
+  font-weight: 500;
+}
+
+.about-text p{
+  font-size: 24px;
+  line-height: 1.5;
+  text-transform: lowercase;
+  font-weight: 400;
+}
+
+.about-text{
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.about-linkedin{
+  color: inherit;
+  text-decoration: underline;
+}
+
+.about-footer{
+  padding: 24px 20px 60px;
+  border-top: 1px solid #efefef;
+  text-align: center;
+  font-size: 14px;
+  color: #6d6d6d;
+  text-transform: lowercase;
+}
+
+@media (max-width: 640px){
+  .about-page{
+    padding-top: 120px;
+  }
+}

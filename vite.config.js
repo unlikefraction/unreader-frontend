@@ -17,6 +17,7 @@ export default defineConfig({
         readBook: resolve(__dirname, 'readBook.html'),
         popup: resolve(__dirname, 'popup.html'),
         credits: resolve(__dirname, 'credits.html'),
+        about: resolve(__dirname, 'about.html'),
         pricing: resolve(__dirname, 'pricing.html'),
         bookDetails: resolve(__dirname, 'bookDetails.html'),
         indexMobile: resolve(__dirname, 'index-mobile.html'),
