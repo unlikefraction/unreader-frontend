@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playback Speed Slider</title>
+  <link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+  <style>
+    /* ── Page shell ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f5f5f5;
+      font-family: "Space Mono", monospace, sans-serif;
+    }
+
+    .demo-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.1);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 280px;
+    }
+
+    .demo-label {
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+      letter-spacing: .04em;
+    }
+
+    /* ── Playback speed slider ───────────────────────────────────── */
+    .playBack {
+      position: relative;       /* anchors the absolute .slider track */
+      padding: 6px;
+      display: flex;
+      cursor: grab;
+    }
+
+    .playBack:active { cursor: grabbing; }
+
+    .slider {
+      position: absolute;
+      top: 50%;
+      left: 6px;                /* align with .playBack padding */
+      width: calc(100% - 12px); /* match thumb width basis exactly */
+      height: 40px;
+      border-radius: 10px;
+      z-index: -1;
+      transform: translateY(-50%);
+    }
+
+    /* thin track line rendered via a pseudo-element */
+    .slider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background-color: #000;
+      border-radius: 100px;
+      transform: translateY(-50%);
+    }
+
+    .thumb {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 60%;           /* initial position; JS overrides via inline style */
+      height: 100%;
+      border-radius: 30px;
+      background: #373737;
+      z-index: 20;
+      padding: 6px;
+    }
+
+    .iconSettings {
+      font-size: 24px;
+      margin-left: 3px;
+    }
+
+    .speedIcon { color: #fff; }
+
+    .playBack .thumb .value {
+      display: flex;
+      padding: 4px 12px;
+      background: #fff;
+      border-radius: 100px;
+      align-items: center;
+      justify-content: center;
+      font-family: "Space Mono", monospace;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="demo-card">
+    <p class="demo-label">Playback speed — drag the thumb</p>
+
+    <!-- Playback speed slider -->
+    <div class="playBack">
+      <div class="slider"></div>
+      <div class="thumb">
+        <i class="ph ph-speedometer iconSettings speedIcon"></i>
+        <div class="value">1.0</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      // ── helpers ──────────────────────────────────────────────────────────
+      // Speed range: 0.5x → 2.0x mapped to 40% → 100% thumb width
+      const widthToSpeed = (w) => { const s = 0.5 + ((w - 40) / 60) * 1.5; return Math.round(s * 10) / 10; };
+      const speedToWidth = (s) => 40 + ((s - 0.5) / 1.5) * 60;
+      const clampSpeed   = (s) => Math.max(0.5, Math.min(2.0, s));
+
+      // ── DOM refs ─────────────────────────────────────────────────────────
+      const root   = document.querySelector('.playBack');
+      const slider = root.querySelector('.slider');
+      const thumb  = root.querySelector('.thumb');
+      const vEl    = root.querySelector('.thumb .value');
+
+      // ── apply UI ─────────────────────────────────────────────────────────
+      function applyUI(speed) {
+        thumb.style.width = speedToWidth(clampSpeed(speed)) + '%';
+        if (vEl) vEl.textContent = speed.toFixed(1);
+      }
+
+      // ── load persisted speed (fallback 1.0x) ─────────────────────────────
+      let currentSpeed = 1.0;
+      try {
+        const saved = localStorage.getItem('ui:playbackSpeed');
+        if (saved != null) currentSpeed = clampSpeed(parseFloat(saved) || 1.0);
+      } catch {}
+      applyUI(currentSpeed);
+
+      // ── pointer handler ───────────────────────────────────────────────────
+      function onPoint(clientX) {
+        const rect     = slider.getBoundingClientRect();
+        const px       = clientX - rect.left;
+        const MIN_VALUE_WIDTH = 36; // minimum assumed width (px) of the value readout pill
+        const vWidth   = Math.max(1, (vEl ? vEl.getBoundingClientRect().width : MIN_VALUE_WIDTH));
+        const padRight = parseFloat(getComputedStyle(thumb).paddingRight || '6') || 6;
+        const desiredWidthPx = px + padRight + (vWidth / 2);
+        let widthPct   = (desiredWidthPx / rect.width) * 100;
+        widthPct       = Math.max(40, Math.min(100, widthPct));
+        const spd      = widthToSpeed(widthPct);
+        applyUI(spd);
+        currentSpeed = spd;
+        try { localStorage.setItem('ui:playbackSpeed', String(spd)); } catch {}
+      }
+
+      // ── drag state ───────────────────────────────────────────────────────
+      let dragging = false;
+      const onDown = (x, e) => { dragging = true; onPoint(x); e?.preventDefault?.(); };
+      const onMove = (x, e) => { if (!dragging) return; onPoint(x); e?.preventDefault?.(); };
+      const onUp   = () => { dragging = false; };
+
+      // mouse
+      thumb.addEventListener('mousedown',  (e) => onDown(e.clientX, e));
+      slider.addEventListener('mousedown', (e) => onDown(e.clientX, e));
+      document.addEventListener('mousemove', (e) => onMove(e.clientX, e));
+      document.addEventListener('mouseup', onUp);
+
+      // touch
+      thumb.addEventListener('touchstart',  (e) => { if (e.touches.length > 0) onDown(e.touches[0].clientX, e); }, { passive: false });
+      slider.addEventListener('touchstart', (e) => { if (e.touches.length > 0) onDown(e.touches[0].clientX, e); }, { passive: false });
+      document.addEventListener('touchmove', (e) => { if (e.touches.length > 0) onMove(e.touches[0].clientX, e); }, { passive: false });
+      document.addEventListener('touchend', onUp);
+    })();
+  </script>
+</body>
+</html>
